@@ -1,0 +1,5 @@
+{
+  "version": "2026.07.1",
+  "description": "Aliases administrados. Los aliases de una corrida se construyen desde el alcance declarado y no se inventan.",
+  "aliases": []
+}

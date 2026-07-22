@@ -1,0 +1,5 @@
+{
+  "version": "2026.07.1",
+  "description": "Only analyst-approved, causal scenario-to-dimension mappings may modify an already supported or validated scenario. The registry is intentionally empty until those mappings are approved.",
+  "mappings": []
+}

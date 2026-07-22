@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --line: #334155;
+      --accent: #38bdf8;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --paper: #ffffff;
+      --ink: #111827;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      background: #f3f4f6;
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a, #1e3a8a);
+      color: var(--text);
+      padding: 32px 42px;
+      border-bottom: 6px solid var(--accent);
+    }
+    header h1 { margin: 0 0 8px; font-size: 28px; }
+    header p { margin: 4px 0; color: #cbd5e1; }
+    main { max-width: 1280px; margin: 24px auto; padding: 0 20px 40px; }
+    section, .card {
+      background: var(--paper);
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+      padding: 22px;
+      margin-bottom: 22px;
+    }
+    h2 { margin-top: 0; font-size: 22px; color: #0f172a; }
+    h3 { margin-top: 26px; color: #1f2937; }
+    h4 { margin-bottom: 8px; color: #374151; }
+    .grid { display: grid; gap: 16px; }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .metric .label { color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .metric .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-weight: 700;
+      font-size: 12px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+    }
+    .Bajo { background: #dcfce7; color: #14532d; border-color: #86efac; }
+    .Moderado { background: #fef3c7; color: #78350f; border-color: #fcd34d; }
+    .Alto { background: #ffedd5; color: #7c2d12; border-color: #fdba74; }
+    .Crítico, .Critico { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
+    .Extremo { background: #581c87; color: #fff; border-color: #c084fc; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; color: #334155; font-weight: 700; }
+    tr:hover td { background: #f9fafb; }
+    .small { font-size: 12px; color: #64748b; }
+    .url { word-break: break-all; max-width: 360px; }
+    .chart { width: 100%; border: 1px solid #e5e7eb; border-radius: 10px; background: white; padding: 8px; }
+    .chart img { width: 100%; height: auto; display: block; }
+    .notice {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #1e3a8a;
+      margin: 12px 0;
+    }
+    .warning {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #78350f;
+      margin: 12px 0;
+    }
+    .critical {
+      background: #fef2f2;
+      border-left: 4px solid #dc2626;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #7f1d1d;
+      margin: 12px 0;
+    }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; font-weight: 700; color: #1d4ed8; }
+    footer { color: #64748b; font-size: 12px; text-align: center; margin: 30px 0; }
+    @media print {
+      header { border-bottom-color: #000; }
+      section, .card { break-inside: avoid; box-shadow: none; }
+      .employee-section { page-break-before: always; }
+    }
+    @media (max-width: 900px) {
+      .grid-4, .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>{{ title }}</h1>
+  <p>Generado: {{ generated_at }}</p>
+  <p>Enfoque: ciberinteligencia, exposición pública, OSINT autorizado, riesgo digital y revisión humana.</p>
+</header>
+<main>
+  <section>
+    <h2>Resumen de portafolio</h2>
+    <div class="grid grid-4">
+      <div class="metric"><div class="label">Empleados cargados</div><div class="value">{{ portfolio.employees_total }}</div></div>
+      <div class="metric"><div class="label">Analizados</div><div class="value">{{ portfolio.employees_analyzed }}</div></div>
+      <div class="metric"><div class="label">Omitidos</div><div class="value">{{ portfolio.employees_skipped }}</div></div>
+      <div class="metric"><div class="label">Riesgo promedio</div><div class="value">{{ portfolio.avg_risk }}</div></div>
+    </div>
+    <div class="notice">
+      Este informe identifica señales públicas y posibles evidencias. No constituye prueba definitiva ni recomendación disciplinaria automática. Todo hallazgo debe validarse con revisión humana, contexto, debido proceso y criterios de privacidad.
+    </div>
+  </section>
+
+  {% for item in summaries %}
+  {% set s = item.summary %}
+  {% set e = item.employee %}
+  <section class="employee-section">
+    <h2>{{ e.full_name }} <span class="badge {{ s.risk_level|replace('í','i') }}">{{ s.risk_level }}</span></h2>
+    {% if s.skipped %}
+      <div class="warning"><strong>Análisis omitido:</strong> {{ s.skip_reason }}</div>
+    {% else %}
+    <div class="grid grid-4">
+      <div class="metric"><div class="label">Employee ID</div><div class="value" style="font-size:18px">{{ e.employee_id }}</div></div>
+      <div class="metric"><div class="label">Riesgo total</div><div class="value">{{ s.total_risk }}</div></div>
+      <div class="metric"><div class="label">Nivel de acceso</div><div class="value">{{ e.access_level }}</div></div>
+      <div class="metric"><div class="label">Mitigantes</div><div class="value">{{ s.mitigation_score }}</div></div>
+    </div>
+
+    <h3>Ficha de contexto</h3>
+    <table>
+      <tr><th>Cargo</th><td>{{ e.role }}</td><th>Área</th><td>{{ e.department }}</td></tr>
+      <tr><th>Organización</th><td>{{ e.organization }}</td><th>Categoría de acceso</th><td>{{ e.access_category }}</td></tr>
+      <tr><th>País/Ciudad</th><td>{{ e.country }} / {{ e.city }}</td><th>Correo corporativo</th><td>{{ e.corporate_email|mask_email }}</td></tr>
+      <tr><th>Consentimiento</th><td>{{ e.consent_status }}</td><th>Fecha consentimiento</th><td>{{ e.consent_date }}</td></tr>
+    </table>
+
+    <h3>Gráficas de riesgo y exposición</h3>
+    <div class="grid grid-2">
+      <div class="chart"><img alt="Riesgo por dimensión" src="data:image/png;base64,{{ item.charts.risk_bar }}"></div>
+      <div class="chart"><img alt="Top keywords" src="data:image/png;base64,{{ item.charts.keyword_bar }}"></div>
+      <div class="chart"><img alt="Probabilidad por impacto" src="data:image/png;base64,{{ item.charts.probability_impact }}"></div>
+      <div class="chart"><img alt="Radar de exposición" src="data:image/png;base64,{{ item.charts.radar }}"></div>
+    </div>
+
+    <h3>Riesgo por dimensión</h3>
+    <table>
+      <thead><tr><th>Dimensión</th><th>Riesgo</th><th>Probabilidad</th><th>Impacto</th></tr></thead>
+      <tbody>
+      {% for dim_key, risk in s.dimension_risks.items() %}
+        {% set point = s.dimension_probability_impact.get(dim_key, {}) %}
+        <tr>
+          <td>{{ s.dimension_labels.get(dim_key, dim_key) }}</td>
+          <td><strong>{{ risk }}</strong></td>
+          <td>{{ point.get('probability', 0) }}</td>
+          <td>{{ point.get('impact', 0) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <h3>Análisis de palabras clave</h3>
+    {% if s.top_keywords %}
+    <table>
+      <thead><tr><th>Keyword</th><th>Frecuencia</th><th>Riesgo acumulado</th></tr></thead>
+      <tbody>
+      {% for row in s.top_keywords %}
+        <tr><td>{{ row.keyword }}</td><td>{{ row.frequency }}</td><td>{{ row.risk }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="small">No se detectaron palabras clave relevantes en los resultados devueltos.</p>
+    {% endif %}
+
+    <h3>Superficies sociales o técnicas detectadas</h3>
+    {% if s.social_surfaces %}
+    <table>
+      <thead><tr><th>Superficie</th><th>URL</th><th>Título</th><th>Confianza</th><th>Riesgo falso positivo</th></tr></thead>
+      <tbody>
+      {% for social in s.social_surfaces %}
+      <tr>
+        <td>{{ social.surface }}</td>
+        <td class="url"><a href="{{ social.url }}" target="_blank" rel="noopener noreferrer">{{ social.url }}</a></td>
+        <td>{{ social.title }}</td>
+        <td>{{ social.confidence_score }}</td>
+        <td>{{ social.false_positive_risk }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="small">No se detectaron URLs clasificadas como superficie social/técnica conocida.</p>
+    {% endif %}
+
+    <h3>Matriz de decisión para {{ s.risk_level }}</h3>
+    {% if item.decision_rows %}
+    <table>
+      <thead>
+        <tr>
+          <th>RR. HH.</th><th>Legal</th><th>Seguridad física</th><th>Ciberseguridad</th><th>Seguridad de la información</th><th>Riesgos</th><th>Compliance</th><th>Gerencia</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in item.decision_rows %}
+        <tr>
+          <td>{{ row.hr }}</td>
+          <td>{{ row.legal }}</td>
+          <td>{{ row.physical_security }}</td>
+          <td>{{ row.cybersecurity }}</td>
+          <td>{{ row.information_security }}</td>
+          <td>{{ row.risk_management }}</td>
+          <td>{{ row.compliance }}</td>
+          <td>{{ row.management }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <h3>Evidencias y URLs</h3>
+    <details open>
+      <summary>Ver tabla de evidencias</summary>
+      <table>
+        <thead>
+          <tr>
+            <th>Dimensión</th><th>Keyword</th><th>URL</th><th>Título/Snippet</th><th>Confianza</th><th>Severidad</th><th>Riesgo</th><th>FP</th><th>Revisión</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for ev in s.evidence %}
+          <tr>
+            <td>{{ ev.dimension_label }}</td>
+            <td>{{ ev.keyword }}</td>
+            <td class="url"><a href="{{ ev.url }}" target="_blank" rel="noopener noreferrer">{{ ev.url }}</a><div class="small">Fuente: {{ ev.source }}</div></td>
+            <td><strong>{{ ev.title }}</strong><br><span class="small">{{ ev.snippet }}</span></td>
+            <td>{{ ev.confidence_score }}</td>
+            <td>{{ ev.severity_score }}</td>
+            <td>{{ ev.evidence_risk }}</td>
+            <td>{{ ev.false_positive_risk }}</td>
+            <td>{{ 'Sí' if ev.requires_human_review else 'No' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <section>
+    <h2>Metodología de scoring</h2>
+    <p>La confianza de cada evidencia se calcula ponderando coincidencia de identidad, confiabilidad de fuente, relevancia de palabra clave, contexto, recencia y calidad de evidencia.</p>
+    <pre>confidence_score = 0.35*identity_match + 0.20*source_reliability + 0.15*keyword_relevance + 0.15*context_relevance + 0.10*recency_score + 0.05*evidence_quality</pre>
+    <p>El riesgo por dimensión combina confianza, severidad y nivel de acceso. Las señales positivas se restan como mitigantes con límite máximo.</p>
+    <div class="critical">El informe no debe usarse como única base para decisiones laborales, disciplinarias, legales o de seguridad. Los falsos positivos son esperables en OSINT, especialmente con homónimos.</div>
+  </section>
+
+  <footer>
+    Employee Virtual Risk OSINT - Reporte HTML local. Verifica la clasificación con un analista humano antes de actuar.
+  </footer>
+</main>
+</body>
+</html>

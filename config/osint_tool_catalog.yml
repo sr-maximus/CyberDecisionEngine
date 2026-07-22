@@ -1,0 +1,182 @@
+catalog_version: "2026-07-15"
+policy:
+  default_execution: disabled
+  approval_required: true
+  legal_scope: authorized_defensive_research_only
+  pii_handling: minimize_hash_or_redact_before_storage
+  social_media_rule: use_official_api_or_public_search_index_first
+  no_evasion: do_not_bypass_rate_limits_logins_paywalls_captchas_or_platform_controls
+  tor_rule: isolated_container_allowlist_timeouts_no_payload_downloads_no_market_interaction
+
+tools:
+  - id: spiderfoot
+    name: SpiderFoot
+    category: osint_automation
+    repository: https://github.com/smicallef/spiderfoot
+    license_observed: MIT
+    fit: high
+    recommended_mode: sidecar_api_container
+    inputs:
+      - domain
+      - ip
+      - email
+      - username
+      - company
+    outputs:
+      - entities
+      - relationships
+      - indicators
+      - evidence_urls
+    notes: Strong candidate for Maltego-style enrichment and graph correlation.
+
+  - id: sherlock
+    name: Sherlock
+    category: username_osint
+    repository: https://github.com/sherlock-project/sherlock
+    license_observed: MIT
+    fit: medium
+    recommended_mode: on_demand_job_container
+    inputs:
+      - username
+    outputs:
+      - social_profile_urls
+      - platform_presence
+    notes: Useful for username exposure, but throttle and cache results.
+
+  - id: maigret
+    name: Maigret
+    category: username_osint
+    repository: https://github.com/soxoj/maigret
+    license_observed: MIT
+    fit: medium
+    recommended_mode: on_demand_job_container
+    inputs:
+      - username
+    outputs:
+      - social_profile_urls
+      - confidence
+      - evidence_urls
+    notes: Alternative to Sherlock with report outputs; validate maintenance before install.
+
+  - id: socialscan
+    name: Socialscan
+    category: email_username_validation
+    repository: https://github.com/iojw/socialscan
+    license_observed: MPL-2.0
+    fit: medium
+    recommended_mode: restricted_job_container
+    inputs:
+      - email
+      - username
+    outputs:
+      - account_availability_status
+    notes: Treat account-existence checks as sensitive; enable only with documented authorization.
+
+  - id: holehe
+    name: Holehe
+    category: email_account_exposure
+    repository: https://github.com/megadose/holehe
+    license_observed: GPL-3.0
+    fit: conditional
+    recommended_mode: disabled_until_legal_review
+    inputs:
+      - email
+    outputs:
+      - platform_presence
+    notes: Uses password-reset/account-existence behavior; high privacy and legal sensitivity.
+
+  - id: onionsearch
+    name: OnionSearch
+    category: darkweb_search
+    repository: https://github.com/megadose/onionsearch
+    license_observed: GPL-3.0
+    fit: conditional
+    recommended_mode: isolated_tor_sidecar_disabled_by_default
+    inputs:
+      - keyword
+      - brand
+      - domain
+    outputs:
+      - onion_urls
+      - search_result_titles
+    notes: Search-only candidate; never crawl arbitrary onion links without allowlist and sandbox.
+
+  - id: onionscan
+    name: OnionScan
+    category: onion_security_audit
+    repository: https://github.com/s-rah/onionscan
+    license_observed: MIT
+    fit: low_legacy
+    recommended_mode: reference_only
+    inputs:
+      - onion_url
+    outputs:
+      - opsec_findings
+    notes: Original project appears old; consider only for controlled onion service audits.
+
+  - id: ransomware_live
+    name: ransomware.live
+    category: ransomware_index
+    repository: https://github.com/JMousqueton/ransomware.live
+    license_observed: Unlicense
+    fit: high
+    recommended_mode: existing_http_api_connector
+    inputs:
+      - brand
+      - domain
+      - country
+    outputs:
+      - victim_metadata
+      - group
+      - evidence_url
+    notes: Already integrated through public API; keep as primary dark-web-safe source.
+
+  - id: opencti
+    name: OpenCTI
+    category: optional_knowledge_backend
+    repository: https://github.com/OpenCTI-Platform/opencti
+    license_observed: Apache-2.0
+    fit: conditional
+    recommended_mode: disabled_by_default
+    inputs:
+      - indicators
+      - reports
+      - entities
+    outputs:
+      - stix_objects
+      - relationships
+      - campaigns
+      - threat_actors
+    notes: Optional knowledge backend, never a collector or required dependency. Enable only after a value assessment and an explicit deployment decision.
+
+  - id: misp
+    name: MISP
+    category: threat_intelligence_platform
+    repository: https://github.com/MISP/MISP
+    license_observed: AGPL-3.0
+    fit: high
+    recommended_mode: external_misp_connector
+    inputs:
+      - indicators
+      - events
+      - feeds
+    outputs:
+      - iocs
+      - sightings
+      - tags
+      - galaxies
+    notes: Strong for IoC feeds and sharing; consider license implications for SaaS packaging.
+
+platform_specific_guidance:
+  x_twitter:
+    preferred: official_api_or_google_news_brave_google_cse_public_results
+    avoid: abandoned_or_evasion_scrapers
+  facebook_instagram:
+    preferred: Meta Graph API for owned assets, public search engine results for open mentions
+    avoid: credentialed scraping, session-cookie scraping, private profile extraction
+  linkedin:
+    preferred: official/manual review and public search results
+    avoid: username/password scrapers and employee enumeration without authorization
+  github:
+    preferred: GitHub API/code search for exposed corporate emails, secrets and commit metadata within allowed scope
+    avoid: bulk harvesting beyond authorized organizational scope
