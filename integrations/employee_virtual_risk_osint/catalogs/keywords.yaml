@@ -1,0 +1,231 @@
+dimensions:
+  credential_exposure:
+    label: "Exposición de credenciales"
+    keywords:
+      - password
+      - contraseña
+      - leaked password
+      - credenciales
+      - credentials
+      - login
+      - usuario
+      - username
+      - breach
+      - data leak
+      - exposed
+      - paste
+      - dump
+      - combo list
+      - hash
+      - token
+      - API key
+      - private key
+      - secret
+      - acceso
+  corporate_information_leakage:
+    label: "Filtración de información corporativa"
+    keywords:
+      - confidencial
+      - confidential
+      - internal use
+      - uso interno
+      - restricted
+      - restringido
+      - NDA
+      - contrato
+      - contract
+      - roadmap
+      - presupuesto
+      - budget
+      - salary
+      - salario
+      - estrategia
+      - strategy
+      - cliente
+      - customer
+      - proveedor
+      - documento interno
+  public_reputational_risk:
+    label: "Riesgo reputacional público"
+    keywords:
+      - fraude
+      - fraud
+      - scam
+      - estafa
+      - corrupción
+      - corruption
+      - denuncia
+      - complaint
+      - lawsuit
+      - demanda
+      - sanción
+      - sanction
+      - investigación
+      - investigation
+      - acoso
+      - harassment
+      - violencia
+      - threat
+      - amenaza
+      - polémica
+  conflict_of_interest:
+    label: "Conflicto de interés"
+    keywords:
+      - competidor
+      - competitor
+      - side business
+      - negocio paralelo
+      - asesor externo
+      - external advisor
+      - proveedor
+      - vendor
+      - commission
+      - comisión
+      - affiliate
+      - afiliado
+      - referral
+      - referido
+      - conflicto de interés
+      - conflict of interest
+      - contrato privado
+      - private contract
+      - consultoría
+      - consulting
+  social_media_exposure:
+    label: "Exposición en redes sociales"
+    keywords:
+      - LinkedIn
+      - X
+      - Twitter
+      - Facebook
+      - Instagram
+      - TikTok
+      - Reddit
+      - GitHub
+      - Telegram
+      - Discord
+      - profile
+      - perfil
+      - post
+      - publicación
+      - comentario
+      - comment
+      - bio
+      - handle
+      - username
+      - social media
+  technical_exposure:
+    label: "Exposición técnica"
+    keywords:
+      - GitHub
+      - GitLab
+      - Bitbucket
+      - repository
+      - repo
+      - commit
+      - source code
+      - código fuente
+      - config
+      - .env
+      - database
+      - DB
+      - S3
+      - bucket
+      - AWS
+      - Azure
+      - GCP
+      - Kubernetes
+      - Docker
+      - Jenkins
+  physical_security_geolocation:
+    label: "Seguridad física y geolocalización"
+    keywords:
+      - home address
+      - dirección
+      - residencia
+      - ubicación
+      - location
+      - check-in
+      - oficina
+      - office
+      - viaje
+      - travel
+      - placa
+      - vehicle
+      - vehículo
+      - rutina
+      - schedule
+      - horario
+      - badge
+      - carnet
+      - acceso físico
+      - physical access
+  financial_coercion_risk:
+    label: "Riesgo financiero o coerción"
+    keywords:
+      - deuda
+      - debt
+      - préstamo
+      - loan
+      - bankruptcy
+      - bancarrota
+      - embargo
+      - extortion
+      - extorsión
+      - gambling
+      - apuesta
+      - betting
+      - crypto scam
+      - inversión dudosa
+      - payday loan
+      - insolvencia
+      - impago
+      - cobranza
+      - financial pressure
+      - presión financiera
+  risky_digital_conduct:
+    label: "Conducta digital riesgosa"
+    keywords:
+      - hack
+      - hacking
+      - malware
+      - phishing
+      - doxxing
+      - dox
+      - botnet
+      - exploit
+      - crack
+      - piratería
+      - leaked data
+      - venta de datos
+      - data sale
+      - fake profile
+      - impersonation
+      - suplantación
+      - spam
+      - carding
+      - credential stuffing
+      - abuso digital
+  positive_mitigating_signals:
+    label: "Señales positivas o mitigantes"
+    keywords:
+      - speaker
+      - ponente
+      - certificación
+      - certification
+      - volunteer
+      - voluntario
+      - mentor
+      - publicación técnica
+      - research
+      - investigación responsable
+      - conference
+      - conferencia
+      - premio
+      - award
+      - community
+      - comunidad
+      - open source
+      - responsible disclosure
+      - liderazgo
+      - training

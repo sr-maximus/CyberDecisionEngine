@@ -1,0 +1,44 @@
+{
+  "status": "passed",
+  "validated_at": "2026-07-19",
+  "model_version": "strategic-news-v1.0.0",
+  "taxonomy_version": "2026.07.1",
+  "mapping_version": "2026.07.1",
+  "source_registry_version": "2026.07.1",
+  "rules": {
+    "score_without_evidence": false,
+    "neutral_fifty_for_missing_evidence": false,
+    "sentiment_drives_pressure": false,
+    "duplicates_multiply_impact": false,
+    "ambiguous_short_alias_accepted": false,
+    "sector_context_equals_direct_evidence": false,
+    "self_report_counts_as_independent_corroboration": false,
+    "pestel_or_porter_creates_scenarios": false,
+    "candidate_can_be_promoted_by_strategic_context": false,
+    "maximum_scenario_context_multiplier": 1.1,
+    "minimum_scenario_context_multiplier": 0.9
+  },
+  "required_cases": {
+    "ambiguous_odl": "passed",
+    "twenty_syndicated_articles": "passed",
+    "official_environmental_sanction": "passed",
+    "global_sector_only": "passed",
+    "competitor_substitute": "passed",
+    "contradictory_sources": "passed",
+    "no_relevant_news": "passed",
+    "supplier_event_multiple_entities": "passed",
+    "json_csv_consistency": "passed",
+    "scenario_modifier_boundary": "passed"
+  },
+  "historical_run": {
+    "run_id": "a9dad6033577",
+    "strategic_articles": 0,
+    "strategic_clusters": 0,
+    "pestel_score": null,
+    "pestel_confidence": 0.0,
+    "porter_score": null,
+    "porter_confidence": 0.0,
+    "status": "insufficient_evidence",
+    "reason": "No collected record simultaneously satisfied strong entity relation, strategic event classification and publication thresholds."
+  }
+}

@@ -1,0 +1,13 @@
+T1566:
+- Security
+- Confidentiality
+T1190:
+- Security
+- Availability
+T1078:
+- Security
+- Confidentiality
+- Privacy
+T1486:
+- Availability
+- Processing Integrity

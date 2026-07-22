@@ -1,0 +1,380 @@
+{
+  "schema_version": "1.0.0",
+  "source": "METRIC_CATALOG",
+  "metrics": [
+    {
+      "metric_id": "active_targets",
+      "label": "Objetivos en alcance",
+      "definition": "Sujeto principal declarado y dominios primarios persistidos en la corrida.",
+      "formula": "count(distinct declared_subject + primary_domains)",
+      "unit": "targets",
+      "numerator": "count(distinct declared_subject + primary_domains)",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "active_domains",
+      "label": "Dominios en alcance",
+      "definition": "Dominios primarios persistidos en la corrida; no incluye comparativos.",
+      "formula": "count(distinct primary_domains)",
+      "unit": "domains",
+      "numerator": "count(distinct primary_domains)",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "raw_records",
+      "label": "Registros brutos",
+      "definition": "Registros recibidos antes de normalizacion y deduplicacion.",
+      "formula": "processing_summary.raw_records_collected",
+      "unit": "records",
+      "numerator": "processing_summary.raw_records_collected",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "unique_records",
+      "label": "Registros unicos",
+      "definition": "Registros restantes despues de normalizacion, descarte y deduplicacion.",
+      "formula": "raw_records - duplicates_removed - discarded_records",
+      "unit": "records",
+      "numerator": "raw_records - duplicates_removed - discarded_records",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "validated_evidence",
+      "label": "Evidencia validada",
+      "definition": "Registros con relacion directa y validacion reproducible en la corrida.",
+      "formula": "count(events where evidence_status in {validated, confirmed})",
+      "unit": "evidence",
+      "numerator": "count(events where evidence_status in {validated, confirmed})",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "direct_evidence",
+      "label": "Evidencia directa",
+      "definition": "Registros relacionados directamente con el alcance, aun pendientes de validacion tecnica.",
+      "formula": "count(events where evidence_status = direct)",
+      "unit": "evidence",
+      "numerator": "count(events where evidence_status = direct)",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "validated_findings",
+      "label": "Hallazgos validados",
+      "definition": "Condiciones de riesgo con estado validado o confirmado.",
+      "formula": "count(findings where evidence_status in {validated, confirmed})",
+      "unit": "findings",
+      "numerator": "count(findings where evidence_status in {validated, confirmed})",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "confirmed_incidents",
+      "label": "Incidentes confirmados",
+      "definition": "Hallazgos con evidencia de materializacion adversa confirmada.",
+      "formula": "count(findings where incident_confirmed = true)",
+      "unit": "incidents",
+      "numerator": "count(findings where incident_confirmed = true)",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "healthy_sources",
+      "label": "Fuentes exitosas",
+      "definition": "Conectores elegibles que fueron consultados y finalizaron correctamente.",
+      "formula": "count(source_statuses where succeeded = true)",
+      "unit": "sources",
+      "numerator": "count(succeeded=true)",
+      "denominator": "count(eligible=true)",
+      "range": "0..eligible_sources",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "queried_sources",
+      "label": "Fuentes consultadas",
+      "definition": "Conectores elegibles que intentaron una consulta, con exito, resultado parcial o fallo.",
+      "formula": "count(source_statuses where attempted = true)",
+      "unit": "sources",
+      "numerator": "count(attempted=true)",
+      "denominator": "count(eligible=true)",
+      "range": "0..eligible_sources",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "total_sources",
+      "label": "Fuentes elegibles",
+      "definition": "Conectores habilitados, configurados y aplicables al alcance de la corrida.",
+      "formula": "count(source_statuses where eligible = true)",
+      "unit": "sources",
+      "numerator": "count(source_statuses where eligible = true)",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "productive_sources",
+      "label": "Fuentes productivas",
+      "definition": "Conectores consultados que aportaron al menos un registro normalizado aceptado.",
+      "formula": "count(source_statuses where productive = true)",
+      "unit": "sources",
+      "numerator": "count(productive=true)",
+      "denominator": "count(attempted=true)",
+      "range": "0..attempted_sources",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "registered_sources",
+      "label": "Fuentes registradas",
+      "definition": "Conectores presentes en el catalogo de la corrida, sin afirmar que fueron elegibles o consultados.",
+      "formula": "count(source_statuses where registered = true)",
+      "unit": "sources",
+      "numerator": "count(source_statuses where registered = true)",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "max_residual_risk",
+      "label": "Riesgo residual maximo",
+      "definition": "Mayor riesgo residual entre hallazgos validados; no se calcula sin hallazgos.",
+      "formula": "max(validated_findings.residual_risk)",
+      "unit": "risk_points",
+      "numerator": "max(validated_findings.residual_risk)",
+      "denominator": "not_applicable",
+      "range": "0..100",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "avg_residual_risk",
+      "label": "Riesgo residual promedio",
+      "definition": "Promedio de riesgo residual entre hallazgos validados; no se calcula sin hallazgos.",
+      "formula": "sum(validated_findings.residual_risk) / count(validated_findings)",
+      "unit": "risk_points",
+      "numerator": "sum(validated_findings.residual_risk) / count(validated_findings)",
+      "denominator": "not_applicable",
+      "range": "0..100",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "supported_scenarios",
+      "label": "Escenarios soportados",
+      "definition": "Escenarios deduplicados con evidencia directa o hallazgo validado en esta corrida.",
+      "formula": "count(distinct supported_scenario_id)",
+      "unit": "scenarios",
+      "numerator": "count(distinct supported_scenario_id)",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    },
+    {
+      "metric_id": "pending_decisions",
+      "label": "Decisiones pendientes",
+      "definition": "Decisiones trazables que requieren actuar, validar o monitorear y que incluyen responsable y criterio de cierre.",
+      "formula": "count(decision_items where status in {act_now, validate_first, monitor})",
+      "unit": "decisions",
+      "numerator": "count(decision_items where status in {act_now, validate_first, monitor})",
+      "denominator": "not_applicable",
+      "range": "0..n",
+      "source": "DecisionIntelligenceSnapshot",
+      "update": "once per completed analysis run",
+      "missing_data_status": "no_data",
+      "dashboards": [
+        "strategic_dashboard"
+      ],
+      "reports": [
+        "executive",
+        "technical",
+        "json",
+        "csv"
+      ]
+    }
+  ]
+}

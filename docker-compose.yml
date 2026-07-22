@@ -1,0 +1,300 @@
+name: cyberdecisionengine
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cyberdecisionengine-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${CDE_POSTGRES_DB:-cyberdecisionengine}
+      POSTGRES_USER: ${CDE_POSTGRES_USER:-cde}
+      POSTGRES_PASSWORD: ${CDE_POSTGRES_PASSWORD:-cde_local_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${CDE_DB_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: cyberdecisionengine-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MPLCONFIGDIR: /tmp/cyberdecisionengine-matplotlib
+      DATABASE_URL: postgresql://${CDE_POSTGRES_USER:-cde}:${CDE_POSTGRES_PASSWORD:-cde_local_password}@postgres:5432/${CDE_POSTGRES_DB:-cyberdecisionengine}
+      NVD_API_KEY: ${NVD_API_KEY:-}
+      GOOGLE_CSE_API_KEY: ${GOOGLE_CSE_API_KEY:-}
+      GOOGLE_CSE_CX: ${GOOGLE_CSE_CX:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      SHODAN_API_KEY: ${SHODAN_API_KEY:-}
+      CENSYS_API_ID: ${CENSYS_API_ID:-}
+      CENSYS_API_SECRET: ${CENSYS_API_SECRET:-}
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      GREYNOISE_API_KEY: ${GREYNOISE_API_KEY:-}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+      URLSCAN_API_KEY: ${URLSCAN_API_KEY:-}
+      OTX_API_KEY: ${OTX_API_KEY:-}
+      HIBP_API_KEY: ${HIBP_API_KEY:-}
+      CIRCL_PDNS_USERNAME: ${CIRCL_PDNS_USERNAME:-}
+      CIRCL_PDNS_PASSWORD: ${CIRCL_PDNS_PASSWORD:-}
+      TAXII_DISCOVERY_URL: ${TAXII_DISCOVERY_URL:-}
+      TAXII_USERNAME: ${TAXII_USERNAME:-}
+      TAXII_PASSWORD: ${TAXII_PASSWORD:-}
+      MISP_URL: ${MISP_URL:-}
+      MISP_API_KEY: ${MISP_API_KEY:-}
+      OPENCTI_URL: ${OPENCTI_URL:-}
+      OPENCTI_TOKEN: ${OPENCTI_TOKEN:-}
+      OPENCTI_SYNC_URL: ${OPENCTI_SYNC_URL:-}
+      OPENCTI_MODE: ${OPENCTI_MODE:-disabled}
+      TOR_SOCKS_PROXY_URL: ${TOR_SOCKS_PROXY_URL:-socks5h://tor-proxy:9050}
+      OSINT_TOOLS_URL: ${OSINT_TOOLS_URL:-http://osint-tools:7001}
+      KALI_SURFACE_URL: ${KALI_SURFACE_URL:-http://kali-surface:7010}
+      SPIDERFOOT_URL: ${SPIDERFOOT_URL:-http://spiderfoot:7020}
+      OPENCLAW_ENABLED: ${OPENCLAW_ENABLED:-true}
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://openclaw-gateway:18789}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_GATEWAY_TOKEN_FILE: /run/openclaw/gateway-token
+      OPENCLAW_AUTOMATION_MODE: ${OPENCLAW_AUTOMATION_MODE:-analysis_only}
+      EVIDENCE_CAPTURE_URL: ${EVIDENCE_CAPTURE_URL:-http://osint-tools:7001/evidence/capture}
+      KALI_SURFACE_MODE: ${KALI_SURFACE_MODE:-light}
+      KALI_SURFACE_MAX_HOSTS: ${KALI_SURFACE_MAX_HOSTS:-24}
+      KALI_SURFACE_TIMEOUT_SECONDS: ${KALI_SURFACE_TIMEOUT_SECONDS:-26}
+      KALI_SURFACE_LIGHT_PROBE: ${KALI_SURFACE_LIGHT_PROBE:-true}
+    volumes:
+      - ./reports:/app/reports
+      - ./data:/app/data
+      - ./config:/app/config
+      - openclaw_runtime:/run/openclaw:ro
+    ports:
+      - "${CDE_API_PORT:-8000}:8000"
+    networks:
+      - default
+      - tor_net
+      - osint_net
+      - surface_net
+      - ai_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    command: >
+      uvicorn cyberdeck_api.main:app --host 0.0.0.0 --port 8000
+
+  web:
+    build:
+      context: ./web
+    container_name: cyberdecisionengine-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${CDE_WEB_PORT:-8080}:80"
+
+  openclaw-gateway:
+    build:
+      context: ./infra/openclaw
+    container_name: cyberdecisionengine-openclaw
+    restart: unless-stopped
+    depends_on:
+      openclaw-init:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 1024m
+    cpus: "1.00"
+    environment:
+      OPENCLAW_GATEWAY_TOKEN_FILE: /run/openclaw/gateway-token
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      OPENCLAW_LOAD_SHELL_ENV: "0"
+    volumes:
+      - openclaw_state:/home/node/.openclaw
+      - openclaw_runtime:/run/openclaw
+    networks:
+      - ai_net
+    expose:
+      - "18789"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
+      interval: 20s
+      timeout: 8s
+      retries: 8
+      start_period: 45s
+
+  openclaw-init:
+    image: ghcr.io/openclaw/openclaw:2026.6.6
+    container_name: cyberdecisionengine-openclaw-init
+    restart: "no"
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["mkdir -p /run/openclaw /home/node/.openclaw && chown -R 1000:1000 /run/openclaw /home/node/.openclaw"]
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - openclaw_state:/home/node/.openclaw
+      - openclaw_runtime:/run/openclaw
+    networks:
+      - ai_net
+
+  tor-proxy:
+    build:
+      context: ./infra/tor
+    container_name: cyberdecisionengine-tor
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: "0.50"
+    networks:
+      - tor_net
+    expose:
+      - "9050"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9050"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    stop_grace_period: 20s
+
+  osint-tools:
+    build:
+      context: ./infra/osint-tools
+    container_name: cyberdecisionengine-osint-tools
+    profiles:
+      - osint
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 512m
+    cpus: "1.00"
+    environment:
+      OSINT_TOOLS_MAX_TARGETS: ${OSINT_TOOLS_MAX_TARGETS:-6}
+      OSINT_TOOLS_TIMEOUT_SECONDS: ${OSINT_TOOLS_TIMEOUT_SECONDS:-60}
+      ALLOW_ACCOUNT_ENUMERATION: ${ALLOW_ACCOUNT_ENUMERATION:-false}
+      ENABLE_USER_SCANNER: ${ENABLE_USER_SCANNER:-true}
+      ENABLE_SOCID_EXTRACTOR: ${ENABLE_SOCID_EXTRACTOR:-true}
+      ENABLE_SOCIAL_ANALYZER: ${ENABLE_SOCIAL_ANALYZER:-false}
+      OSINT_ALLOW_PROXY: ${OSINT_ALLOW_PROXY:-false}
+      OSINT_PRIORITY_MODE: ${OSINT_PRIORITY_MODE:-false}
+      EVIDENCE_CAPTURE_DIR: /evidence-assets
+      EVIDENCE_CAPTURE_MAX_TARGETS: ${EVIDENCE_CAPTURE_MAX_TARGETS:-6}
+    volumes:
+      - ./reports/web/assets:/evidence-assets
+    networks:
+      - osint_net
+      - tor_net
+    expose:
+      - "7001"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:7001/health', timeout=5)\""]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  kali-surface:
+    build:
+      context: ./infra/kali-surface
+    container_name: cyberdecisionengine-kali-surface
+    profiles:
+      - surface
+    restart: "no"
+    read_only: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 1536m
+    cpus: "2.00"
+    environment:
+      KALI_SURFACE_ALLOW_LIGHT_PROBES: ${KALI_SURFACE_ALLOW_LIGHT_PROBES:-true}
+      KALI_SURFACE_ALLOW_AMASS: ${KALI_SURFACE_ALLOW_AMASS:-false}
+      KALI_SURFACE_ALLOW_WAF_FINGERPRINT: ${KALI_SURFACE_ALLOW_WAF_FINGERPRINT:-false}
+      KALI_SURFACE_ALLOW_SSLSCAN: ${KALI_SURFACE_ALLOW_SSLSCAN:-true}
+      KALI_SURFACE_ALLOW_NUCLEI: ${KALI_SURFACE_ALLOW_NUCLEI:-false}
+    networks:
+      - surface_net
+    expose:
+      - "7010"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:7010/health', timeout=5)\""]
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+
+  spiderfoot:
+    build:
+      context: ./infra/spiderfoot
+    container_name: cyberdecisionengine-spiderfoot
+    restart: "no"
+    read_only: false
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 1024m
+    cpus: "1.50"
+    networks:
+      - osint_net
+    expose:
+      - "7020"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:7020/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  openclaw_state:
+  openclaw_runtime:
+
+networks:
+  tor_net:
+    driver: bridge
+  osint_net:
+    driver: bridge
+  surface_net:
+    driver: bridge
+  ai_net:
+    driver: bridge

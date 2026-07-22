@@ -1,0 +1,191 @@
+sources:
+  cisa_kev:
+    enabled: true
+    url: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+    source_weight: 0.95
+  epss:
+    enabled: true
+    api: https://api.first.org/data/v1/epss
+    source_weight: 0.9
+  nvd:
+    enabled: true
+    api: https://services.nvd.nist.gov/rest/json/cves/2.0
+    requires_key: false
+    env_key: NVD_API_KEY
+    source_weight: 0.85
+  rss:
+    enabled: true
+    feeds:
+      - name: CISA Cybersecurity Advisories
+        url: https://www.cisa.gov/cybersecurity-advisories/all.xml
+      - name: FTC Data Spotlight
+        url: https://www.ftc.gov/feeds/data-spotlight.xml
+      - name: FTC Business Blog
+        url: https://www.ftc.gov/feeds/blog-business.xml
+      - name: FTC Consumer Blog
+        url: https://www.consumer.ftc.gov/blog/gd-rss.xml
+      - name: Microsoft Security
+        url: https://msrc.microsoft.com/blog/feed
+      - name: Cisco Talos
+        url: https://blog.talosintelligence.com/rss/
+      - name: Unit 42
+        url: https://unit42.paloaltonetworks.com/feed/
+      - name: Mandiant
+        url: https://www.mandiant.com/resources/blog/rss.xml
+      - name: CSIRT Salud Colombia
+        url: https://csirtsalud.gov.co/feed/
+  github_advisories:
+    enabled: true
+    api: https://api.github.com/advisories
+    source_weight: 0.75
+  web_search:
+    enabled: true
+    provider: aggregated_public_search
+    providers:
+      - duckduckgo_lite
+      - google_news_rss
+      - gdelt
+      - hacker_news
+      - google_cse
+      - brave
+    google_cse_api_key_env: GOOGLE_CSE_API_KEY
+    google_cse_cx_env: GOOGLE_CSE_CX
+    brave_api_key_env: BRAVE_SEARCH_API_KEY
+    request_delay_seconds: 0.35
+    timeout_seconds: 8
+    provider_query_limits:
+      duckduckgo_lite: 12
+      google_news_rss: 8
+      gdelt: 5
+      hacker_news: 5
+      google_cse: 25
+      brave: 25
+    max_records: 90
+    max_queries: 25
+    queries: []
+  osint_public:
+    enabled: true
+    provider: common_crawl_cdx
+    max_records: 40
+    max_indexes: 1
+    domains: []
+  osint_tools:
+    enabled: true
+    provider: sherlock_sidecar
+    endpoint_env: OSINT_TOOLS_URL
+    max_records: 60
+    timeout_seconds: 80
+    targets: []
+    policy:
+      username_search: public_profile_presence_only
+      account_enumeration: disabled_by_default
+  kali_surface:
+    enabled: true
+    provider: kali_surface_sidecar
+    endpoint_env: KALI_SURFACE_URL
+    mode: light
+    max_hosts: 40
+    max_records: 120
+    timeout_seconds: 120
+    tools:
+      passive:
+        - subfinder
+        - dnsrecon
+        - dig
+      light_probe:
+        - httpx-toolkit
+        - whatweb
+        - sslscan
+      installed_manual_or_policy_gated:
+        - amass
+        - theHarvester
+        - wafw00f
+        - nuclei
+  spiderfoot:
+    enabled: true
+    provider: spiderfoot_passive_sidecar
+    endpoint_env: SPIDERFOOT_URL
+    use_case: passive
+    depth: deep
+    max_records: 120
+    timeout_seconds: 900
+    max_threads: 4
+    include_raw: false
+    domains: []
+    policy:
+      real_only: true
+      no_visual_ui: true
+      execution: serialized_background_collection
+      raw_records: filtered_by_default
+      modules: curated_passive_deep
+  socmint_public:
+    enabled: true
+    allowed_public_only: true
+    provider: public_discussion_search
+    max_records: 60
+    max_queries: 12
+    keywords: []
+  urlscan:
+    enabled: true
+    provider: urlscan_public_search
+    api_key_env: URLSCAN_API_KEY
+    max_records: 60
+    timeout_seconds: 8
+    terms: []
+  otx:
+    enabled: true
+    provider: alienvault_otx
+    api_key_env: OTX_API_KEY
+    max_records: 60
+    timeout_seconds: 8
+    domains: []
+  ransomware_live:
+    enabled: true
+    provider: ransomware.live
+    max_records: 30
+    search_terms: []
+  fraud_intelligence:
+    enabled: true
+    public_sources:
+      - FBI IC3
+      - ENISA Finance Threat Landscape
+      - ACFE Report to the Nations
+      - NIST SP 800-63-4
+      - FFIEC Cybersecurity resources
+  darkweb_authorized:
+    enabled: false
+    allow_tor: false
+    accepted_inputs:
+      - csv_redacted
+      - json_redacted
+      - taxii
+      - misp
+  regional_public_sources:
+    colombia:
+      enabled: true
+      purpose: Public defensive intelligence for Colombia-specific context, cyber alerts, business validation, regulatory context and brand/fraud monitoring.
+      official_sources:
+        - name: COLCERT / CSIRT Gobierno
+          url: https://www.colcert.gov.co/
+          usage: Cybersecurity bulletins and national digital security alerts via public web search.
+        - name: CSIRT-PONAL
+          url: https://cc-csirt.policia.gov.co/alertas-tips
+          usage: Police CSIRT alerts, IoCs and prevention bulletins via public web search.
+        - name: CSIRT Salud Colombia
+          url: https://csirtsalud.gov.co/feed/
+          usage: Sector health cyber alerts through RSS.
+        - name: Datos Abiertos Colombia
+          url: https://www.datos.gov.co/
+          usage: Public datasets for government context and public-sector exposure analysis.
+        - name: RUES
+          url: https://www.rues.org.co/
+          usage: Business registry validation by public search/manual review; no automated bypass.
+        - name: SIC
+          url: https://www.sic.gov.co/
+          usage: Consumer protection and data protection public context.
+        - name: Superintendencia Financiera de Colombia
+          url: https://www.superfinanciera.gov.co/
+          usage: Financial-sector regulatory context for Colombia.
+        - name: Superintendencia de Sociedades
+          url: https://www.supersociedades.gov.co/
+          usage: Corporate/regulatory context for companies.

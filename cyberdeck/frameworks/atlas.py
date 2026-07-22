@@ -1,0 +1,21 @@
+from __future__ import annotations
+
+
+ATLAS_MINIMAL = {
+    "AML.TA0002": "Reconnaissance",
+    "AML.TA0003": "Resource Development",
+    "AML.TA0004": "Initial Access",
+    "AML.TA0000": "AI Model Access",
+    "AML.TA0005": "Execution",
+    "AML.TA0006": "Persistence",
+    "AML.TA0012": "Privilege Escalation",
+    "AML.TA0007": "Defense Evasion",
+    "AML.TA0013": "Credential Access",
+    "AML.TA0008": "Discovery",
+    "AML.TA0015": "Lateral Movement",
+    "AML.TA0009": "Collection",
+    "AML.TA0001": "AI Attack Staging",
+    "AML.TA0014": "Command and Control",
+    "AML.TA0010": "Exfiltration",
+    "AML.TA0011": "Impact",
+}

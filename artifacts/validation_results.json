@@ -1,0 +1,143 @@
+{
+  "generated_at": "2026-07-19T15:20:29Z",
+  "status": "passed_with_documented_limitations",
+  "historical_regression": {
+    "run_id": "a9dad6033577",
+    "raw_records": 595,
+    "normalized_records": 595,
+    "unique_records": 593,
+    "duplicates_removed": 2,
+    "evidence_status_counts": {
+      "raw": 0,
+      "contextual": 207,
+      "potential": 0,
+      "related": 364,
+      "direct": 22,
+      "validated": 0,
+      "confirmed": 0,
+      "false_positive": 0,
+      "discarded": 0
+    },
+    "validated_findings": 2,
+    "confirmed_findings": 0,
+    "finding_levels": {
+      "low": 2,
+      "medium": 0,
+      "high": 0,
+      "critical": 0
+    },
+    "confirmed_incidents": 0,
+    "applicable_cves": 0,
+    "applicable_kev": 0,
+    "validated_fraud_signals": 0,
+    "validated_disinformation_signals": 0,
+    "actionable_darkweb_signals": 0,
+    "active_scenarios": 0,
+    "scenario_library_count": 1500,
+    "sources": 23,
+    "healthy_sources": 10
+  },
+  "framework_catalogs": {
+    "attack": "19.1",
+    "d3fend": "1.4.0",
+    "atlas": "5.6.0",
+    "scenario_library_version": "2026.07.evidence-gated-attack-d3fend-atlas-disarm"
+  },
+  "tests": {
+    "python_pytest": {
+      "status": "passed",
+      "passed": 64,
+      "failed": 0
+    },
+    "typescript_vite_build": {
+      "status": "passed",
+      "modules_transformed": 1627,
+      "known_warning": "EmployeeRiskView is lazy-loaded but retains an 8.17 MB country/state/city data chunk."
+    },
+    "python_dependencies": {
+      "status": "passed",
+      "result": "No broken requirements found"
+    },
+    "node_production_audit": {
+      "status": "passed",
+      "result": "No known vulnerabilities found"
+    },
+    "docker_compose_config": {
+      "status": "passed"
+    },
+    "docker_health": {
+      "status": "passed",
+      "services": [
+        "api",
+        "web",
+        "postgres",
+        "tor-proxy",
+        "osint-tools",
+        "spiderfoot",
+        "kali-surface"
+      ]
+    }
+  },
+  "api_and_persistence": {
+    "health_http_status": 200,
+    "web_http_status": 200,
+    "executive_report_http_status": 200,
+    "technical_report_http_status": 200,
+    "postgres_context": {
+      "run_id": "a9dad6033577",
+      "payload_type": "object",
+      "raw_events": 593,
+      "raw_records": 595,
+      "unique_records": 593
+    }
+  },
+  "visual_validation": {
+    "strategic_desktop": {
+      "viewport": "1440x1000",
+      "horizontal_overflow": false,
+      "overflowing_panels": 0,
+      "sidebar_position": "sticky",
+      "screenshot": "artifacts/visual/strategic-desktop.png"
+    },
+    "strategic_mobile": {
+      "viewport": "390x844",
+      "horizontal_overflow": false,
+      "overflowing_panels": 0,
+      "sidebar_height_px": 68,
+      "screenshot": "artifacts/visual/strategic-mobile.png"
+    },
+    "module_navigation": {
+      "status": "passed",
+      "modules": [
+        "OSINT",
+        "SOCMINT",
+        "Dark Web",
+        "Mapeo de Frameworks",
+        "Informes",
+        "Tablero estrategico"
+      ]
+    },
+    "executive_report": {
+      "horizontal_overflow": false,
+      "overflowing_panels": 0,
+      "browser_console_errors": 0,
+      "screenshot": "artifacts/visual/report-executive-desktop.png"
+    },
+    "technical_report": {
+      "horizontal_overflow": false,
+      "overflowing_panels": 0,
+      "browser_console_errors": 0,
+      "visible_external_evidence_urls": 190,
+      "screenshot": "artifacts/visual/report-technical-desktop.png"
+    }
+  },
+  "report_semantics": {
+    "calibrated_attack_probability_claims": 0,
+    "report_formula_disclosures": 0,
+    "undefined_scenario_library_errors": 0,
+    "supported_active_scenarios": 0,
+    "validated_findings": 2,
+    "confirmed_findings": 0,
+    "confirmed_incidents": 0
+  }
+}

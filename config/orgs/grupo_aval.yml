@@ -1,0 +1,73 @@
+organization:
+  name: "Grupo Aval"
+  sector: "multi_sector_financial_holding"
+  country: "CO"
+  author: "Edwin Penuela"
+  authorized_scope: true
+  business_units:
+    - banking
+    - pensions
+    - fiduciary
+    - investment_banking
+    - merchant_banking
+    - brokerage
+    - leasing
+    - low_value_payments
+    - infrastructure
+    - energy_gas
+    - hotels
+    - agribusiness
+  crown_jewels:
+    - digital_banking
+    - mobile_apps
+    - internet_banking
+    - payments
+    - cards
+    - swift
+    - identity
+    - active_directory
+    - cloud
+    - apis
+    - fraud_platforms
+    - pension_fund_platforms
+    - fiduciary_operations
+    - brokerage_platforms
+    - merchant_banking_portfolio
+    - infrastructure_operations
+    - energy_gas_operations
+    - hotel_operations
+    - agribusiness_operations
+    - third_party_integrations
+  technologies:
+    - cloud
+    - iam
+    - api_gateway
+    - siem
+    - edr
+    - waf
+    - mobile
+  risk_appetite:
+    operational: 0.25
+    financial: 0.25
+    reputational: 0.20
+    regulatory: 0.20
+    innovation: 0.10
+  control_maturity:
+    iso27001_score: 0.62
+    nist_csf_score: 0.66
+    soc2_score: 0.55
+    d3fend_coverage: 0.58
+    attack_detection_coverage: 0.52
+    incident_response_maturity: 0.68
+  fraud_maturity:
+    identity_proofing: 0.58
+    transaction_monitoring: 0.62
+    device_intelligence: 0.54
+    mule_detection: 0.48
+    case_management: 0.61
+    customer_awareness: 0.56
+sources:
+  allow_passive_external_exposure: false
+  allow_socmint_public: true
+  allow_darkweb_authorized_import: true
+  allow_tor: false

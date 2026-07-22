@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }} - Portafolio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{--bg:#071321;--panel:#0c1d35;--line:#203758;--text:#e6eefc;--muted:#9fb2d1;--accent:#35b6ff;--good:#22c55e;--warn:#f59e0b;--risk:#ef4444;--purple:#8b5cf6;}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(180deg,#091829,#050d18);color:var(--text)}
+    .page{max-width:1320px;margin:0 auto;padding:24px}.hero,.card{background:rgba(12,29,53,.92);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 15px 36px rgba(0,0,0,.22)}
+    .hero h1{margin:8px 0 8px;font-size:30px}.eyebrow{color:#67e8f9;text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:700}.grid{display:grid;gap:16px}.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}.metric{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}.metric .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.metric .value{font-size:28px;font-weight:800;margin-top:8px}
+    table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid rgba(255,255,255,.08);padding:10px;text-align:left}th{background:rgba(255,255,255,.04)}tr:hover td{background:rgba(255,255,255,.025)} a{color:#7dd3fc}.small{font-size:12px;color:var(--muted)}
+    .badge{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800}.Bajo{background:rgba(34,197,94,.15);color:#9bf3b6}.Moderado{background:rgba(245,158,11,.15);color:#ffd89a}.Alto{background:rgba(249,115,22,.15);color:#ffc08a}.Critico,.Crítico{background:rgba(239,68,68,.18);color:#ffc0c0}.Extremo{background:rgba(139,92,246,.18);color:#e0ccff}
+    .notice{background:rgba(53,182,255,.10);border:1px solid rgba(53,182,255,.25);color:#dbeeff;padding:14px 16px;border-radius:14px}.mt{margin-top:20px} footer{text-align:center;color:var(--muted);font-size:12px;padding:18px 0 8px}
+    @media (max-width:1100px){.grid-4{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <section class="hero">
+    <div class="eyebrow">Ciberinteligencia · Portafolio</div>
+    <h1>{{ title }}</h1>
+    <p>{{ author_label }} · Generado: {{ generated_at }}</p>
+    <div class="notice mt">Este índice consolida todos los empleados cargados y enlaza cada informe individual. El análisis está orientado a demostración autorizada, trazabilidad de hallazgos y revisión humana.</div>
+  </section>
+  <section class="grid grid-4 mt">
+    <div class="metric"><div class="label">Empleados cargados</div><div class="value">{{ portfolio.employees_total }}</div></div>
+    <div class="metric"><div class="label">Analizados</div><div class="value">{{ portfolio.employees_analyzed }}</div></div>
+    <div class="metric"><div class="label">Omitidos</div><div class="value">{{ portfolio.employees_skipped }}</div></div>
+    <div class="metric"><div class="label">Riesgo promedio</div><div class="value">{{ portfolio.avg_risk }}</div></div>
+  </section>
+  <section class="grid grid-4 mt">
+    <div class="metric"><div class="label">Crítico / Extremo</div><div class="value">{{ portfolio.critical_count }}</div></div>
+    <div class="metric"><div class="label">Alto</div><div class="value">{{ portfolio.high_count }}</div></div>
+    <div class="metric"><div class="label">Riesgo máximo</div><div class="value">{{ portfolio.max_risk }}</div></div>
+    <div class="metric"><div class="label">Formato</div><div class="value" style="font-size:18px">Individual + índice</div></div>
+  </section>
+  <section class="card mt">
+    <h2>Informes individuales por empleado</h2>
+    <table>
+      <thead><tr><th>Employee ID</th><th>Nombre</th><th>Cargo / área</th><th>Acceso</th><th>Riesgo</th><th>Evidencias</th><th>Estado</th><th>Informe</th></tr></thead>
+      <tbody>
+        {% for row in employee_rows %}
+        <tr>
+          <td>{{ row.employee_id }}</td>
+          <td>{{ row.full_name }}<div class="small">{{ row.organization }}</div></td>
+          <td>{{ row.role }}<div class="small">{{ row.department }}</div></td>
+          <td>{{ row.access_level }} / {{ row.access_category }}</td>
+          <td>{{ row.risk }}</td>
+          <td>{{ row.evidence_count }}</td>
+          <td>{% if row.skipped %}<span class="small">Omitido: {{ row.skip_reason }}</span>{% else %}<span class="badge {{ row.risk_level|replace('í','i') }}">{{ row.risk_level }}</span>{% endif %}</td>
+          <td><a href="{{ row.report_rel_path }}">Abrir informe</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <footer>{{ author_label }} · Informe maestro de ciberinteligencia · Uso autorizado y sujeto a revisión humana.</footer>
+</div>
+</body>
+</html>

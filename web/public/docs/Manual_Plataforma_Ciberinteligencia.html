@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual integral | CyberDecisionEngine</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#eef3f5; --surface:#fff; --text:#172332; --muted:#5e7080; --line:#d6e0e5; --accent:#087f83; --code:#11202a; }
+    @media (prefers-color-scheme:dark) { :root { --bg:#0c151b; --surface:#142129; --text:#edf5f6; --muted:#a9bac3; --line:#2d424d; --accent:#42c3c4; --code:#091116; } }
+    * { box-sizing:border-box; } html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.65 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    .layout { max-width:1440px; margin:0 auto; display:grid; grid-template-columns:280px minmax(0,1fr); gap:28px; padding:24px; }
+    aside { position:sticky; top:20px; height:calc(100vh - 40px); overflow:auto; padding:18px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+    aside strong { display:block; margin-bottom:12px; font-size:16px; }
+    aside a { display:block; padding:6px 8px; border-left:2px solid transparent; color:var(--muted); text-decoration:none; font-size:12px; line-height:1.35; }
+    aside a:hover { border-color:var(--accent); color:var(--accent); } .toc-level-2 { padding-left:18px; } .toc-level-3 { padding-left:30px; }
+    main { min-width:0; padding:34px 44px 64px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:0 18px 45px rgba(16,34,44,.08); }
+    h1,h2,h3 { line-height:1.25; scroll-margin-top:24px; } h1 { font-size:32px; } h2 { margin-top:38px; padding-bottom:8px; border-bottom:1px solid var(--line); font-size:23px; } h3 { margin-top:28px; font-size:17px; }
+    p,li { max-width:92ch; } a { color:var(--accent); } table { width:100%; border-collapse:collapse; font-size:13px; } th,td { padding:9px 10px; border:1px solid var(--line); text-align:left; vertical-align:top; } th { background:color-mix(in srgb,var(--accent) 9%,var(--surface)); }
+    pre { overflow:auto; padding:16px; border-radius:6px; background:var(--code); color:#e6f4f4; } code { font-family:"SFMono-Regular",Consolas,monospace; font-size:.9em; } :not(pre)>code { padding:2px 5px; border-radius:4px; background:color-mix(in srgb,var(--accent) 10%,var(--surface)); }
+    blockquote { margin-left:0; padding:10px 16px; border-left:3px solid var(--accent); background:color-mix(in srgb,var(--accent) 7%,var(--surface)); color:var(--muted); }
+    @media (max-width:900px) { .layout { grid-template-columns:1fr; padding:12px; } aside { position:relative; top:0; height:auto; max-height:340px; } main { padding:24px 20px 48px; } }
+    @media print { body { background:#fff; } .layout { display:block; padding:0; } aside { display:none; } main { border:0; box-shadow:none; padding:0; } }
+  </style>
+</head>
+<body><div class="layout"><aside><strong>CyberDecisionEngine</strong><a class="toc-level-1" href="#manual-de-cyberdecisionengine">Manual de CyberDecisionEngine</a><a class="toc-level-2" href="#1-introduccion">1. Introducción</a><a class="toc-level-2" href="#2-objetivo">2. Objetivo</a><a class="toc-level-2" href="#3-casos-de-uso">3. Casos de uso</a><a class="toc-level-2" href="#4-arquitectura">4. Arquitectura</a><a class="toc-level-3" href="#contenedores">Contenedores</a><a class="toc-level-3" href="#fuente-de-verdad">Fuente de verdad</a><a class="toc-level-2" href="#5-despliegue-y-operacion">5. Despliegue y operación</a><a class="toc-level-2" href="#6-configuracion">6. Configuración</a><a class="toc-level-3" href="#organizacion-y-alcance">Organización y alcance</a><a class="toc-level-3" href="#fuentes">Fuentes</a><a class="toc-level-2" href="#7-operacion-paso-a-paso">7. Operación paso a paso</a><a class="toc-level-2" href="#8-proceso-de-inteligencia">8. Proceso de inteligencia</a><a class="toc-level-2" href="#9-fuentes-y-estados">9. Fuentes y estados</a><a class="toc-level-2" href="#10-normalizacion-y-deduplicacion">10. Normalización y deduplicación</a><a class="toc-level-2" href="#11-analisis-realizados">11. Análisis realizados</a><a class="toc-level-3" href="#osint">OSINT</a><a class="toc-level-3" href="#socmint">SOCMINT</a><a class="toc-level-3" href="#superficie-externa">Superficie externa</a><a class="toc-level-3" href="#marca-y-fraude">Marca y fraude</a><a class="toc-level-3" href="#dark-web">Dark web</a><a class="toc-level-3" href="#desinformacion">Desinformación</a><a class="toc-level-3" href="#vulnerabilidades">Vulnerabilidades</a><a class="toc-level-3" href="#pestel-y-porter">PESTEL y Porter</a><a class="toc-level-3" href="#escenarios-y-plantillas-preventivas">Escenarios y plantillas preventivas</a><a class="toc-level-2" href="#12-matematicas-y-calculos">12. Matemáticas y cálculos</a><a class="toc-level-3" href="#actividad-de-amenazas">Actividad de amenazas</a><a class="toc-level-3" href="#likelihood-contextual-heuristico">Likelihood contextual heurístico</a><a class="toc-level-3" href="#impacto">Impacto</a><a class="toc-level-3" href="#efectividad-de-controles">Efectividad de controles</a><a class="toc-level-3" href="#riesgo">Riesgo</a><a class="toc-level-3" href="#matriz-4x4">Matriz 4x4</a><a class="toc-level-3" href="#monte-carlo">Monte Carlo</a><a class="toc-level-3" href="#indice-de-presion-de-senales">Índice de presión de señales</a><a class="toc-level-3" href="#pestel-porter-operativo">PESTEL/Porter operativo</a><a class="toc-level-2" href="#13-marcos-de-referencia">13. Marcos de referencia</a><a class="toc-level-2" href="#14-dashboard">14. Dashboard</a><a class="toc-level-2" href="#15-distribucion-geografica">15. Distribución geográfica</a><a class="toc-level-2" href="#16-inteligencia-socmint-y-grafos">16. Inteligencia SOCMINT y grafos</a><a class="toc-level-2" href="#17-lectura-de-informes">17. Lectura de informes</a><a class="toc-level-3" href="#ejecutivo">Ejecutivo</a><a class="toc-level-3" href="#tecnico">Técnico</a><a class="toc-level-3" href="#estados">Estados</a><a class="toc-level-2" href="#18-modelo-claim-evidence">18. Modelo claim-evidence</a><a class="toc-level-2" href="#19-openclaw-e-ia">19. OpenClaw e IA</a><a class="toc-level-2" href="#20-opencti">20. OpenCTI</a><a class="toc-level-2" href="#21-seguridad-y-privacidad">21. Seguridad y privacidad</a><a class="toc-level-2" href="#22-administracion">22. Administración</a><a class="toc-level-2" href="#23-solucion-de-problemas">23. Solución de problemas</a><a class="toc-level-2" href="#24-glosario-y-anexos">24. Glosario y anexos</a><a class="toc-level-3" href="#checklist-operativo">Checklist operativo</a><a class="toc-level-3" href="#documentos-relacionados">Documentos relacionados</a></aside><main><h1 id="manual-de-cyberdecisionengine">Manual de CyberDecisionEngine</h1>
+<table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Plataforma</td>
+<td>CyberDecisionEngine</td>
+</tr>
+<tr>
+<td>Versión de aplicación</td>
+<td>0.1.0</td>
+</tr>
+<tr>
+<td>Versión del manual</td>
+<td>1.1.0</td>
+</tr>
+<tr>
+<td>Fecha</td>
+<td>2026-07-20</td>
+</tr>
+<tr>
+<td>Clasificación</td>
+<td>Uso interno / información pública autorizada</td>
+</tr>
+<tr>
+<td>Creador conceptual</td>
+<td>Edwin Peñuela, modelo desarrollado desde 2022</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-introduccion">1. Introducción</h2>
+<p>CyberDecisionEngine transforma registros públicos y autorizados en evidencia normalizada, relaciones, hallazgos, escenarios y posibilidades de decisión. Está orientada a dirección, CISO, riesgo, fraude, SOC, infraestructura, legal y analistas de inteligencia.</p>
+<p>La plataforma diferencia:</p>
+<ul>
+<li><strong>recolección:</strong> obtención de registros desde una fuente;</li>
+<li><strong>procesamiento:</strong> normalización, canonicalización, deduplicación y clasificación;</li>
+<li><strong>análisis:</strong> evaluación reproducible de relaciones, riesgo y contexto;</li>
+<li><strong>inteligencia:</strong> interpretación trazable que soporta una decisión;</li>
+<li><strong>informe:</strong> representación ejecutiva o técnica de un snapshot persistido.</li>
+</ul>
+<p>No explota vulnerabilidades, no autentica contra terceros, no realiza fuerza bruta y no convierte una mención en incidente.</p>
+<h2 id="2-objetivo">2. Objetivo</h2>
+<p>La plataforma responde:</p>
+<ol>
+<li>qué alcance fue analizado;</li>
+<li>qué fuentes fueron consultadas y con qué resultado;</li>
+<li>qué registros únicos fueron recolectados;</li>
+<li>qué afirmaciones tienen evidencia;</li>
+<li>qué escenarios son candidatos o están respaldados;</li>
+<li>qué riesgo externo puede justificarse;</li>
+<li>qué información falta;</li>
+<li>qué posibilidades de tratamiento deben evaluarse.</li>
+</ol>
+<p>No sustituye una auditoría interna, un pentest, un peritaje, una certificación, una evaluación legal ni la respuesta a incidentes.</p>
+<h2 id="3-casos-de-uso">3. Casos de uso</h2>
+<ul>
+<li>evaluación pública de una organización o dominio autorizado;</li>
+<li>monitoreo periódico o 24/7 con alertas internas;</li>
+<li>OSINT de dominios, marca, noticias, advisories y documentos públicos;</li>
+<li>SOCMINT basado en contenido público indexado y atribuible;</li>
+<li>superficie externa defensiva: DNS, certificados, WHOIS, subdominios y tecnologías;</li>
+<li>inteligencia de vulnerabilidades con control de aplicabilidad;</li>
+<li>fraude y suplantación de marca;</li>
+<li>desinformación y mapeo DISARM;</li>
+<li>contexto estratégico PESTEL/Porter;</li>
+<li>escenarios ATT&amp;CK, D3FEND, ATLAS y DISARM;</li>
+<li>informe ejecutivo y técnico bajo solicitud del usuario;</li>
+<li>análisis separado de riesgo virtual de empleados con consentimiento.</li>
+</ul>
+<h2 id="4-arquitectura">4. Arquitectura</h2>
+<pre><code class="language-mermaid">flowchart LR
+    U[&quot;Usuario web&quot;] --&gt; W[&quot;React + Nginx&quot;]
+    W --&gt; A[&quot;FastAPI&quot;]
+    A --&gt; R[&quot;RunStore y workers&quot;]
+    R --&gt; C[&quot;Recolectores públicos&quot;]
+    R --&gt; S1[&quot;OSINT tools&quot;]
+    R --&gt; S2[&quot;Superficie externa&quot;]
+    R --&gt; S3[&quot;SpiderFoot pasivo&quot;]
+    R --&gt; T[&quot;Tor SOCKS opcional&quot;]
+    R --&gt; P[&quot;Normalización y deduplicación&quot;]
+    P --&gt; M[&quot;Análisis, riesgo y escenarios&quot;]
+    M --&gt; AI[&quot;OpenClaw aislado: borradores y revisión&quot;]
+    M --&gt; K[&quot;Backend interno de conocimiento&quot;]
+    K -. &quot;opcional&quot; .-&gt; O[&quot;OpenCTI&quot;]
+    M --&gt; DB[(&quot;PostgreSQL&quot;)]
+    M --&gt; F[&quot;Contexto por runId&quot;]
+    F --&gt; D[&quot;Dashboard&quot;]
+    F --&gt; G[&quot;Generador de informes&quot;]
+    G --&gt; V[&quot;Validador HTML + JSON + CSV&quot;]
+</code></pre>
+<h3 id="contenedores">Contenedores</h3>
+<table>
+<thead>
+<tr>
+<th>Servicio</th>
+<th>Función</th>
+<th>Exposición</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>web</code></td>
+<td>interfaz y reportes</td>
+<td>host 8080</td>
+</tr>
+<tr>
+<td><code>api</code></td>
+<td>API y motor</td>
+<td>host 8000</td>
+</tr>
+<tr>
+<td><code>postgres</code></td>
+<td>datos persistentes</td>
+<td>host 15432 para administración local</td>
+</tr>
+<tr>
+<td><code>osint-tools</code></td>
+<td>búsquedas auxiliares autorizadas</td>
+<td>solo red interna</td>
+</tr>
+<tr>
+<td><code>kali-surface</code></td>
+<td>superficie defensiva</td>
+<td>solo red interna</td>
+</tr>
+<tr>
+<td><code>spiderfoot</code></td>
+<td>recolección pasiva</td>
+<td>solo red interna</td>
+</tr>
+<tr>
+<td><code>tor-proxy</code></td>
+<td>proxy SOCKS opcional</td>
+<td>solo red interna</td>
+</tr>
+<tr>
+<td><code>openclaw-gateway</code></td>
+<td>orquestación de IA controlada</td>
+<td>solo red interna, sin puerto host</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fuente-de-verdad">Fuente de verdad</h3>
+<p>Cada ejecución produce un <code>RunContext</code> persistido bajo <code>data/web_runs/&lt;runId&gt;/context.json</code> y replicado en PostgreSQL. Dashboard, informe ejecutivo, informe técnico, JSON y CSV se derivan del mismo <code>DecisionIntelligenceSnapshot</code>.</p>
+<h2 id="5-despliegue-y-operacion">5. Despliegue y operación</h2>
+<p>La topología soportada usa Docker Compose, PostgreSQL y servicios internos sin exponer sidecars de recolección al host. El manual funcional no depende de una ruta local ni de un sistema operativo específico.</p>
+<p>Los prerrequisitos, variables, arranque, migraciones, respaldo, restauración, actualización, observabilidad y comandos reproducibles están separados en <code>docs/operacion/Guia_Despliegue_y_Operacion.md</code>. Los secretos permanecen fuera del repositorio y nunca deben aparecer en informes.</p>
+<h2 id="6-configuracion">6. Configuración</h2>
+<h3 id="organizacion-y-alcance">Organización y alcance</h3>
+<p>Una ejecución organizacional requiere al menos un dominio o nombre de organización/marca y <code>authorized_scope=true</code>. La investigación de personas pertenece exclusivamente al módulo <strong>Riesgo virtual de empleados</strong>, con permisos, minimización, retención e informe separados. Campos principales:</p>
+<ul>
+<li>marca, grupo o conglomerado;</li>
+<li>dominios propios;</li>
+<li>sector y subsector;</li>
+<li>país y países de operación;</li>
+<li>marcas, filiales, productos y activos estratégicos;</li>
+<li>ventana temporal;</li>
+<li>modo <code>snapshot</code> o <code>deep</code>;</li>
+<li>presupuesto de tiempo;</li>
+<li>autorización Tor;</li>
+<li>idioma español o inglés.</li>
+</ul>
+<p>Los dominios comparativos se almacenan aparte y no se mezclan con el alcance propio.</p>
+<h3 id="fuentes">Fuentes</h3>
+<p>Las API keys son opcionales. Su ausencia debe producir <code>disabled</code>, <code>not_applicable</code> o <code>skipped</code>, nunca registros simulados. OpenCTI usa <code>OPENCTI_MODE=disabled</code> por defecto.</p>
+<h2 id="7-operacion-paso-a-paso">7. Operación paso a paso</h2>
+<ol>
+<li>Inicie sesión con un rol habilitado.</li>
+<li>Cree o seleccione una empresa si corresponde.</li>
+<li>Abra <strong>Overview</strong>; allí se integran alcance, configuración, ejecución, progreso y resumen de resultados.</li>
+<li>Escriba la marca/organización y dominios autorizados.</li>
+<li>Defina sector, país, ventana, profundidad y Tor.</li>
+<li>Confirme el alcance.</li>
+<li>Lance la ejecución.</li>
+<li>Observe <code>Estado de corrida</code>; cada etapa cambia progreso y estado.</li>
+<li>Revise cobertura de conectores y errores parciales.</li>
+<li>Desde Overview abra tablero estratégico, evidencia, superficie, OSINT, Inteligencia SOCMINT y posibilidades soportadas.</li>
+<li>Valide o descarte evidencia desde el ledger.</li>
+<li>Solicite el informe con el botón <strong>Generar informe</strong>.</li>
+<li>Revise el resultado del validador.</li>
+<li>Descargue HTML, JSON o CSV.</li>
+</ol>
+<p>Cerrar sesión no detiene el worker: la ejecución vive en la API y queda persistida.</p>
+<h2 id="8-proceso-de-inteligencia">8. Proceso de inteligencia</h2>
+<pre><code class="language-mermaid">flowchart TD
+    D[&quot;Dirección: pregunta y alcance&quot;] --&gt; P[&quot;Planeación de fuentes y tiempo&quot;]
+    P --&gt; C[&quot;Recolección pública autorizada&quot;]
+    C --&gt; N[&quot;Normalización, hashes y deduplicación&quot;]
+    N --&gt; E[&quot;Entidades, relaciones y validación&quot;]
+    E --&gt; A[&quot;Análisis de riesgo, contexto y escenarios&quot;]
+    A --&gt; PR[&quot;Producción de dashboard&quot;]
+    PR --&gt; H[&quot;Revisión humana&quot;]
+    H --&gt; I[&quot;Informe solicitado&quot;]
+    I --&gt; F[&quot;Retroalimentación, cierre o monitoreo&quot;]
+</code></pre>
+<h2 id="9-fuentes-y-estados">9. Fuentes y estados</h2>
+<p>El catálogo puede incluir buscadores públicos/RSS, noticias, CISA KEV, NVD, FIRST EPSS, GitHub Advisories, OTX, urlscan, DNS/certificados/WHOIS, SpiderFoot, índices autorizados de dark web, MISP y TAXII.</p>
+<p>Estados del ciclo de vida:</p>
+<ul>
+<li><code>registered</code>: el conector existe en el catálogo;</li>
+<li><code>eligible</code>: configuración, licencia y alcance permitían consultarlo;</li>
+<li><code>attempted</code>: la corrida inició una consulta real;</li>
+<li><code>succeeded</code>: la consulta terminó sin fallo;</li>
+<li><code>productive</code>: entregó al menos un registro;</li>
+<li><code>empty</code>: consulta correcta sin registros relacionados;</li>
+<li><code>degraded</code>: resultado parcial, timeout o rate limit con respuesta utilizable;</li>
+<li><code>skipped</code>: no se intentó por una regla explícita;</li>
+<li><code>unconfigured</code>: faltó configuración obligatoria;</li>
+<li><code>failed</code>: error técnico sin resultado utilizable.</li>
+</ul>
+<p>Los KPI usan denominadores explícitos: productividad sobre intentadas y cobertura sobre elegibles. Los conectores registrados nunca inflan por sí solos la salud operativa.</p>
+<p>Una fuente real indica procedencia real; no convierte cada afirmación en verdadera.</p>
+<h2 id="10-normalizacion-y-deduplicacion">10. Normalización y deduplicación</h2>
+<p>Cada registro conserva el dato original y añade:</p>
+<ul>
+<li>identificador canónico;</li>
+<li>hash de contenido;</li>
+<li>URL canónica;</li>
+<li>timestamp observado;</li>
+<li>tipo de registro;</li>
+<li>relación con el alcance;</li>
+<li>estado de evidencia;</li>
+<li>confianza;</li>
+<li>referencias de fuente;</li>
+<li>número de duplicados;</li>
+<li>resultado y método de validación.</li>
+</ul>
+<p>Duplicados exactos se agrupan por identidad/hash. Copias sindicadas no multiplican automáticamente el impacto. La evidencia original y la interpretación permanecen separadas.</p>
+<h2 id="11-analisis-realizados">11. Análisis realizados</h2>
+<h3 id="osint">OSINT</h3>
+<p>Consolida información pública relacionada con el alcance. Muestra consultas, registros, fuentes, URLs y limitaciones. Un resultado por coincidencia de palabra permanece relacionado o candidato hasta validar relación directa.</p>
+<h3 id="socmint">SOCMINT</h3>
+<p>Trabaja con menciones y perfiles públicos indexados. Los nodos representan entidades presentes en registros; las aristas representan relaciones derivadas de evidencia. Si no hay datos, no se dibuja una red.</p>
+<h3 id="superficie-externa">Superficie externa</h3>
+<p>Revisa DNS, correo, certificados, WHOIS, subdominios y tecnologías mediante técnicas defensivas. Un servicio visible no es vulnerabilidad. Una CVE solo se vuelve aplicable si producto y versión pueden justificarse.</p>
+<h3 id="marca-y-fraude">Marca y fraude</h3>
+<p>Busca suplantación, dominios similares y narrativas relacionadas. La similitud lexical es una señal, no prueba de fraude. El impacto reputacional requiere evidencia de alcance, contexto y corroboración.</p>
+<h3 id="dark-web">Dark web</h3>
+<p>Usa índices y metadatos autorizados. Tor es opcional. No descarga datos robados ni interactúa con mercados. <code>no_data</code> describe la cobertura disponible, no ausencia global.</p>
+<h3 id="desinformacion">Desinformación</h3>
+<p>Mapea registros compatibles a DISARM. Sin evidencia posterior a la corrida, las tácticas no se muestran como activas.</p>
+<h3 id="vulnerabilidades">Vulnerabilidades</h3>
+<p>Combina CVE, CVSS, EPSS y KEV con aplicabilidad. CVSS mide severidad técnica; EPSS estima explotación de CVE; KEV registra explotación conocida; ninguno prueba afectación del activo sin identificación tecnológica.</p>
+<h3 id="pestel-y-porter">PESTEL y Porter</h3>
+<p>Clasifican clusters de evidencia vinculada al sujeto: información corporativa, regulatoria, sectorial, financiera, tecnológica, operacional, de sostenibilidad y noticias públicas. El análisis se calcula una vez para la marca, grupo o conglomerado y sus dominios propios; los comparativos permanecen fuera del alcance. Cada dimensión muestra cobertura de evidencia aunque todavía no exista soporte suficiente para publicar una presión direccional. La presión agregada solo se publica cuando cobertura &gt;= 60 %, confianza &gt;= 50 y más de la mitad de dimensiones tienen datos puntuables. Cobertura no es riesgo, cumplimiento ni probabilidad de ataque.</p>
+<h3 id="escenarios-y-plantillas-preventivas">Escenarios y plantillas preventivas</h3>
+<p>El catálogo contiene 1.500 <strong>plantillas preventivas de referencia</strong>, no 1.500 escenarios ejecutables. Actualmente existen 0 definiciones que satisfagan el contrato completo de escenario ejecutable. Una posibilidad se muestra como soportada solo cuando evidencia de la corrida satisface criterios explícitos; esto no confirma un ataque ni un incidente. El detalle auditable está en <code>docs/auditoria/escenarios-inventario.md</code>.</p>
+<h2 id="12-matematicas-y-calculos">12. Matemáticas y cálculos</h2>
+<p><strong>Versión de riesgo residual:</strong> <code>2.0.0</code>.<br />
+<strong>Versión de evidencia:</strong> <code>1.0.0</code>.<br />
+<strong>Versión claim-evidence:</strong> registrada en cada contexto.</p>
+<h3 id="actividad-de-amenazas">Actividad de amenazas</h3>
+<p>Para cada registro <code>i</code>:</p>
+<p><code>T = sum(sourceWeight_i * confidence_i * 2^(-ageDays_i / halfLife_i))</code></p>
+<p><code>A = 1 - exp(-0.35 * T)</code></p>
+<p>El resultado está acotado a <code>[0,1]</code> y normaliza saturación de volumen. No es probabilidad.</p>
+<h3 id="likelihood-contextual-heuristico">Likelihood contextual heurístico</h3>
+<p><code>L = sigmoid(-2.10 + 0.70A + 0.85E + 0.75V + 0.90logit(P)/6 + 0.85K + 0.70TTP + 0.55S + 0.35G - 0.80C - 0.60D - 0.45R)</code></p>
+<p>Variables: actividad, exposición, vulnerabilidad, prior EPSS, KEV, TTP, sector, geografía, controles, detección y respuesta. Es una heurística versionada, no un modelo predictivo calibrado.</p>
+<h3 id="impacto">Impacto</h3>
+<p><code>I = 0.25F + 0.20O + 0.20C + 0.15In + 0.10A + 0.05L + 0.05R</code></p>
+<p>Los pesos suman 1.0. Datos ausentes no deben sustituirse por cero observado.</p>
+<h3 id="efectividad-de-controles">Efectividad de controles</h3>
+<p><code>CE = 0.25ISO + 0.25NIST + 0.15SOC2 + 0.15D3FEND + 0.10Detection + 0.10IR</code></p>
+<p>El valor máximo aplicado al riesgo residual es 0.85 para evitar una reducción total no justificable.</p>
+<h3 id="riesgo">Riesgo</h3>
+<p><code>R_inherent = 100 * L * I</code></p>
+<p><code>R_residual = R_inherent * (1 - min(0.85, CE))</code></p>
+<p>Ejemplo: <code>L=0.40</code>, <code>I=0.60</code>, <code>CE=0.50</code>. Riesgo inherente <code>24</code>; residual <code>12</code>.</p>
+<h3 id="matriz-4x4">Matriz 4x4</h3>
+<p><code>L</code> e <code>I</code> se discretizan en 1..4 y se multiplican. 1-3 bajo, 4-7 medio, 8-11 alto, 12-16 crítico.</p>
+<h3 id="monte-carlo">Monte Carlo</h3>
+<p>Muestrea distribuciones beta alrededor de <code>L</code>, <code>I</code> y <code>CE</code> con semilla reproducible y reporta p10, p50 y p90. Son bandas de sensibilidad del modelo, no intervalos de una frecuencia observada.</p>
+<h3 id="indice-de-presion-de-senales">Índice de presión de señales</h3>
+<p>La implementación activa muestra bandas de sensibilidad derivadas de intensidad reciente cuando existen datos suficientes. La función Poisson permanece registrada como <code>reference_only</code>, sin caller productivo ni calibración; por ello no se publica como probabilidad de ataque.</p>
+<h3 id="pestel-porter-operativo">PESTEL/Porter operativo</h3>
+<p>Cada cluster aporta <code>match * quality * recency * directness * novelty * corroboration * extraction * mapping</code>; la presión final usa una transformación <code>tanh</code> acotada. La cobertura ponderada de evidencia se calcula por separado para impedir que un dato real pero no direccional se convierta en un cero o porcentaje inventado. Sin umbral de cobertura/confianza, la presión queda <code>insufficient_evidence</code>, pero el tablero conserva los aspectos respaldados, sus fuentes y la cobertura disponible. Las funciones heredadas <code>pestel_cyber_index</code> y <code>porter_cyber_index</code> no son el cálculo productivo actual.</p>
+<h2 id="13-marcos-de-referencia">13. Marcos de referencia</h2>
+<ul>
+<li>ATT&amp;CK 19.1: comportamiento adversario y técnicas;</li>
+<li>D3FEND 1.4.0: contramedidas defensivas;</li>
+<li>ATLAS 5.6.0: amenazas contra sistemas de IA;</li>
+<li>DISARM: tácticas de desinformación;</li>
+<li>NIST CSF 2.0: resultados de gobierno y ciberseguridad;</li>
+<li>ISO 27001:2022: áreas de control mediante resúmenes no propietarios;</li>
+<li>PCI DSS 4.0.1, SOC 2, GDPR, CIS Controls y COBIT: cobertura de mapeo.</li>
+</ul>
+<p>Un porcentaje de framework significa cobertura de mapeo de señales, no cumplimiento.</p>
+<h2 id="14-dashboard">14. Dashboard</h2>
+<p>El dashboard debe leerse de arriba hacia abajo:</p>
+<ol>
+<li>alcance y ventana;</li>
+<li>estado y duración;</li>
+<li>cobertura de conectores;</li>
+<li>registros únicos y hallazgos;</li>
+<li>distribución web/geográfica;</li>
+<li>confianza y limitaciones;</li>
+<li>riesgo;</li>
+<li>relaciones;</li>
+<li>cambios históricos;</li>
+<li>posibilidades de decisión.</li>
+</ol>
+<p>Cada KPI se deriva del snapshot y debe enlazar al detalle. <code>0 observado</code> y <code>sin datos</code> son estados diferentes.</p>
+<h2 id="15-distribucion-geografica">15. Distribución geográfica</h2>
+<p>Las ubicaciones deben distinguir coordenada exacta, ciudad, región, país, infraestructura e inferencia. Nunca se usa una coordenada arbitraria para datos sin ubicación. Una IP puede representar infraestructura y no una persona. La precisión y confianza deben acompañar el punto o agregado.</p>
+<h2 id="16-inteligencia-socmint-y-grafos">16. Inteligencia SOCMINT y grafos</h2>
+<ul>
+<li>nodo: persona, organización, cuenta, dominio, alias, correo, publicación, URL, hashtag, evento o infraestructura;</li>
+<li>arista: relación sustentada o inferida, con dirección, peso, fecha y evidencia;</li>
+<li>degree: número de relaciones;</li>
+<li>in/out-degree: relaciones entrantes/salientes;</li>
+<li>betweenness: capacidad de puente;</li>
+<li>densidad: relaciones presentes respecto de las posibles;</li>
+<li>comunidad: grupo estructural detectado.</li>
+</ul>
+<p>Centralidad alta no implica culpabilidad, intención ni control. Las métricas se muestran solo con suficiente estructura.</p>
+<h2 id="17-lectura-de-informes">17. Lectura de informes</h2>
+<h3 id="ejecutivo">Ejecutivo</h3>
+<p>Presenta alcance, cobertura, hallazgos validados, riesgo, contexto y plan de trabajo. Usa referencias compactas y enlaza a evidencia. No contiene respuestas técnicas completas.</p>
+<h3 id="tecnico">Técnico</h3>
+<p>Incluye consulta, respuesta original disponible, URL, hash, timestamp, fuente, entidad, relación, validación, contradicciones y limitaciones. Las evidencias HTTP(S) públicas priorizadas pueden incluir una captura aislada con hash, dimensiones, URL final, código HTTP y fecha; la imagen amplía al seleccionarla. Una captura demuestra el contenido observado en ese momento, no confirma por sí sola la interpretación. Permite reconstruir el análisis.</p>
+<h3 id="estados">Estados</h3>
+<ul>
+<li>candidato: relación pendiente;</li>
+<li>respaldado: evidencia relacionada suficiente para análisis;</li>
+<li>validado: método y evidencias registradas;</li>
+<li>confirmado: supera umbral y no tiene contradicción crítica abierta;</li>
+<li>materializado: impacto de seguridad demostrado.</li>
+</ul>
+<h2 id="18-modelo-claim-evidence">18. Modelo claim-evidence</h2>
+<p>Toda afirmación importante recorre:</p>
+<p><code>Claim -&gt; Evidence -&gt; Interpretation -&gt; Limitation -&gt; Decision -&gt; Closure</code></p>
+<p>Cada hallazgo explica qué se encontró, qué demuestra, qué no demuestra, cómo se validó, confianza, limitaciones, decisión, responsable y criterio de cierre.</p>
+<h2 id="19-openclaw-e-ia">19. OpenClaw e IA</h2>
+<p>OpenClaw es una capa reemplazable de orquestación, no el núcleo. En el despliegue local actual su gateway se inicia en una red Docker interna con autenticación por token, filesystem de solo lectura, límites de CPU/memoria y herramientas de ejecución denegadas. Puede preparar borradores, explicar scores, detectar contradicciones y proponer consultas; no publica, no cambia scores, no evade controles y no ejecuta comandos arbitrarios. Para producir texto necesita además un proveedor/modelo configurado: <code>ready</code> describe el gateway y <code>model_available</code> confirma el modelo. Si falta esa credencial, la plataforma sigue operando y lo informa como <code>configured_unverified</code>, sin simular una respuesta de IA.</p>
+<p>El contenido web se trata como dato no confiable. Las salidas deben registrar hechos, inferencias, evidencia, confianza, modelo, prompt y herramientas. La aprobación humana permanece obligatoria.</p>
+<h2 id="20-opencti">20. OpenCTI</h2>
+<p>OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto. Modos: <code>disabled</code>, <code>read_context</code>, <code>sync_validated</code>, <code>system_of_record</code>. Solo <code>sync_validated</code> envía entidades y relaciones validadas; nunca datos brutos, caché, falsos positivos o propuestas de IA.</p>
+<h2 id="21-seguridad-y-privacidad">21. Seguridad y privacidad</h2>
+<ul>
+<li>alcance autorizado obligatorio;</li>
+<li>redes Docker separadas;</li>
+<li>sidecars sin puertos host;</li>
+<li>capacidades Linux eliminadas y <code>no-new-privileges</code>;</li>
+<li>secretos fuera del repositorio;</li>
+<li>roles y licencias por organización;</li>
+<li>logs y auditoría;</li>
+<li>TLP/PAP en evidencia;</li>
+<li>sesiones y MFA disponibles en la capa local, pendientes de IdP/SSO para producción;</li>
+<li>OpenClaw en modo propuesta y allowlist;</li>
+<li>redacción de datos sensibles en informes.</li>
+</ul>
+<h2 id="22-administracion">22. Administración</h2>
+<p><code>superadmin</code> gestiona empresas, licencias, usuarios, módulos y auditoría. <code>admin</code> gestiona usuarios de su empresa. Roles operativos consumen módulos permitidos. Antes de producción, el control de acceso debe aplicarse server-side con JWT/refresh o SSO, MFA, revocación y hashing robusto.</p>
+<h2 id="23-solucion-de-problemas">23. Solución de problemas</h2>
+<table>
+<thead>
+<tr>
+<th>Síntoma</th>
+<th>Verificación</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web no abre</td>
+<td><code>docker compose ps</code></td>
+<td>reconstruir <code>web</code> y revisar 8080</td>
+</tr>
+<tr>
+<td>API no responde</td>
+<td><code>/api/health</code>, logs API</td>
+<td>validar PostgreSQL y reiniciar API</td>
+</tr>
+<tr>
+<td>corrida no avanza</td>
+<td><code>GET /api/runs/&lt;runId&gt;</code></td>
+<td>revisar etapa, timeout y conectores</td>
+</tr>
+<tr>
+<td>conector sin datos</td>
+<td>estado y <code>message</code></td>
+<td>no confundir con cero; revisar cuota/alcance</td>
+</tr>
+<tr>
+<td>Tor parcial</td>
+<td>logs de <code>tor-proxy</code></td>
+<td>validar <code>allow_tor</code> y red interna</td>
+</tr>
+<tr>
+<td>informe rechazado</td>
+<td><code>_validation.json</code></td>
+<td>corregir evidencia, referencias o conteos y regenerar</td>
+</tr>
+<tr>
+<td>ciudades tardan</td>
+<td>red del navegador</td>
+<td>el catálogo se carga de forma diferida</td>
+</tr>
+<tr>
+<td>Python local falla</td>
+<td><code>python --version</code></td>
+<td>usar Docker o Python 3.13</td>
+</tr>
+</tbody>
+</table>
+<h2 id="24-glosario-y-anexos">24. Glosario y anexos</h2>
+<ul>
+<li><strong>registro recolectado:</strong> dato obtenido de una fuente;</li>
+<li><strong>evidencia validada:</strong> registro unido a una afirmación mediante método registrado;</li>
+<li><strong>hallazgo:</strong> condición analizada que cumple reglas de evidencia;</li>
+<li><strong>confianza:</strong> calidad de soporte de una afirmación;</li>
+<li><strong>likelihood:</strong> plausibilidad contextual heurística;</li>
+<li><strong>riesgo:</strong> likelihood, impacto y controles con evidencia;</li>
+<li><strong>alerta:</strong> regla, umbral, responsable, acción y estado;</li>
+<li><strong>incidente confirmado:</strong> impacto de seguridad demostrado y estado de respuesta;</li>
+<li><strong>runId:</strong> identidad única de una ejecución;</li>
+<li><strong>snapshot:</strong> fuente canónica de dashboard e informes;</li>
+<li><strong>TLP/PAP:</strong> restricciones de distribución y acción.</li>
+</ul>
+<h3 id="checklist-operativo">Checklist operativo</h3>
+<ul>
+<li>[ ] alcance autorizado;</li>
+<li>[ ] sujeto y dominios sin valores por defecto;</li>
+<li>[ ] ventana y país definidos;</li>
+<li>[ ] conectores revisados;</li>
+<li>[ ] corrida completada;</li>
+<li>[ ] evidencia crítica inspeccionada;</li>
+<li>[ ] afirmaciones sin huérfanos;</li>
+<li>[ ] informe solicitado por el usuario;</li>
+<li>[ ] validador aprobado;</li>
+<li>[ ] limitaciones comunicadas;</li>
+<li>[ ] cierre o monitoreo asignado.</li>
+</ul>
+<h3 id="documentos-relacionados">Documentos relacionados</h3>
+<ul>
+<li><code>docs/SEMANTIC_MODEL.md</code></li>
+<li><code>docs/EVIDENCE_MODEL.md</code></li>
+<li><code>docs/CLAIM_EVIDENCE_GUIDE.md</code></li>
+<li><code>docs/TERM_DICTIONARY.md</code></li>
+<li><code>docs/OPENCTI_DECISION.md</code></li>
+<li><code>docs/opencti_value_assessment.md</code></li>
+<li><code>docs/HOW_TO_READ_REPORTS.md</code></li>
+<li><code>docs/arquitectura/openclaw-cti.md</code></li>
+<li><code>docs/seguridad/openclaw-threat-model.md</code></li>
+<li><code>docs/seguridad/openclaw-controls.md</code></li>
+<li><code>docs/auditoria/00-diagnostico-inicial.md</code></li>
+<li><code>docs/auditoria/01-optimizacion-geografica.md</code></li>
+<li><code>docs/auditoria/02-matriz-referencias.md</code></li>
+<li><code>docs/auditoria/03-ejecuciones-grupo-aval-frontera.md</code></li>
+<li><code>docs/roadmap/Mejoras_Recomendadas.md</code></li>
+</ul>
+</main></div></body>
+</html>

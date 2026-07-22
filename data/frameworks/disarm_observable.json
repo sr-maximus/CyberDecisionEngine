@@ -1,0 +1,2588 @@
+{
+  "source": "DISARMFoundation/DISARMframeworks-20-observable",
+  "source_url": "https://github.com/DISARMFoundation/DISARMframeworks-20-observable",
+  "tactics": [
+    {
+      "id": "TA21",
+      "name": "Observed Asset",
+      "phase_id": "P05",
+      "summary": "This Category contains different types of Asset which can be observed as part of a potential incident"
+    },
+    {
+      "id": "TA22",
+      "name": "Observed Asset Descriptors",
+      "phase_id": "P05",
+      "summary": "This Category contains different ways to describe an Asset's features or settings"
+    },
+    {
+      "id": "TA23",
+      "name": "Asset Identity Descriptors",
+      "phase_id": "P05",
+      "summary": "This Category contains ways to document the Identity presented as operating an Asset"
+    },
+    {
+      "id": "TA41",
+      "name": "Interact with Publication, Asset, or Content",
+      "phase_id": "P06",
+      "summary": "This Category contains actions which relate to Publications, Assets, or Content"
+    },
+    {
+      "id": "TA42",
+      "name": "Actions Available to Platforms",
+      "phase_id": "P06",
+      "summary": "This Category contains actions which are available only to Platforms"
+    },
+    {
+      "id": "TA43",
+      "name": "Offline Actions",
+      "phase_id": "P06",
+      "summary": "This Category contains actions which are available offline"
+    },
+    {
+      "id": "TA61",
+      "name": "Publication Details",
+      "phase_id": "P06",
+      "summary": "This Category contains information about an online publication"
+    },
+    {
+      "id": "TA62",
+      "name": "Content Origin",
+      "phase_id": "P06",
+      "summary": "This Category contains infomation about the origin of content"
+    },
+    {
+      "id": "TA63",
+      "name": "Narrative Details",
+      "phase_id": "P06",
+      "summary": "This Category contains different types of narrative information"
+    },
+    {
+      "id": "TA64",
+      "name": "Content Effect",
+      "phase_id": "P07",
+      "summary": "This Category contains different impacts content can have"
+    }
+  ],
+  "techniques": [
+    {
+      "id": "T2001",
+      "name": "User Asset",
+      "summary": "This Category contains different types of user which can take action online",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": false
+    },
+    {
+      "id": "T2001.001",
+      "name": "Account Asset",
+      "summary": "The Asset is a user account",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2001.002",
+      "name": "Admin Account Asset",
+      "summary": "The Asset is an administrator account",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2001.003",
+      "name": "Unauthenticated Account Asset",
+      "summary": "The Asset is an unauthenticated / guest account on a Platform which does not mandate account creation to take actions on it",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002",
+      "name": "Community Asset",
+      "summary": "The Asset is an online community in which users can interact with each other",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002.001",
+      "name": "Online Community Group",
+      "summary": "The Asset is a 'group' created using a Platform's native features (e.g. Facebook Group)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002.002",
+      "name": "Online Community Page",
+      "summary": "The Asset is a 'page' created using a Platform's native features (e.g. Facebook Page)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002.003",
+      "name": "Chat Community Server",
+      "summary": "The Asset is a collection of chat rooms and/or chat broadcast groups organised into a server (e.g. a Discord or Slack server)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002.004",
+      "name": "Chat Room",
+      "summary": "The Asset is a closed group where three or more users can send messages to each other",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002.005",
+      "name": "Chat Broadcast Group",
+      "summary": "The Asset is a closed group where 'administrators' can send messages to a community who may react to, comment on, or forward the messages",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002.006",
+      "name": "Community Sub-Forum",
+      "summary": "The Asset is a sub-forum on a community forum platform (e.g. a Subreddit)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2002.007",
+      "name": "Online Game Session",
+      "summary": "The Asset is a session for an online game (e.g. a Roblox or Minecraft server)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003",
+      "name": "Community Hosting Platform",
+      "summary": "The Asset is a Platform which is primarily designed for users to interact with each other as part of a community",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.001",
+      "name": "Social Media Platform",
+      "summary": "The Asset is a Social Media Platform (e.g. Facebook, Instagram)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.002",
+      "name": "Chat Platform",
+      "summary": "The Asset is a Chat Platform (e.g. Whastapp, Discord)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.003",
+      "name": "Microblogging Platform",
+      "summary": "The Asset is a Microblogging Platform (e.g. Twitter, TikTok, BlueSky)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.004",
+      "name": "Legacy Online Forum Platform",
+      "summary": "The Asset is an old-school forum (e.g. Something Awful, War Thunder)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.005",
+      "name": "Community Forum Platform",
+      "summary": "The Asset is an Online Community Forum (e.g. Reddit)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.006",
+      "name": "Image Board Platform",
+      "summary": "The Asset is an Image Board Platform (e.g. 4chan)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.007",
+      "name": "Question and Answer Platform",
+      "summary": "The Asset is a Q&A Platform (e.g. Quora)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.008",
+      "name": "Online Game Platform",
+      "summary": "The Asset is an Online Game Platform (e.g. Roblox, Minecraft)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2003.009",
+      "name": "Dating Platform",
+      "summary": "The Asset is a Dating Platform (e.g. Tinder, Grindr)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004",
+      "name": "Content Hosting Platform",
+      "summary": "The Asset is a Platform which is primarily designed for users to upload and consume content",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.001",
+      "name": "Website Asset",
+      "summary": "The Asset is a collection of associated webpages under a single domain",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.002",
+      "name": "Paste Platform",
+      "summary": "The Asset is a Platform designed for sharing plaintext (e.g. Pastebin)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.003",
+      "name": "Video Platform",
+      "summary": "The Asset is a Platform designed for publishing and viewing video-based content (e.g. YouTube, Vimeo)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.004",
+      "name": "Audio Platform",
+      "summary": "The Asset is a Platform designed for publishing and listening to audio-based content (e.g. Spotify, Soundcloud, PodBean)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.005",
+      "name": "Live Streaming Platform",
+      "summary": "The Asset is a Platform designed for users to stream live content to their audience (e.g. Twitch, Kick)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.006",
+      "name": "Software Delivery Platform",
+      "summary": "The Asset is a Platform designed for publishing and downloading software (e.g. Apple App Store, Google Play Store, Steam)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.007",
+      "name": "File Hosting Platform",
+      "summary": "The Asset is a Platform designed for hosting and sharing files online (e.g. Google Drive, Dropbox)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.008",
+      "name": "Wiki Platform",
+      "summary": "The Asset is a Platform designed for online knowledge management (e.g. Wikipedia)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.009",
+      "name": "Content Subscription Service Platform",
+      "summary": "The Asset is a Platform designed for allowing users to charge a subscription for content, access, or other benefits (e.g. Patreon, OnlyFans)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2004.010",
+      "name": "Blog Asset",
+      "summary": "The Asset is a blog in which people post typically informal articles",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005",
+      "name": "Digital Service Platform",
+      "summary": "The Asset is a Platform which is primarily designed to provide a digital service to their users",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.001",
+      "name": "Blog Hosting Service Platform",
+      "summary": "The Asset is a Platform which hosts Blogs (e.g. Medium, Substack)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.002",
+      "name": "Website Hosting Service Platform",
+      "summary": "The Asset is a Platform which hosts Websites (e.g. Webflow, Weebly, Wix)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.003",
+      "name": "Email Service Platform",
+      "summary": "The Asset is a Platform which provides Email service (e.g. GMail, Proton Mail, Microsoft Office)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.004",
+      "name": "Link Shortening Service Platform",
+      "summary": "The Asset is a Link Shortening Service provder (e.g. Bitly, TinyURL)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.005",
+      "name": "Online Advertising Platform",
+      "summary": "The Asset is an Online Advertising platform (e.g. Meta Ads, Google Ads, Amazon Ads)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.006",
+      "name": "Search Engine Platform",
+      "summary": "The Asset is a Search Engine Platform (e.g. Google, DuckDuckGo, Ecosia)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.007",
+      "name": "AI LLM Platform",
+      "summary": "The Asset is an AI LLM provider (e.g. LeChat, Claude, Gemini)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2005.008",
+      "name": "AI Media Platform",
+      "summary": "The Asset is an AI Media generator (e.g. Midjourney, DALL-E, Gemini)",
+      "tactic_id": "TA21",
+      "tactic": "Observed Asset",
+      "usable": true
+    },
+    {
+      "id": "T2021",
+      "name": "Asset Configuration",
+      "summary": "This Category contains ways to describe how an Asset has been configured",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": false
+    },
+    {
+      "id": "T2021.001",
+      "name": "Verified Asset",
+      "summary": "The Asset displays an indicator that it has been verified by the Platform it operates on",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2021.002",
+      "name": "Lookalike Asset ID",
+      "summary": "The Asset has an identifier (e.g. account handle) which is visually similar to another asset's identifier",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2021.003",
+      "name": "Lookalike Domain",
+      "summary": "The observed Platform has a domain which is visually similar to another Platform's domain (AKA typosquat)",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2022",
+      "name": "Asset Description",
+      "summary": "This Category contains ways to describe how an Asset has described itself (e.g. a User or Community's biography field, a Platform's 'About us' page)",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2023",
+      "name": "Asset Imagery",
+      "summary": "This Category contains ways to describe the imagery with which an Asset has been configured",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2023.001",
+      "name": "Copied Asset Imagery",
+      "summary": "The Asset uses imagery which is the same as imagery already used by another Asset",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2023.002",
+      "name": "Mimicked Asset Imagery",
+      "summary": "The Asset uses imagery which is visually similar (but not the same as) imagery already used by another Asset (e.g. mimicking colour scheme, typography)",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2023.003",
+      "name": "Animal Profile Picture",
+      "summary": "The User has an animal set as their profile picture",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2023.004",
+      "name": "Scenery Profile Picture",
+      "summary": "The User has scenery set as their profile picture",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2023.005",
+      "name": "Illustrated Character Profile Picture",
+      "summary": "The User has an illustrated character (e.g. Anime, Manga, Cartoon) set as their profile picture",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2023.006",
+      "name": "Attractive Person Profile Picture",
+      "summary": "The User has an attractive person set as their profile picture",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2024",
+      "name": "Platform Capability",
+      "summary": "This Category contains ways to document different Capabilities a Platform may have",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": false
+    },
+    {
+      "id": "T2024.001",
+      "name": "Payment Processing Capability",
+      "summary": "The Platform has the capability to proccess one time payments",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2024.002",
+      "name": "Subscription Processing Capability",
+      "summary": "The Platform has the capability to process payments on a recurring, automated basis",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2024.003",
+      "name": "Email Service Capability",
+      "summary": "The Platform has the capability to send and recieve emails",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2024.004",
+      "name": "Encrypted Communication Capability",
+      "summary": "Communications sent on this platform are encrypted",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2025",
+      "name": "Asset Gating",
+      "summary": "This Category contains ways to describe how access to an Asset is gated",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": false
+    },
+    {
+      "id": "T2025.001",
+      "name": "Gated Asset",
+      "summary": "The Asset prevents access to it in some way (i.e. it is 'gated')",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2025.002",
+      "name": "Invite Gated Asset",
+      "summary": "The Asset cannot be accessed by users unless the user is invited to access it",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2025.003",
+      "name": "Approval Gated Asset",
+      "summary": "The Asset cannot be accessed by users unless they use a Platform's feature to request access to it, and that request is approved",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2025.004",
+      "name": "Geoblocked Asset",
+      "summary": "The Asset is configured to prevent access to users from specified locations",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2025.005",
+      "name": "Paid Access Asset",
+      "summary": "The Asset cannot be accessed by users unless they make a one time payment",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2025.006",
+      "name": "Subscription Access Asset",
+      "summary": "The Asset cannot be accessed by users unless they make a recurring subscription payment",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026",
+      "name": "Asset Acquisition",
+      "summary": "This Category contains ways to describe how an actor acquired an Asset",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": false
+    },
+    {
+      "id": "T2026.001",
+      "name": "Newly Created Asset",
+      "summary": "The Asset was created as part of the observed incident",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.002",
+      "name": "Pre-Existing Asset",
+      "summary": "The Asset was created before the observed incident",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.003",
+      "name": "Asset Activated after Period of Dormancy",
+      "summary": "The Asset was took part in the observed incident after a period of dormancy",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.004",
+      "name": "Freely Created Asset",
+      "summary": "The Platform the Asset was created on did not charge for creation",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.005",
+      "name": "Paid Created Asset",
+      "summary": "The Platform the Asset was created on charged for its creation",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.006",
+      "name": "Bulk Created Asset",
+      "summary": "The Asset was created in bulk alongside other Assets",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.007",
+      "name": "Purchased Existing Asset",
+      "summary": "The actor acquired the Asset by purchasing it from another individual or institution",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.008",
+      "name": "Rented Existing Asset",
+      "summary": "The actor acquired the Asset by renting it another individual or institution",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2026.009",
+      "name": "Compromised Existing Asset",
+      "summary": "The actor acquired the Asset by compromising another individual or institution's Asset",
+      "tactic_id": "TA22",
+      "tactic": "Observed Asset Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2041",
+      "name": "Asset Presented Identity",
+      "summary": "This Category contains different ways to document the validity of the presented identity of the individual or institution operating the Asset",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": false
+    },
+    {
+      "id": "T2041.001",
+      "name": "Asset Presents Anonymous Identity",
+      "summary": "The Asset is not presenting an identity (i.e. the individual or institution operating the asset is choosing to not disclose who they are)",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2041.002",
+      "name": "Asset Presents Legitimate Identity of Asset Operator",
+      "summary": "The Identity presetned by the Asset is authentic (i.e. the individual or institution operating the asset is who the Asset claims it to be)",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2041.003",
+      "name": "Asset Presents Nonexistent Identity",
+      "summary": "The Identity presented by the Asset is an individual or institution which doesn't exist",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2041.004",
+      "name": "Asset Presents Impersonation of Another Identity",
+      "summary": "The Identity presented by the Asset is an impersonation of another individual or institution (i.e. it claims to be operated by someone, but it is actually operated by someone else)",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2041.005",
+      "name": "Asset Presents Parody of Another Identity",
+      "summary": "The Identity presented by the Asset is a disclosed parody of an individual or institution",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2041.006",
+      "name": "Asset's Previous Identity Maintained after Acquisition",
+      "summary": "The Identity presented by the Asset has stayed the same even though the actor operating the asset changed",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2041.007",
+      "name": "Asset Presents New Identity",
+      "summary": "The Identity which is being presented by the Asset has changed (e.g. it previously claimed it was operated by someone, now it claims it's being operated by someone else)",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042",
+      "name": "Individual Role",
+      "summary": "The Identity presented as operating the asset is an individual",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.001",
+      "name": "Local Individual Role",
+      "summary": "The Identity presented as operating the asset presents itself as an individual local to a given location",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.002",
+      "name": "Journalist Role",
+      "summary": "The Identity presented as operating the asset presents itself as a journalist",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.003",
+      "name": "Activist Role",
+      "summary": "The Identity presented as operating the asset presents itself as an activist",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.004",
+      "name": "Hacktivist Role",
+      "summary": "The Identity presented as operating the asset presents itself as a hacktivist",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.005",
+      "name": "Military Personnel Role",
+      "summary": "The Identity presented as operating the asset presents itself as a member of the military",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.006",
+      "name": "Recruiter Role",
+      "summary": "The Identity presented as operating the asset presents itself as a recruiter",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.007",
+      "name": "Researcher Role",
+      "summary": "The Identity presented as operating the asset presents itself as a researcher",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.008",
+      "name": "Expert Role",
+      "summary": "The Identity presented as operating the asset presents itself as an expert on a given topic area",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.009",
+      "name": "Romantic Suitor Role",
+      "summary": "The Identity presented as operating the asset presents itself as an individual persuing a romantic or physical relationship",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.010",
+      "name": "Party Official Role",
+      "summary": "The Identity presented as operating the asset presents itself as an individual representing a political party",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.011",
+      "name": "Government Official Role",
+      "summary": "The Identity presented as operating the asset presents itself as an indiviaul serving as a member of the governing party of a country",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.012",
+      "name": "Government Employee Role",
+      "summary": "The Identity presented as operating the asset presents itself as an individual employed to work as part of the government",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.013",
+      "name": "Law Enforcement Officer Role",
+      "summary": "The Identity presented as operating the asset presents itself as a member of law enforcement in a country",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2042.014",
+      "name": "Sex Worker Role",
+      "summary": "The Identity presented as operating the asset presents itself as a sex worker",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043",
+      "name": "Institutional Role",
+      "summary": "The Identity presented as operating the asset is an institution",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.001",
+      "name": "Local Institution Role",
+      "summary": "The Identity presented as operating the asset presents itself as in institution local to a given location",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.002",
+      "name": "News Outlet Role",
+      "summary": "The Identity presented as operating the asset presents itself as a news outlet",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.003",
+      "name": "Fact Checking Organisation Role",
+      "summary": "The Identity presented as operating the asset presents itself as a fact checking organisation",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.004",
+      "name": "Think Tank Role",
+      "summary": "The Identity presented as operating the asset presents itself as a think tank",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.005",
+      "name": "Business Role",
+      "summary": "The Identity presented as operating the asset presents itself as business",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.006",
+      "name": "Government Institution Role",
+      "summary": "The Identity presented as operating the asset presents itself as government or government body",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.007",
+      "name": "NGO Role",
+      "summary": "The Identity presented as operating the asset presents itself as non-govermental organisation, non-profit, or other volunteer organisation",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.008",
+      "name": "Social Cause Role",
+      "summary": "The Identity presented as operating the asset presents itself as a collective campaigning for a social cause",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2043.009",
+      "name": "Adult Entertainment Outlet Role",
+      "summary": "The Identity presented as operating the asset presents itself as a provider of adult entertainment (e.g. Pornography)",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2044",
+      "name": "Asset Role Validity",
+      "summary": "This Category contains ways to document whether the Identity has legitimate claim to the Role they present themselves as having",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": false
+    },
+    {
+      "id": "T2044.001",
+      "name": "Identity Has Legitimate Claim to Role",
+      "summary": "The Identity presented as operating the asset has legitimate claim to the Role they present themselves as having",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2044.002",
+      "name": "Identity Does Not Have Legitimate Claim to Role",
+      "summary": "The Identity presented as operating the asset does not have legitimate claim to the Role they present themselves as having",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2045",
+      "name": "Use of Automation",
+      "summary": "This Category contains ways to document the use of automation and its disclosure in an asset",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": false
+    },
+    {
+      "id": "T2045.001",
+      "name": "Asset Uses and Discloses Automation",
+      "summary": "The Asset uses automation to operate online, and discloses the use of automation",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2045.002",
+      "name": "Asset Uses Automation without Disclosure",
+      "summary": "The Asset uses automation to operate online, and does not disclose the use of automation",
+      "tactic_id": "TA23",
+      "tactic": "Asset Identity Descriptors",
+      "usable": true
+    },
+    {
+      "id": "T2201",
+      "name": "Publish Online Publication",
+      "summary": "This Cateogry contains Actions related to publishing a Publication",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": false
+    },
+    {
+      "id": "T2201.001",
+      "name": "Publish",
+      "summary": "Publish a post to an online community or group",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2201.002",
+      "name": "Send",
+      "summary": "Send a message or email to a closed messaging group or service",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2201.003",
+      "name": "Conduct",
+      "summary": "Conduct a live stream or call to a public or private audience",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2201.004",
+      "name": "Upload",
+      "summary": "Upload a file to a platform",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2201.005",
+      "name": "Comment",
+      "summary": "Comment on another existing Publication",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2201.006",
+      "name": "Submit",
+      "summary": "Submit a report or search to a platform",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2202",
+      "name": "Amplify Online Publication",
+      "summary": "This Cateogry contains Actions related to amplifying a Publication",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": false
+    },
+    {
+      "id": "T2202.001",
+      "name": "Repost",
+      "summary": "Use a platform’s “Repost” feature",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2202.002",
+      "name": "Emote React",
+      "summary": "Use a platform’s “Emote React” feature",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2202.003",
+      "name": "Forward",
+      "summary": "Use a platform’s “Forward” feature",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2203",
+      "name": "Interact with Community or User",
+      "summary": "This Category contains Actions taken on Users or Communities on Platforms",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": false
+    },
+    {
+      "id": "T2203.001",
+      "name": "Request Connection with Asset",
+      "summary": "Use a platform’s feature to request a connection with another asset (sometimes called “Friending” or “Adding)",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2203.002",
+      "name": "Connect with Asset",
+      "summary": "Use a platform’s feature to make a connection with another account (sometimes called Accepting, Approving or Confirming a Friend Request)",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2203.003",
+      "name": "Follow Asset",
+      "summary": "Use a platform’s feature to follow another asset",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2203.004",
+      "name": "Join Community",
+      "summary": "Use a platform’s feature to join a community on the platform",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2203.005",
+      "name": "Add Asset to Community",
+      "summary": "Use a platform’s feature to add another asset to a community on the platform",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2203.006",
+      "name": "Block Asset",
+      "summary": "Use a platform’s feature to “Block” another asset",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2204",
+      "name": "Acquire Content",
+      "summary": "This Category contains methods of acquiring Content",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": false
+    },
+    {
+      "id": "T2204.001",
+      "name": "Produce",
+      "summary": "Produce text, image, video, or audio content",
+      "tactic_id": "TA41",
+      "tactic": "Interact with Publication, Asset, or Content",
+      "usable": true
+    },
+    {
+      "id": "T2221",
+      "name": "Platform Curation Actions",
+      "summary": "This Category contains actions taken by a Platform to curate their Users' experience",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": false
+    },
+    {
+      "id": "T2221.001",
+      "name": "Host",
+      "summary": "Host publications, content, users, or communities on a platform",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2221.002",
+      "name": "Promote",
+      "summary": "A platform feature promotes a publication or piece of content",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2221.003",
+      "name": "Deliver",
+      "summary": "A platform delivers search results or an advertisement",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2222",
+      "name": "Platform Prompting Action",
+      "summary": "This Category contains actions taken by a Platform to prompt a User to take an action",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": false
+    },
+    {
+      "id": "T2222.001",
+      "name": "Suggest Action",
+      "summary": "A platform feature suggests an action to its user",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2222.002",
+      "name": "Enable Action",
+      "summary": "A platform feature enables its user to take an action",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2223",
+      "name": "Platform Takes Moderation Action",
+      "summary": "This Category contains moderation actions available to Platforms",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2223.001",
+      "name": "Platform Suppresses Algorithmic Reach",
+      "summary": "A platform suppresses the algorithmic reach of a publication, user, or community on its platform",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2223.002",
+      "name": "Platform Suppresses Search Results",
+      "summary": "A platform suppresses search results from being delivered to a user of its platform",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2223.003",
+      "name": "Platform Removes Publication from Platform",
+      "summary": "A platform removes a publication from its platform",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2223.004",
+      "name": "Platform Applies Disclaimer",
+      "summary": "A platform applies a disclaimer to a publication, user, or community on its platform",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2223.005",
+      "name": "Platform Suspends Asset",
+      "summary": "A platform suspends an asset from its platform",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2224",
+      "name": "Platform Failure to Take Action",
+      "summary": "This Category contains ways to document a Platform's failure to take action on harmful or infringing content",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2224.001",
+      "name": "Platform Fails to Address Asset with Repeat Infringements",
+      "summary": "A platform takes no moderation action against an asset with repeat infringements",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2224.002",
+      "name": "Platform Fails to Reverse Erroneous Moderation Action",
+      "summary": "A platform fails to reverse moderation action it took erroneously (e.g. unjustified or accidental moderation)",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2224.003",
+      "name": "Platform Fails to Act on Report in Timely Manner",
+      "summary": "A report submitted to a platform is not acted upon in a reasonable amount of time",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2224.004",
+      "name": "Platform Denies Infringement is Infringing",
+      "summary": "A platform denies that an infringing user, community, publication, or piece of content is infringing",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2225",
+      "name": "Issue with Platform Moderation Action",
+      "summary": "This Category contains ways to describe issues with moderation actions taken by a Platform",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": false
+    },
+    {
+      "id": "T2225.001",
+      "name": "Platform Fails to Provide Clear Reason for Moderation Decision",
+      "summary": "A platform took moderation action without providing a clear reason",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2225.002",
+      "name": "Platform Fails to Adequately Communicate Moderation Decision",
+      "summary": "A platform took moderation action without adequately communicating their decision",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2225.003",
+      "name": "Platform Fails to Disclose Use of Automation in Moderation Decision",
+      "summary": "A platform took automated moderation action without disclosing the use of automation",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2225.004",
+      "name": "Platform Fails to Provide Method to Challenge Moderation Decision",
+      "summary": "A platform took moderation and did not provide a method to challenge the moderation action",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T2225.005",
+      "name": "Platform Fails to Meet Legal Standards for Method to Challenge Moderation Decision",
+      "summary": "The method a platform provides to challenge a moderation decision fails to meet legal standards",
+      "tactic_id": "TA42",
+      "tactic": "Actions Available to Platforms",
+      "usable": true
+    },
+    {
+      "id": "T3001",
+      "name": "Offline Harm",
+      "summary": "This Category contains types of offline harm",
+      "tactic_id": "TA43",
+      "tactic": "Offline Actions",
+      "usable": false
+    },
+    {
+      "id": "T3001.001",
+      "name": "Physical Violence",
+      "summary": "An individual or group has conducted physical violence on another individual or group",
+      "tactic_id": "TA43",
+      "tactic": "Offline Actions",
+      "usable": true
+    },
+    {
+      "id": "T3001.002",
+      "name": "Physical Sexual Violence",
+      "summary": "An individual or group has conducted physical sexual violence on another individual or group",
+      "tactic_id": "TA43",
+      "tactic": "Offline Actions",
+      "usable": true
+    },
+    {
+      "id": "T4001",
+      "name": "Publication Type",
+      "summary": "This Category contains different things which can be published online, like posts, streams, messages, and more",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4001.001",
+      "name": "Post",
+      "summary": "A Post is static content which is typically published to a broad community of users who can view its contents",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.002",
+      "name": "Message",
+      "summary": "A Message is static content which is typically sent to a closed community in a group chat or server, or an individual over direct messaging",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.003",
+      "name": "Email",
+      "summary": "An Email is static content which is typically sent to the private inbox of one or more recipients",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.004",
+      "name": "Call",
+      "summary": "A Call is a live, private communication between two or more participants in video or audio format",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.005",
+      "name": "Stream",
+      "summary": "A Stream is a live broadcast typically conducted to a broad community of users, who can comment in reaction to events",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.006",
+      "name": "File",
+      "summary": "A File is a container for digital information on a device",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.007",
+      "name": "Report of Infraction",
+      "summary": "A Report of Infraction is submitted by using a platform’s reporting feature to flag Material or an Asset which goes against the platform’s stated policy, or local laws",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.008",
+      "name": "Search",
+      "summary": "A Search is submitted by using a platform’s search feature to return Material or an Asset on the platform",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.009",
+      "name": "Search Results",
+      "summary": "Search Resuts are a list of items delivered by a Platform when after a user submits a search to them",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4001.010",
+      "name": "Advertisement",
+      "summary": "An Advertisement is delivered by a Platform to its users",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002",
+      "name": "Content Format",
+      "summary": "This Category contains different ways content can be formatted; Text, Audio, Video, or Image",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4002.001",
+      "name": "Text Content",
+      "summary": "Content which takes the form of text",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.002",
+      "name": "Templated Text",
+      "summary": "Text which has been produced following a template",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.003",
+      "name": "Image Content",
+      "summary": "Content which takes the form of an image",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.004",
+      "name": "Evidence Collage",
+      "summary": "An image which collates different material into a collage of evidence to support a narrative or claim",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.005",
+      "name": "Text Presented in Image Format",
+      "summary": "An image file which has been produced predominantly to house text content e.g. to avoid text-based moderation",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.006",
+      "name": "Video Content",
+      "summary": "Content which takes the form of a video",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.007",
+      "name": "Vertical Video",
+      "summary": "A video produced in the vertical format, a form factor optimised for mobile viewing",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.008",
+      "name": "Horizontal Video",
+      "summary": "A video produced in the horizontal format, a form factor optimised for desktop, laptop, or televisual viewing",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.009",
+      "name": "Subtitled Speech",
+      "summary": "Subtitled speech on video content",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.010",
+      "name": "Audio Content",
+      "summary": "Content which takes the form of audio",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4002.011",
+      "name": "Music",
+      "summary": "Audio in the form of music",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003",
+      "name": "Content Style",
+      "summary": "This Category contains different ways a publication or a piece of content can be styled",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4003.001",
+      "name": "News Report",
+      "summary": "Content has been styled as a news report",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003.002",
+      "name": "Opinion Piece",
+      "summary": "Content has been styled as an opinion piece",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003.003",
+      "name": "Academic Research Report",
+      "summary": "Content has been styled as an academic research report",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003.004",
+      "name": "Fact Check",
+      "summary": "Content has been styled as a fact check",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003.005",
+      "name": "Impersonated Content",
+      "summary": "Content has been produced in such a way that it impersonates publications or content produced by another individual or institution",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003.006",
+      "name": "Document",
+      "summary": "Content has been styled in the format of a document",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003.007",
+      "name": "Book",
+      "summary": "Content has been styled in the form of a book",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4003.008",
+      "name": "Podcast Episode",
+      "summary": "Content has been produced in the format of a podcast episode",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4004",
+      "name": "Content Details",
+      "summary": "This Category contains different ways a piece of content can be styled",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4004.001",
+      "name": "Content Constitutes Leak of Private Material",
+      "summary": "Private materials have been non-consensually published to an audience not originally intended to have access to said materials",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4004.002",
+      "name": "Secret Recording",
+      "summary": "Audio, Video, or Image content produced without the knowledge of those recorded",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4004.003",
+      "name": "Screen Capture",
+      "summary": "An image or video produced by taking a screen capture of what was visible on a user’s device",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4004.004",
+      "name": "Anonymised Content",
+      "summary": "Content intentionally produced to anonymise individuals depicted, or to hide the identity of who produced it",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4004.005",
+      "name": "Meme",
+      "summary": "Content is styled in the form of an internet meme; content which is humorous in nature, often referentially with slight variants made by different users",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4004.006",
+      "name": "Stock Content",
+      "summary": "Audio, Video, or Image content sourced from a stock media provider, or placeholder text content",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4005",
+      "name": "Language Details",
+      "summary": "This Category contains details about use of language which aren’t indicative of misleading or malicious behaviour on their own, but may be useful information for making assessments about an actor",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4005.001",
+      "name": "Translated Content",
+      "summary": "Content which has been translated from one language to another",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4005.002",
+      "name": "Non-Native Language Error",
+      "summary": "A non-native language error is a mistake or oddity in use of language atypical of a native speaker",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4005.003",
+      "name": "Coded Terminology",
+      "summary": "Content makes use of coded terminology, e.g. letter replacements in words, 'algospeak', euphemisms, or dog whistles",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4005.004",
+      "name": "Machine Translated Content",
+      "summary": "Use of automation, online translation tools, AI, or other non-manual translation methods to translate material from one language to another",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006",
+      "name": "Demonstrably False Content",
+      "summary": "This Category contains types of content which can be shown to have been artificially created, or content that contains information which is demonstrably incorrect",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4006.001",
+      "name": "Statement Incorrectly Presented as Made by Individual or Institution",
+      "summary": "A statement has incorrectly been presented as having been made by an individual or institution",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006.002",
+      "name": "Falsified Depiction of Content Amplification",
+      "summary": "Image of Video content which has been created to give the false impression that another piece of content is being amplified online",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006.003",
+      "name": "Falsified Graffiti or Signage",
+      "summary": "Image or Video content which has been edited to impose graffiti or other signage",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006.004",
+      "name": "Imagery Depicting Individual Edited to Introduce Sexual Material",
+      "summary": "Sexual content has been edited to introduce the target individual’s visage",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006.005",
+      "name": "Claim to Nonexistent Physical Address",
+      "summary": "An ownership or association claim is made with regards to a physical address, but the address doesn't exist",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006.006",
+      "name": "Incorrect Claim to Real Physical Address",
+      "summary": "An ownership or association claim is made with regards to a physical address, but the address is not actually owned or associated with the claimant",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006.007",
+      "name": "Mislabeled Publication",
+      "summary": "A Publication has not been correctly labeled in line with platform policy (e.g. an Advertisement missing a political label)",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4006.008",
+      "name": "Action Incorrectly Presented as Taken by Individual or Institution",
+      "summary": "A claim incorrectly attributes an action as having been taken by an individual or institution",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4007",
+      "name": "Content Relationship to Platform Policy",
+      "summary": "This Category enables documentation of whether content is aligned with a platform's stated policy",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4007.001",
+      "name": "Content Goes Against Platform Policy",
+      "summary": "Published content goes against the stated policy of the platform it was published to",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4007.002",
+      "name": "Content Within Platform Policy",
+      "summary": "Published content is within the stated policy of the platform it was published to",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4008",
+      "name": "Publication Use of Platform Features",
+      "summary": "This Category contains different features platforms offer which an be applied to a publication",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4008.001",
+      "name": "Tag Geolocation",
+      "summary": "Use of a Platform's feature to tag a geolocation",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4008.002",
+      "name": "Tag Hashtag",
+      "summary": "Use of a Platform's feature to tag a hashtag",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4008.003",
+      "name": "Tag Asset",
+      "summary": "Use of a Platform's feature to tag an asset",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4009",
+      "name": "Publication Access Settings",
+      "summary": "This Category contains different ways that access to a publication can be configured",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": false
+    },
+    {
+      "id": "T4009.001",
+      "name": "Number of Times Publication can be Viewed Limited per User",
+      "summary": "A post or message uses a platform's feature to limit the number of times it is able to be viewed per user (e.g. Snapchat Snaps)",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4009.002",
+      "name": "Access to Publication Automatically Removed after Specified Time Expires",
+      "summary": "A post, message or file uses a platform's feature to automatically remove the ability to view it after a time window has expired (e.g. Instagram Stories)",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4009.003",
+      "name": "Ability to View Publication Restricted to Specified Audience within Platform",
+      "summary": "A post, stream, or file which would otherwise be accessible to a broad group of users (per the platform's default functionality) has been configured to be viewable only to a specified group by the publishing asset",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4009.004",
+      "name": "Ability to Comment on Publication Restricted to Specified Audience within Platform",
+      "summary": "A post, stream, or file which would otherwise be accessible to a broad group of users (per the platform's default functionality) has been configured to be commentable to a specified group by the publishing asset",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4009.005",
+      "name": "Ability to Comment on Publication Disabled for All Users within Platform",
+      "summary": "A post, stream, message, or file has had the platform's default comment functionality turned off for all platform users",
+      "tactic_id": "TA61",
+      "tactic": "Publication Details",
+      "usable": true
+    },
+    {
+      "id": "T4201",
+      "name": "AI-Generated Content",
+      "summary": "Content was generated using AI",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4201.001",
+      "name": "Deepfake Impersonation",
+      "summary": "AI was used to generate a deepfake impersonation of an individual",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4201.002",
+      "name": "Sexual Deepfake Impersonation",
+      "summary": "AI was used to generate a deepfake impersonation of an individual which depicts them sexually",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4201.003",
+      "name": "AI-Nudified Imagery",
+      "summary": "AI was used to produce an undressed (‘nudified’) version of existing media",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4202",
+      "name": "Private Materials",
+      "summary": "This Category contains different types of content typically intended for a private audience",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4202.001",
+      "name": "Personally Identifiable Information",
+      "summary": "Content contains personally identifiable information (or “PII”) about a person or institution, such as their name, social accounts, physical address, contact details, information about their employer, or their friends or family",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4202.002",
+      "name": "Private Intimate Imagery",
+      "summary": "Content is private intimate imagery; imagery which depicts an individual in a state of undress, engaging in sexual activity, or in other intimate situations where there is a reasonable expectation of privacy",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4202.003",
+      "name": "Internal Communications",
+      "summary": "Content is internal communications originally intended to be kept private by the communicating party",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4202.004",
+      "name": "Internal Document",
+      "summary": "Content is an internal document originally intended to be kept private by the party who created it",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4202.005",
+      "name": "Internal Contacts List",
+      "summary": "Content is an internal list of people or institutions, and their contact details",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4202.006",
+      "name": "Asset Login Credentials",
+      "summary": "Content is login credentials for an online asset (e.g. an account)",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4203",
+      "name": "Edited Content",
+      "summary": "Content has been edited without disclosure",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4203.001",
+      "name": "Clipped Content",
+      "summary": "Content was clipped from a longer piece of Audio or Video Content without disclosure",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4203.002",
+      "name": "Cropped Content",
+      "summary": "Image or Video Content has been edited to zoom in on part of the visuals without disclosure",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4203.003",
+      "name": "Playback Speed Altered",
+      "summary": "Audio or Video Content has had its playback speed edited without disclosure",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4203.004",
+      "name": "Source Removed from Content",
+      "summary": "Content was edited in such a way that its original source has been removed or obscured without disclosure",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4203.005",
+      "name": "AI-Edited Content",
+      "summary": "AI has been used to edit existing content",
+      "tactic_id": "TA62",
+      "tactic": "Content Origin",
+      "usable": true
+    },
+    {
+      "id": "T4401",
+      "name": "Content Verifiability",
+      "summary": "This Category contains items which can be used to document the degree to which information can be independently verified or validated",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4401.001",
+      "name": "Information is Verified",
+      "summary": "Information presented by the actor has been independently confirmed by the analyst through credible fact-checking",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4401.002",
+      "name": "Information is False",
+      "summary": "Information presented by the actor has been confirmed to be false by the analyst through credible fact-checking",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4401.003",
+      "name": "Information is Unverifiable",
+      "summary": "Information presented by the actor cannot be confirmed or refuted by the analyst due to a lack of accessible, credible evidence",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4401.004",
+      "name": "Information is Misleading",
+      "summary": "Information presented by the actor contains some accurate or verifiable information, but is presented in a misleading way",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4401.005",
+      "name": "Content Produced as Satire",
+      "summary": "Content was created for humor or commentary, not to convey factual information",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4401.006",
+      "name": "Content Previously Fact Checked",
+      "summary": "Content has been identified which was previously addressed by Fact Checkers",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4401.007",
+      "name": "Claim Previously Fact Checked",
+      "summary": "A claim has been identified which was previously addressed by Fact Checkers",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402",
+      "name": "Reframe Context",
+      "summary": "Information presented outside of its original context in such a way that reframes its meaning or implications",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4402.001",
+      "name": "Incorrect Subtitled Speech Reframes Context",
+      "summary": "Incorrect translation of subtitled speech giving a false impression of what was being said",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.002",
+      "name": "Edits Made to News Report which Reframe Context",
+      "summary": "A report published by a legitimate news outlet has been edited to change what was reported",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.003",
+      "name": "Historic Content Incorrectly Presented as Current",
+      "summary": "Content depicting previously occurring events presented as depicting a recent or ongoing event",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.004",
+      "name": "Content Incorrectly Presented as Depicting Another Location",
+      "summary": "Content depicting one location presented as if it depicts a different location",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.005",
+      "name": "Video Game Content Incorrectly Presented as Depicting Reality",
+      "summary": "Footage from video games presented as authentic, real-world material",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.006",
+      "name": "AI-Generated Content Incorrectly Presented as Depicting Reality",
+      "summary": "Images, videos, or audio generated using AI presented as authentic, real-world material",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.007",
+      "name": "Context Reframed by Edits to Media",
+      "summary": "Altered or manipulated content is presented as unedited and authentic",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.008",
+      "name": "Statement Reframed by Removal from Context",
+      "summary": "A statement made by an individual or institution has been taken out of context, which reframes its meaning or interpretation",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.009",
+      "name": "Entertainment Media Content Incorrectly Presented as Depicting Reality",
+      "summary": "Clips or stills from staged movies, series, or other staged performances are shared as authentic, non-staged depiction of real-world events",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4402.010",
+      "name": "Content Originally Produced as Satire Presented as Not Satire",
+      "summary": "Genuine satire is shared as though it were factual reporting",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4403",
+      "name": "Issues with Cited Academic Research",
+      "summary": "Narrative provides a citation to academic research which has issues impacting its legitimacy",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4403.001",
+      "name": "Narrative Cites Nonexistent Academic Research",
+      "summary": "Narrative provides a citation to academic research which does not exist to support a claim",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4403.002",
+      "name": "Narrative Misrepresents Findings of Cited Academic Research",
+      "summary": "Narrative misrepresents the findings of cited academic research to support a claim",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4403.003",
+      "name": "Narrative Cites Retracted Academic Research",
+      "summary": "Narrative supports a claim by citing academic research which has been retracted",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4403.004",
+      "name": "Narrative Cites Academic Research not Peer Reviewed",
+      "summary": "Narrative does not disclose that it cites academic research which has not been peer reviewed to support a claim",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4404",
+      "name": "Issues with Presented Statistical Evidence",
+      "summary": "A claim is presented alongside statistics which have validity issues",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4404.001",
+      "name": "Narrative Presents Fabricated Statistics as Genuine Data",
+      "summary": "A claim is presented alongside statistics which were not generated using real data points, but presented as legitimate statistics grounded in research",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4404.002",
+      "name": "Narrative Uses Selective Statistics to Support Claim",
+      "summary": "Content presents a selective subset of data which produces beneficial statistics to support a claim",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4404.003",
+      "name": "Narrative Uses Misinterpreted Statistics to Support Claim",
+      "summary": "Narrative uses real statistics in support of a claim, but presents an incorrect interpretation of their meaning",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4404.004",
+      "name": "Narrative Uses Misleading Data Visualisation",
+      "summary": "Narrative presents a data visualisation (such as a bar, line, or pie chart) which misrepresents data in support of a claim",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4405",
+      "name": "Issue with Content's Headline",
+      "summary": "There is an issue with how a piece of content has been titled",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4405.001",
+      "name": "Content Constitutes Clickbait",
+      "summary": "Content with attention-grabbing, knowledge gap titles to attract attention and encourage a view",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406",
+      "name": "Rhetorical Device",
+      "summary": "This Category contains rhetorical devices or fallacies which can mislead",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4406.001",
+      "name": "Narrative Ties In to Current Events",
+      "summary": "A narrative builds upon or otherwise ties in to events or narratives which are currently or recently within the public conversation or sphere of focus",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.002",
+      "name": "Narrative Uses False Cause",
+      "summary": "False cause is the fallacy of assuming that one event causes another simply because the two occur together or in sequence",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.003",
+      "name": "Narrative Uses Whataboutism",
+      "summary": "Whataboutism is a rhetorical device in which someone avoids addressing an argument by diverting attention to a different or unrelated issue",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.004",
+      "name": "Narrative Uses Cherry Picking",
+      "summary": "Cherry-picking refers to selectively presenting evidence that supports a claim while ignoring evidence that challenges it",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.005",
+      "name": "Narrative Uses Anecdote",
+      "summary": "Anecdotes are the use of evidence in the form of personal experience or an isolated case, possibly rumour or hearsay, most often to discredit statistics",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.006",
+      "name": "Narrative Uses Strawman",
+      "summary": "Strawman is a rhetorical device in which someone misrepresents or exaggerates another person’s argument to make it easier to attack or refute",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.007",
+      "name": "Narrative Uses Leading Question",
+      "summary": "Leading questions are a manipulative questioning technique where the phrasing or sequence of questions subtly steers the respondent toward a predetermined conclusion",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.008",
+      "name": "Narrative Uses Appeal to Emotion",
+      "summary": "Appeal to emotion is a persuasive tactic that uses emotionally charged language to provoke strong feelings instead of presenting logical evidence",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4406.009",
+      "name": "Narrative Uses Exaggeration",
+      "summary": "Exaggeration is the act of overstating or amplifying facts, qualities, or events to make them seem more significant or dramatic than they really are",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4407",
+      "name": "Content Sourcing Details",
+      "summary": "This Category contains different sourcing claims for a piece of content",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4407.001",
+      "name": "Incorrect Content Source Presented",
+      "summary": "An incorrect source is presented as having produced a piece of content",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4407.002",
+      "name": "Content Presented as Produced by Third Party",
+      "summary": "A piece of content is framed as having been produced by a third party",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4407.003",
+      "name": "Content Presented as Produced by Actor",
+      "summary": "A piece of content is framed as having been produced by the actor who published the content",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4407.004",
+      "name": "Source Embedded in Media",
+      "summary": "Image or video content contains sourcing embedded within the it (e.g. a visual overlay providing the source)",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4601",
+      "name": "Content Algorithmic Optimisation",
+      "summary": "This Category contains different ways content can be optimised for performance in platforms' algorithms",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": false
+    },
+    {
+      "id": "T4601.001",
+      "name": "Platform Recommendation Algorithm Optimised Content",
+      "summary": "Content has been intentionally produced in such a way that it optimises how a platform's content recommendation algorithm favours it in promoting it to platform users",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4601.002",
+      "name": "Search Engine Optimised Content",
+      "summary": "Content has been intentionally produced in such a way that it optimises its ranking in search results provided by search engine platforms",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4602",
+      "name": "Content Contains Link",
+      "summary": "This Category contains different ways content can link to other online content or assets",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4602.001",
+      "name": "Content Contains Disguised Link",
+      "summary": "Content links out to another online asset or material using a link which has been disguised using a hyperlink to look it links to something else",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4602.002",
+      "name": "Content Contains Shortened Link",
+      "summary": "Content links out to another online asset or material using a link which has been shortened by a link shortening service",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4602.003",
+      "name": "Content Contains QR Code Link",
+      "summary": "Content links out to another online asset or material using a QR Code",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4602.004",
+      "name": "Content Contains Embedded Link",
+      "summary": "Content uses a platform's native embedding feature to link to another asset or material, such as a quote post on X/Twitter, or a video end screen on YouTube",
+      "tactic_id": "TA63",
+      "tactic": "Narrative Details",
+      "usable": true
+    },
+    {
+      "id": "T4603",
+      "name": "Content Action",
+      "summary": "This Category contains different actions which can be taken by a piece of content",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": false
+    },
+    {
+      "id": "T4603.001",
+      "name": "Content Threatens Action",
+      "summary": "Content includes the threat of taking a specific action",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4603.002",
+      "name": "Content Encourages Action",
+      "summary": "Content includes the encourages another user to take a specific action",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4603.003",
+      "name": "Content Contains Instructions for Action",
+      "summary": "Content includes instructions on how to take a specific action",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4603.004",
+      "name": "Content Solicits Action",
+      "summary": "Content includes a request for another user to take a specific action",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4603.005",
+      "name": "Content Depicts Offline Harm",
+      "summary": "Content depicts an offline harm",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604",
+      "name": "Harmful Content",
+      "summary": "Content is harmful in nature",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": false
+    },
+    {
+      "id": "T4604.001",
+      "name": "Content Constitutes Unsolicited Sexual Imagery",
+      "summary": "Content is sexual in nature, and has been delivered unsolicited to an audience (AKA “cyberflashing”)",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.002",
+      "name": "Content Constitutes Unsolicited Request for Sexual Imagery",
+      "summary": "Content constitutes an unsolicited request for sexual imagery from an individual",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.003",
+      "name": "Content Constitutes Voyeuristic Content",
+      "summary": "Image or Video content secretively taken of another individual for sexual purpose",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.004",
+      "name": "Content Constitutes CSAM",
+      "summary": "Content is media which show sexual abuse or exploitation of a child",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.005",
+      "name": "Content Constitutes Sextortion",
+      "summary": "Content extorts an individual with threat of non-consensual publication of sexual material depicting the target",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.006",
+      "name": "Content Constitutes Abusive Content",
+      "summary": "Content is targeted negative messaging, unwanted by the recipient",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.007",
+      "name": "Content Constitutes Discriminatory Content",
+      "summary": "Content is harmful or negative messaging that perpetuates stereotypes, biases, or prejudices based on a single personal characteristic such as sexual orientation, gender, race, religion, disability, or other legally protected social identities or attributes.",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.008",
+      "name": "Content Constitutes Intersectional Discriminatory Content",
+      "summary": "Content is harmful or negative messaging that perpetuates stereotypes, biases, or prejudices based on multiple personal characteristic such as sexual orientation, gender, race, religion, disability, or other legally protected social identities or attributes.",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    },
+    {
+      "id": "T4604.009",
+      "name": "Content Constitutes Eating Disorder Content",
+      "summary": "Content promotes eating disorder behaviours, such as extremee weight loss, pro-anarexia or bulimia content, harmful diet and exertcise plans, or image or video content which may trigger harmful eating disorder behaviours",
+      "tactic_id": "TA64",
+      "tactic": "Content Effect",
+      "usable": true
+    }
+  ]
+}

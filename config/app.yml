@@ -1,0 +1,29 @@
+app:
+  name: CyberDecisionEngine
+  creator: Edwin Penuela
+  cache_db: data/cyberdeck.sqlite
+  reports_dir: reports
+  data_dir: data
+  default_timeout_seconds: 20
+  default_rate_limit_per_minute: 60
+  demo_mode_on_missing_keys: true
+  real_data_only_default: true
+  redact_sensitive_output: true
+  require_authorized_scope: true
+risk:
+  threat_half_life_days: 14
+  strategic_half_life_days: 45
+  monte_carlo_samples: 10000
+fraud:
+  enabled: true
+  focus:
+    - phishing
+    - smishing
+    - vishing
+    - business_email_compromise
+    - account_takeover
+    - mule_accounts
+    - synthetic_identity
+    - transaction_anomaly
+    - brand_impersonation
+    - deepfake_social_engineering

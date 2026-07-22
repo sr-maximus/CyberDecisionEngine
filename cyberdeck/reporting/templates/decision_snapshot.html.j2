@@ -1,0 +1,76 @@
+{% set ds = decision_snapshot %}
+{% set ds_metrics = ds.metrics %}
+{% set technical_detail = snapshot_detail | default(false) %}
+{% set status_labels = {
+  "valid_value": ("Valid value" if report_lang == "en" else "Valor válido"),
+  "observed_zero": ("Observed zero" if report_lang == "en" else "Cero observado"),
+  "no_data": ("No data" if report_lang == "en" else "Sin datos"),
+  "insufficient_evidence": ("Insufficient evidence" if report_lang == "en" else "Evidencia insuficiente"),
+  "partial_data": ("Partial data" if report_lang == "en" else "Datos parciales")
+} %}
+<section id="decision-snapshot" class="decision-snapshot-section">
+  <div class="snapshot-heading">
+    <div>
+      <span class="section-kicker">{{ "Single decision record" if report_lang == "en" else "Registro único de decisión" }}</span>
+      <h2>{{ "Decision status" if report_lang == "en" else "Estado para decisión" }}</h2>
+      <p>{{ "This section is rendered from the same versioned snapshot used by the dashboard, API, JSON and CSV." if report_lang == "en" else "Esta sección se genera desde el mismo snapshot versionado que utiliza el tablero, la API, el JSON y el CSV." }}</p>
+    </div>
+    <div class="snapshot-version"><span>v{{ ds.report_context.snapshot_version }}</span><code>{{ ds.snapshot_hash[:12] }}</code></div>
+  </div>
+  <div class="snapshot-kpis">
+    <article><span>{{ "Confirmed incidents" if report_lang == "en" else "Incidentes confirmados" }}</span><strong>{{ ds_metrics.confirmed_incidents.value | int }}</strong><small>{{ status_labels.get(ds_metrics.confirmed_incidents.value_status, ds_metrics.confirmed_incidents.value_status) }} · {{ ds_metrics.confirmed_incidents.period }} · {{ (ds_metrics.confirmed_incidents.confidence * 100) | round | int }}%</small></article>
+    <article><span>{{ "Validated findings" if report_lang == "en" else "Hallazgos validados" }}</span><strong>{{ ds_metrics.validated_findings.value | int }}</strong><small>{{ status_labels.get(ds_metrics.validated_findings.value_status, ds_metrics.validated_findings.value_status) }} · {{ ds_metrics.validated_findings.period }} · {{ (ds_metrics.validated_findings.confidence * 100) | round | int }}%{% if ds_metrics.validated_findings.evidence_ids %} · [{{ ds_metrics.validated_findings.evidence_ids | join(", ") }}]{% endif %}</small></article>
+    <article><span>{{ "Supported scenarios" if report_lang == "en" else "Escenarios soportados" }}</span><strong>{{ ds_metrics.supported_scenarios.value | int }}</strong><small>{{ status_labels.get(ds_metrics.supported_scenarios.value_status, ds_metrics.supported_scenarios.value_status) }} · {{ ds_metrics.supported_scenarios.period }} · {{ (ds_metrics.supported_scenarios.confidence * 100) | round | int }}%{% if ds_metrics.supported_scenarios.evidence_ids %} · [{{ ds_metrics.supported_scenarios.evidence_ids | join(", ") }}]{% endif %}</small></article>
+    <article><span>{{ "Maximum residual risk" if report_lang == "en" else "Riesgo residual máximo" }}</span><strong>{% if ds_metrics.max_residual_risk.value is not none %}{{ "%.2f"|format(ds_metrics.max_residual_risk.value) }}{% else %}N/D{% endif %}</strong><small>{{ status_labels.get(ds_metrics.max_residual_risk.value_status, ds_metrics.max_residual_risk.value_status) }} · {{ ds_metrics.max_residual_risk.period }} · {{ (ds_metrics.max_residual_risk.confidence * 100) | round | int }}%{% if ds_metrics.max_residual_risk.evidence_ids %} · [{{ ds_metrics.max_residual_risk.evidence_ids | join(", ") }}]{% endif %}</small></article>
+    <article><span>{{ "Productive / attempted sources" if report_lang == "en" else "Fuentes productivas / consultadas" }}</span><strong>{{ ds_metrics.productive_sources.value | int }}/{{ ds_metrics.queried_sources.value | int }}</strong><small>{{ ds_metrics.total_sources.value | int }} {{ "eligible" if report_lang == "en" else "elegibles" }} · {{ ds_metrics.productive_sources.period }} · {{ (ds_metrics.productive_sources.confidence * 100) | round | int }}%</small></article>
+    <article><span>{{ "Pending decisions" if report_lang == "en" else "Decisiones pendientes" }}</span><strong>{{ ds_metrics.pending_decisions.value | int }}</strong><small>{{ status_labels.get(ds_metrics.pending_decisions.value_status, ds_metrics.pending_decisions.value_status) }} · {{ ds_metrics.pending_decisions.period }} · {{ (ds_metrics.pending_decisions.confidence * 100) | round | int }}%{% if ds_metrics.pending_decisions.evidence_ids %} · [{{ ds_metrics.pending_decisions.evidence_ids | join(", ") }}]{% endif %}</small></article>
+  </div>
+  <div class="snapshot-split">
+    <article class="snapshot-panel">
+      <div class="snapshot-panel-head"><h3>{{ "Analysed targets" if report_lang == "en" else "Objetivos analizados" }}</h3><span>{{ (ds.domains | length) if ds.domains else (ds.analyzed_entities | length) }}</span></div>
+      <div class="snapshot-domain-list">
+        {% if ds.domains %}
+        {% for row in ds.domains %}
+        <div class="snapshot-domain-row">
+          <div><strong>{{ row.domain }}</strong><small>{% if row.top_signal %}{{ row.top_signal }}{% else %}{{ "No direct signal in this run" if report_lang == "en" else "Sin señal directa en esta corrida" }}{% endif %}</small></div>
+          <div class="domain-facts"><span><b>{{ row.record_count }}</b> {{ "records" if report_lang == "en" else "registros" }}</span><span><b>{{ row.validated_findings_count }}</b> {{ "findings" if report_lang == "en" else "hallazgos" }}</span><span><b>{% if row.max_residual_risk is not none %}{{ "%.2f"|format(row.max_residual_risk) }}{% else %}N/D{% endif %}</b> {{ "risk" if report_lang == "en" else "riesgo" }}</span></div>
+        </div>
+        {% endfor %}
+        {% else %}
+        {% for entity in ds.analyzed_entities %}
+        <div class="snapshot-domain-row">
+          <div><strong>{{ entity.canonical_name }}</strong><small>{{ entity.entity_type }} · {{ entity.validation_status }}</small></div>
+          <div class="domain-facts"><span><b>{{ ds_metrics.unique_records.value | int }}</b> {{ "records" if report_lang == "en" else "registros" }}</span><span><b>{{ ds_metrics.validated_findings.value | int }}</b> {{ "findings" if report_lang == "en" else "hallazgos" }}</span><span><b>{% if ds_metrics.max_residual_risk.value is not none %}{{ "%.2f"|format(ds_metrics.max_residual_risk.value) }}{% else %}N/D{% endif %}</b> {{ "risk" if report_lang == "en" else "riesgo" }}</span></div>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </article>
+    <article class="snapshot-panel">
+      <div class="snapshot-panel-head"><h3>{{ "Scenario funnel" if report_lang == "en" else "Embudo de escenarios" }}</h3><span>{{ ds.scenario_funnel.supported }} {{ "supported" if report_lang == "en" else "soportados" }}</span></div>
+      <div class="scenario-funnel">
+        <div><span>{{ "Reference templates" if report_lang == "en" else "Plantillas de referencia" }}</span><strong>{{ ds.scenario_funnel.reference_templates }}</strong></div>
+        <div><span>{{ "Candidates" if report_lang == "en" else "Candidatos" }}</span><strong>{{ ds.scenario_funnel.candidate }}</strong></div>
+        <div><span>{{ "Supported" if report_lang == "en" else "Soportados" }}</span><strong>{{ ds.scenario_funnel.supported }}</strong></div>
+        <div><span>{{ "Validated" if report_lang == "en" else "Validados" }}</span><strong>{{ ds.scenario_funnel.validated }}</strong></div>
+        <div><span>{{ "Confirmed" if report_lang == "en" else "Confirmados" }}</span><strong>{{ ds.scenario_funnel.confirmed }}</strong></div>
+      </div>
+      {% for scenario in ds.supported_scenarios %}
+      <div class="snapshot-scenario"><div><span>{{ scenario.scenario_id }}</span><strong>{{ scenario.title }}</strong></div><p>{{ scenario.decision_possibility }}</p><small>{{ scenario.domain }} · {{ scenario.status }} · {{ (scenario.confidence * 100) | round | int }}% · [{{ scenario.evidence_ids | join(", ") }}]</small></div>
+      {% else %}<div class="snapshot-empty">{{ "No scenario crossed the evidence support threshold." if report_lang == "en" else "Ningún escenario cruzó el umbral de soporte de evidencia." }}</div>{% endfor %}
+    </article>
+  </div>
+  <h3>{{ "Decision possibilities" if report_lang == "en" else "Posibilidades de decisión" }}</h3>
+  <div class="snapshot-decisions">
+    {% for decision in ds.decisions %}
+    <article><div class="decision-status {{ decision.status }}">{{ "Act now" if decision.status == "act_now" and report_lang == "en" else "Actuar ahora" if decision.status == "act_now" else "Validate first" if report_lang == "en" else "Validar primero" }}</div><h4>{{ decision.title }}</h4><p>{{ decision.rationale }}</p><dl><div><dt>{{ "Owner" if report_lang == "en" else "Responsable" }}</dt><dd>{{ decision.owner_role }}</dd></div><div><dt>{{ "Window" if report_lang == "en" else "Ventana" }}</dt><dd>{{ decision.due_window }}</dd></div><div><dt>{{ "Success" if report_lang == "en" else "Éxito" }}</dt><dd>{{ decision.success_measure }}</dd></div></dl><small>[{{ decision.evidence_ids | join(", ") }}]</small></article>
+    {% else %}<div class="snapshot-empty">{{ "There is no evidence-supported action in the current run." if report_lang == "en" else "No existe una acción soportada por evidencia en la corrida actual." }}</div>{% endfor %}
+  </div>
+  <details class="snapshot-limitations"><summary>{{ "Limits and unavailable calculations" if report_lang == "en" else "Limitaciones y cálculos no disponibles" }}</summary><ul>{% for item in ds.limitations %}<li>{{ item }}</li>{% endfor %}</ul></details>
+  {% if technical_detail %}
+  <h3>{{ "Complete evidence references" if report_lang == "en" else "Referencias completas de evidencia" }}</h3>
+  <div class="evidence-table snapshot-reference-table"><table><tr><th>ID</th><th>{{ "Type" if report_lang == "en" else "Tipo" }}</th><th>{{ "Domain" if report_lang == "en" else "Dominio" }}</th><th>{{ "Title" if report_lang == "en" else "Título" }}</th><th>{{ "Validation" if report_lang == "en" else "Validación" }}</th><th>URL</th></tr>{% for ref in ds.evidence_references %}<tr><td>{{ ref.evidence_id }}</td><td>{{ ref.record_type }}</td><td>{{ ref.domain or "N/D" }}</td><td>{{ ref.title }}</td><td>{{ ref.validation_status }} · {{ (ref.confidence * 100) | round | int }}%</td><td>{% if ref.url %}<a class="full-url" href="{{ ref.url }}">{{ ref.url }}</a>{% else %}<span class="small">{{ "No public URL" if report_lang == "en" else "Sin URL pública" }}</span>{% endif %}</td></tr>{% endfor %}</table></div>
+  {% else %}
+  <p class="snapshot-reference-note">{{ "Compact evidence references" if report_lang == "en" else "Referencias compactas" }}: {% for ref in ds.evidence_references[:12] %}<span>[{{ ref.evidence_id }}] {{ ref.domain or ref.record_type }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% endif %}
+</section>

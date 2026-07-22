@@ -1,0 +1,2 @@
+employee_id,url,title,snippet,query,keyword,dimension_key,dimension_label,query_type,source
+AUTH-003,https://example.com/perfil-publico,Perfil público de ejemplo,Snippet de ejemplo encontrado manualmente en Google,"Juan Carlos Cortés Malagón",manual_seed,digital_identity_discovery,Descubrimiento de identidad digital,manual_result,google_manual

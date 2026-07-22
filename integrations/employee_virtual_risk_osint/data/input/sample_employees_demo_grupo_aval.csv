@@ -1,0 +1,4 @@
+employee_id,full_name,personal_email,corporate_email,identification_document,role,department,organization,country,city,access_level,access_category,consent_status,consent_date,authorized_personal_email
+GA-DEMO-001,Ana Sofia Restrepo,,ana.restrepo.demo@grupoaval.example,,Analista de Riesgos,Riesgos,Grupo Aval DEMO,Colombia,Bogotá,3,confidencial,approved,2026-07-01,false
+GA-DEMO-002,Carlos Andres Molina,,carlos.molina.demo@grupoaval.example,,Coordinador de Seguridad,Ciberseguridad,Grupo Aval DEMO,Colombia,Bogotá,4,seguridad,approved,2026-07-01,false
+GA-DEMO-003,Laura Camila Gomez,laura.demo@example.com,laura.gomez.demo@grupoaval.example,,Abogada Senior,Legal,Grupo Aval DEMO,Colombia,Bogotá,4,legal,approved,2026-07-01,true

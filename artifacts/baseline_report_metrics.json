@@ -1,0 +1,10 @@
+{
+  "captured_before_change": true,
+  "run_id": "a9dad6033577",
+  "domains_visible_in_scope_section": 5,
+  "source_health_display": "15/23",
+  "source_health_semantics": "queried sources mislabeled as healthy sources",
+  "risk_radar_rendered_without_minimum_evidence": true,
+  "decision_snapshot_present": false,
+  "shared_json_csv_contract": false
+}

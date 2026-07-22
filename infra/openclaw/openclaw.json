@@ -1,0 +1,80 @@
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "http": {
+      "endpoints": {
+        "responses": {
+          "enabled": true,
+          "files": { "allowUrl": false },
+          "images": { "allowUrl": false }
+        }
+      }
+    },
+    "nodes": {
+      "denyCommands": ["system.run"]
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/home/node/.openclaw/workspace"
+    },
+    "list": [
+      {
+        "id": "cyberdecision",
+        "workspace": "/home/node/.openclaw/workspace-cyberdecision",
+        "tools": {
+          "deny": [
+            "apply_patch",
+            "browser",
+            "canvas",
+            "cron",
+            "edit",
+            "exec",
+            "gateway",
+            "image",
+            "nodes",
+            "process",
+            "read",
+            "sessions_history",
+            "sessions_list",
+            "sessions_send",
+            "sessions_spawn",
+            "web_fetch",
+            "web_search",
+            "write"
+          ]
+        }
+      }
+    ]
+  },
+  "tools": {
+    "deny": [
+      "apply_patch",
+      "browser",
+      "canvas",
+      "cron",
+      "edit",
+      "exec",
+      "gateway",
+      "image",
+      "nodes",
+      "process",
+      "read",
+      "sessions_history",
+      "sessions_list",
+      "sessions_send",
+      "sessions_spawn",
+      "web_fetch",
+      "web_search",
+      "write"
+    ]
+  },
+  "commands": {
+    "restart": false
+  }
+}

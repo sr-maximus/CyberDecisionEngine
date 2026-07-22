@@ -1,0 +1,11 @@
+{
+  "reference_count": 24,
+  "claim_reference_count": 24,
+  "orphan_reference_ids": [],
+  "unreferenced_evidence_ids": [],
+  "orphan_claims": 0,
+  "orphan_references": 0,
+  "invalid_reference_ids": 0,
+  "unsupported_executive_claims": 0,
+  "status": "pass"
+}

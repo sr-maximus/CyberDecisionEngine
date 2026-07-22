@@ -1,0 +1,109 @@
+{
+  "routing_model": "single-page application with persisted ViewKey state",
+  "base_url": "http://localhost:8080/",
+  "dashboard_views": [
+    {
+      "view_key": "overview",
+      "label": "Visión general",
+      "url": "http://localhost:8080/?view=overview"
+    },
+    {
+      "view_key": "dashboards",
+      "label": "Tablero estratégico",
+      "url": "http://localhost:8080/?view=dashboards"
+    },
+    {
+      "view_key": "scenarios",
+      "label": "Escenarios y decisiones",
+      "url": "http://localhost:8080/?view=scenarios"
+    },
+    {
+      "view_key": "brand",
+      "label": "Marca y fraude",
+      "url": "http://localhost:8080/?view=brand"
+    },
+    {
+      "view_key": "attackSurface",
+      "label": "Superficie de ataque",
+      "url": "http://localhost:8080/?view=attackSurface"
+    },
+    {
+      "view_key": "employeeRisk",
+      "label": "Riesgo virtual de empleados",
+      "url": "http://localhost:8080/?view=employeeRisk"
+    },
+    {
+      "view_key": "disinformation",
+      "label": "Desinformación",
+      "url": "http://localhost:8080/?view=disinformation"
+    },
+    {
+      "view_key": "socmint",
+      "label": "SOCMINT",
+      "url": "http://localhost:8080/?view=socmint"
+    },
+    {
+      "view_key": "osint",
+      "label": "OSINT",
+      "url": "http://localhost:8080/?view=osint"
+    },
+    {
+      "view_key": "darkweb",
+      "label": "Dark web",
+      "url": "http://localhost:8080/?view=darkweb"
+    },
+    {
+      "view_key": "frameworks",
+      "label": "Mapeo de frameworks",
+      "url": "http://localhost:8080/?view=frameworks"
+    },
+    {
+      "view_key": "ai",
+      "label": "IA estratégica",
+      "url": "http://localhost:8080/?view=ai"
+    },
+    {
+      "view_key": "runs",
+      "label": "Estado de corrida",
+      "url": "http://localhost:8080/?view=runs"
+    },
+    {
+      "view_key": "domains",
+      "label": "Dominios",
+      "url": "http://localhost:8080/?view=domains"
+    },
+    {
+      "view_key": "reports",
+      "label": "Informes",
+      "url": "http://localhost:8080/?view=reports"
+    },
+    {
+      "view_key": "help",
+      "label": "Uso y modelo",
+      "url": "http://localhost:8080/?view=help"
+    },
+    {
+      "view_key": "settings",
+      "label": "Configuración",
+      "url": "http://localhost:8080/?view=settings"
+    }
+  ],
+  "metric_endpoints": [
+    "GET /api/runs",
+    "GET /api/runs/{run_id}",
+    "GET /api/runs/{run_id}/snapshot",
+    "POST /api/analysis",
+    "POST /api/runs/{run_id}/rerun",
+    "POST /api/runs/{run_id}/report",
+    "GET /api/reports",
+    "GET /api/attack-surface",
+    "GET /api/mitre/groups",
+    "GET /api/scenarios/library",
+    "GET /api/disinformation/framework",
+    "GET /api/monitoring"
+  ],
+  "report_urls": [
+    "http://localhost:8080/reports/web/a9dad6033577-puertobahia-com-co-odl-com-co-fronteraenergy-ca.html",
+    "http://localhost:8080/reports/web/a9dad6033577-puertobahia-com-co-odl-com-co-fronteraenergy-ca-technical.html"
+  ]
+}

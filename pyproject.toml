@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cyberdecisionengine"
+version = "0.1.0"
+description = "CLI defensivo de ciberinteligencia, ciberriesgo y fraude financiero"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Edwin Penuela" }]
+dependencies = [
+  "typer>=0.12.5",
+  "rich>=13.9.0",
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+  "httpx>=0.27.2",
+  "tenacity>=9.0.0",
+  "pydantic>=2.9.0",
+  "PyYAML>=6.0.2",
+  "Jinja2>=3.1.4",
+  "plotly>=5.24.1",
+  "python-multipart>=0.0.20",
+  "python-dotenv>=1.0.0",
+  "psycopg[binary]>=3.2.0",
+  "pandas>=2.0.0",
+  "openpyxl>=3.1.0",
+  "requests>=2.31.0",
+  "matplotlib>=3.7.0",
+  "rapidfuzz>=3.0.0",
+  "tldextract>=5.0.0",
+  "beautifulsoup4>=4.12.0"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.3", "ruff>=0.6.9", "markdown-it-py>=3.0"]
+
+[project.scripts]
+cyberdeck = "cyberdeck.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cyberdeck", "cyberdeck_api"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

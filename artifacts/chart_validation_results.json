@@ -1,0 +1,46 @@
+{
+  "rules_version": "1.0.0",
+  "checks": [
+    {
+      "chart_id": "executive_risk_radar",
+      "eligible": false,
+      "value_status": "insufficient_evidence",
+      "period_present": true,
+      "sources_present": true,
+      "definition_present": true,
+      "decision_question_present": true,
+      "result": "pass"
+    },
+    {
+      "chart_id": "risk_heatmap",
+      "eligible": false,
+      "value_status": "insufficient_evidence",
+      "period_present": true,
+      "sources_present": true,
+      "definition_present": true,
+      "decision_question_present": true,
+      "result": "pass"
+    },
+    {
+      "chart_id": "pestel",
+      "eligible": false,
+      "value_status": "insufficient_evidence",
+      "period_present": true,
+      "sources_present": true,
+      "definition_present": true,
+      "decision_question_present": true,
+      "result": "pass"
+    },
+    {
+      "chart_id": "porter",
+      "eligible": false,
+      "value_status": "insufficient_evidence",
+      "period_present": true,
+      "sources_present": true,
+      "definition_present": true,
+      "decision_question_present": true,
+      "result": "pass"
+    }
+  ],
+  "status": "pass"
+}

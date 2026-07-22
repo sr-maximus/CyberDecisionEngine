@@ -1,0 +1,4 @@
+employee_id,full_name,personal_email,corporate_email,identification_document,role,department,organization,country,city,access_level,access_category,consent_status,consent_date,authorized_personal_email
+E001,Ana María Torres,ana.personal@example.com,ana.torres@empresa.com,123456789,Analista SOC,Ciberseguridad,Empresa Demo,Colombia,Bogotá,4,confidencial,approved,2026-07-01,true
+E002,Carlos Andrés Rojas,,carlos.rojas@empresa.com,,Coordinador de Infraestructura,Tecnología,Empresa Demo,Colombia,Medellín,5,privilegiado,approved,2026-07-01,false
+E003,Laura Pérez,,laura.perez@empresa.com,,Auxiliar Administrativo,Recursos Humanos,Empresa Demo,Colombia,Cali,2,general,pending,,false
