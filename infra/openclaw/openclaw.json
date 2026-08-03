@@ -19,14 +19,94 @@
       "denyCommands": ["system.run"]
     }
   },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://ollama:11434",
+        "apiKey": "ollama-local",
+        "api": "ollama",
+        "timeoutSeconds": 900,
+        "models": [
+          {
+            "id": "cyberdecision-cti-chat",
+            "name": "CyberDecision CTI Interactive",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 8192,
+            "maxTokens": 1024,
+            "params": {
+              "num_ctx": 8192,
+              "thinking": false,
+              "keep_alive": "3m"
+            },
+            "compat": {
+              "supportsTools": false
+            }
+          },
+          {
+            "id": "cyberdecision-cti",
+            "name": "CyberDecision CTI Local",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 32768,
+            "maxTokens": 4096,
+            "params": {
+              "num_ctx": 32768,
+              "thinking": false,
+              "keep_alive": "3m"
+            },
+            "compat": {
+              "supportsTools": false
+            }
+          }
+        ]
+      }
+    }
+  },
   "agents": {
     "defaults": {
-      "workspace": "/home/node/.openclaw/workspace"
+      "workspace": "/home/node/.openclaw/workspace",
+      "skipBootstrap": true,
+      "contextInjection": "never",
+      "skills": [],
+      "startupContext": {
+        "enabled": false
+      },
+      "heartbeat": {
+        "every": "0m"
+      },
+      "experimental": {
+        "localModelLean": true
+      },
+      "model": {
+        "primary": "ollama/cyberdecision-cti"
+      },
+      "thinkingDefault": "off",
+      "reasoningDefault": "off",
+      "timeoutSeconds": 900
     },
     "list": [
       {
         "id": "cyberdecision",
         "workspace": "/home/node/.openclaw/workspace-cyberdecision",
+        "contextInjection": "never",
+        "skills": [],
+        "experimental": {
+          "localModelLean": true
+        },
         "tools": {
           "deny": [
             "apply_patch",
@@ -76,5 +156,10 @@
   },
   "commands": {
     "restart": false
+  },
+  "diagnostics": {
+    "enabled": true,
+    "stuckSessionWarnMs": 300000,
+    "stuckSessionAbortMs": 850000
   }
 }

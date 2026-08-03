@@ -1,8 +1,50 @@
 # CyberDecisionEngine
 
-CyberDecisionEngine es un motor CLI defensivo de ciberinteligencia, analitica de ciberriesgo y fraude financiero creado conceptualmente por Edwin Penuela.
+CyberDecisionEngine es el motor defensivo de ciberinteligencia, evidencia,
+decisión y riesgo creado por **Edwin Javier Peñuela Camacho**. Es la
+implementación de referencia viva de **P-CIDER v1.0** (Peñuela Cyber
+Intelligence Decision, Evidence & Risk Model), construido a partir de su
+investigación, arquitectura, metodología y modelos propios.
 
-El repositorio genera informes HTML ejecutivo y tecnico para direccion, CISO, SOC, riesgo, fraude, infraestructura, cloud, DevSecOps y legal. El pipeline combina OSINT permitido, inteligencia de vulnerabilidades, CTI, SOCMINT publico, Dark Web autorizada, fraude digital, ATT&CK, D3FEND, ATLAS, DISARM, NIST CSF 2.0, ISO/IEC 27001:2022, SOC 2, PESTEL, Porter, matriz 4x4 e indice no calibrado de presion de senales.
+El repositorio genera dashboards, JSON/CSV e informes HTML ejecutivo y técnico
+para dirección, CISO, SOC, riesgo, fraude, infraestructura, cloud, DevSecOps y
+legal. El pipeline combina OSINT permitido, inteligencia de vulnerabilidades,
+CTI, SOCMINT público, Dark Web autorizada, fraude digital, ATT&CK, D3FEND,
+ATLAS, DISARM, MITRE F3, NIST CSF 2.0, ISO/IEC 27001:2022, SOC 2, PESTEL,
+Porter, matriz 4x4 e índice no calibrado de presión de señales.
+
+## Alineación P-CIDER
+
+CyberDecisionEngine operacionaliza el ciclo P-CIDER:
+
+```text
+Prepare -> Collect -> Integrate -> Determine -> Estimate -> Respond & Review
+```
+
+Y conserva la cadena analítica:
+
+```text
+Claim -> Evidence -> Interpretation -> Limitation -> Decision -> Closure
+```
+
+La razón teórica es separar conceptos que suelen mezclarse: severidad técnica
+(`CVSS`), prior de explotación (`EPSS`), explotación conocida (`KEV`),
+plausibilidad contextual, impacto, confianza, controles y riesgo. La razón
+práctica es evitar decisiones infladas por duplicados, fuentes incompletas,
+controles no evidenciados o escenarios que no pertenecen al alcance.
+
+Invariantes aplicados:
+
+- La probabilidad/plausibilidad contextual excluye controles.
+- El riesgo inherente se calcula antes de controles.
+- La efectividad de controles se aplica una sola vez al riesgo residual.
+- `sin datos`, `cero observado`, `evidencia potencial`, `hallazgo validado` e
+  `incidente confirmado` son estados distintos.
+- Todos los dashboards, reportes y exportes salen del mismo snapshot persistido
+  por `runId`.
+- MITRE ATT&CK, D3FEND, ATLAS, F3, DISARM, NIST, ISO y otros marcos se usan
+  como referencias interoperables; no transfieren autoría ni propiedad del
+  modelo.
 
 ## Principios de seguridad
 
@@ -13,6 +55,18 @@ El repositorio genera informes HTML ejecutivo y tecnico para direccion, CISO, SO
 - Shodan, Censys, VirusTotal, GreyNoise y AbuseIPDB son conectores pasivos opcionales por API key.
 - Todo analisis organizacional exige `authorized_scope: true` en el perfil YAML.
 - Consola e informe aplican redaccion de secretos y datos sensibles.
+
+## Licencia y derechos
+
+CyberDecisionEngine no usa licencia MIT. Se publica bajo **SDMC
+SOURCE-AVAILABLE NON-COMMERCIAL LICENSE**. Edwin Javier Peñuela Camacho reserva
+los derechos económicos, patrimoniales, de explotación comercial, reproducción,
+distribución, transformación y licenciamiento.
+
+Todo uso comercial, consultoría, SaaS, reportes para clientes, capacitación
+pagada, APIs, dashboards, productos, datasets, modelos o cualquier beneficio
+económico directo o indirecto requiere autorización escrita y pagada de Edwin
+Javier Peñuela Camacho.
 
 ## Instalacion en Mac Intel
 
@@ -69,6 +123,7 @@ Documentación operativa y de auditoría:
 
 - Manual navegable: http://localhost:8080/docs/Manual_Plataforma_Ciberinteligencia.html
 - Manual fuente: `docs/manual/Manual_Plataforma_Ciberinteligencia.md`
+- Proceso, evidencia y cálculos: `docs/cyberdecisionengine_proceso_modelo_calculos.md`
 - Despliegue y operación: `docs/operacion/Guia_Despliegue_y_Operacion.md`
 - Validación paso a paso de dominios: `docs/auditoria/04-validacion-paso-a-paso-dominios.md`
 - Rendimiento y arquitectura: `docs/auditoria/rendimiento-y-arquitectura.md`
@@ -181,7 +236,7 @@ Argon2/bcrypt, MFA y enforcement de licencia en la API ademas del menu.
 
 ```bash
 cyberdeck doctor --verbose
-cyberdeck init-org --name "Grupo Aval" --sector financial --country CO --author "Edwin Penuela" --out config/orgs/grupo_aval.yml
+cyberdeck init-org --name "Grupo Aval" --sector financial --country CO --author "Edwin Javier Peñuela Camacho" --out config/orgs/grupo_aval.yml
 cyberdeck frameworks sync --all --verbose
 cyberdeck run --org config/orgs/grupo_aval.yml --mode snapshot --lookback-days 30 --html reports/grupo_aval_executive.html --verbose
 cyberdeck run --org config/orgs/grupo_aval.yml --mode deep --lookback-days 90 --html reports/grupo_aval_deep.html --verbose
@@ -229,7 +284,7 @@ make test
 scripts/healthcheck.sh
 ```
 
-Los tests cubren el modelo matematico, matriz 4x4, mappings y generacion de reporte. El demo genera un HTML valido sin servidor local.
+Los tests cubren el modelo matematico P-CIDER, matriz 4x4, mappings y generacion de reporte. El demo genera un HTML valido sin servidor local.
 
 La aceptación vigente comprende 120 pruebas Python, lint, build TypeScript/Vite,
 validación de informes y paridad entre API, snapshot de decisión, HTML, JSON y CSV.

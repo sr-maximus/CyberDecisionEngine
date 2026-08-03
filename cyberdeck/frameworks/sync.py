@@ -9,6 +9,7 @@ import yaml
 from cyberdeck.frameworks.atlas import ATLAS_MINIMAL
 from cyberdeck.frameworks.attack import ATTACK_MINIMAL
 from cyberdeck.frameworks.defend import D3FEND_MINIMAL
+from cyberdeck.frameworks.f3 import F3_DATA_PATH, F3_SOURCE, validate_f3_records
 from cyberdeck.frameworks.iso27001 import ISO27001_2022_SUMMARY
 from cyberdeck.frameworks.nist_csf import NIST_CSF_2, NIST_CSF_CATEGORIES
 from cyberdeck.frameworks.soc2 import SOC2_TSC
@@ -73,6 +74,53 @@ async def sync_frameworks(sync_all: bool = True) -> list[SourceStatus]:
 
     _write_json(out_dir / "mitre_d3fend_minimal.json", D3FEND_MINIMAL)
     _write_json(out_dir / "mitre_atlas_minimal.json", ATLAS_MINIMAL)
+    f3_config = config.get("mitre_f3", {})
+    f3_records = 0
+    if sync_all and f3_config.get("enabled", True) and f3_config.get("data_json"):
+        try:
+            f3_payload = validate_f3_records(await http.get_json(f3_config["data_json"]))
+            _write_json(F3_DATA_PATH, f3_payload)
+            f3_records = len(f3_payload)
+            statuses.append(
+                SourceStatus(
+                    name=F3_SOURCE,
+                    status="ok",
+                    records=f3_records,
+                    mode="real",
+                )
+            )
+        except Exception as exc:
+            try:
+                cached = validate_f3_records(
+                    json.loads(F3_DATA_PATH.read_text(encoding="utf-8"))
+                )
+                f3_records = len(cached)
+            except Exception:
+                f3_records = 0
+            statuses.append(
+                SourceStatus(
+                    name=F3_SOURCE,
+                    status="fallback" if f3_records else "error",
+                    records=f3_records,
+                    mode="cache",
+                    warning=str(exc),
+                )
+            )
+    elif F3_DATA_PATH.exists():
+        try:
+            f3_records = len(
+                validate_f3_records(json.loads(F3_DATA_PATH.read_text(encoding="utf-8")))
+            )
+        except Exception:
+            f3_records = 0
+        statuses.append(
+            SourceStatus(
+                name=F3_SOURCE,
+                status="cache" if f3_records else "error",
+                records=f3_records,
+                mode="cache",
+            )
+        )
     _write_yaml(out_dir / "nist_csf_2.yml", {"functions": NIST_CSF_2, "categories": NIST_CSF_CATEGORIES})
     _write_yaml(out_dir / "iso27001_2022_summary.yml", ISO27001_2022_SUMMARY)
     _write_yaml(out_dir / "soc2_tsc.yml", SOC2_TSC)

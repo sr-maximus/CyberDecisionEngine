@@ -36,7 +36,7 @@ evidencia por una imagen inferida.
 | Media | `country-state-city` produce un chunk diferido grande | catalogo geografico completo | latencia al abrir ciudad; no afecta carga inicial | aceptado y medido en auditoria 01 |
 | Media | El modelo de evidencia no tenia un contrato de captura visual | solo existian URL y validacion tecnica | el informe no podia demostrar que una captura fue generada | corregido: `EvidenceCapture` y validacion de assets |
 | Media | Los paquetes independientes conservaban un `run-summary.json` anterior | el regenerador copiaba informes y contexto, pero no reconstruia el resumen | dashboard/API y carpeta `outputs` podian diferir | corregido y cubierto por prueba |
-| Baja | El host no expone Node en `PATH` por defecto | runtime encapsulado de Codex/Docker | el build local requiere ruta del runtime o Docker | documentado |
+| Baja | El host no expone Node en `PATH` por defecto | runtime encapsulado o Docker | el build local requiere ruta del runtime o Docker | documentado |
 | Informativa | La copia no contiene `.git` | entrega sin metadatos Git | no es posible crear rama o commits | limitacion del workspace |
 
 ## Casos reales disponibles

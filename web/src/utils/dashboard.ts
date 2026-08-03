@@ -13,6 +13,14 @@ export interface RankedItem {
   tone?: "low" | "medium" | "high" | "critical";
 }
 
+export interface GeographicCountryItem {
+  name: string;
+  code: string;
+  records: number;
+  declared: boolean;
+  status: "declared_scope" | "declared_and_mentioned" | "mention_only" | "supported_operational_context";
+}
+
 export interface SocmintNode {
   id: string;
   label: string;
@@ -50,6 +58,33 @@ export interface FrameworkMappingItem {
   sourceDate?: string;
   decision: string;
   tone: "low" | "medium" | "high" | "critical";
+  recordCount: number;
+  validatedCount: number;
+  directCount: number;
+  axisMappings: FrameworkAxisMapping[];
+}
+
+export interface FrameworkEvidenceRecord {
+  evidenceId: string;
+  title: string;
+  url: string;
+  source: string;
+  status: string;
+  relationship: string;
+  domain: string;
+  observedAt: string;
+}
+
+export interface FrameworkAxisMapping {
+  axis: string;
+  controls: string[];
+  recordCount: number;
+  validatedCount: number;
+  directCount: number;
+  relatedCount: number;
+  findingCount: number;
+  domains: string[];
+  evidence: FrameworkEvidenceRecord[];
 }
 
 export interface StrategyDimension {
@@ -165,6 +200,7 @@ export interface PredictionDriver {
 }
 
 export interface PredictionScenario {
+  id?: string;
   modality: string;
   technique: string;
   group: string;
@@ -173,15 +209,24 @@ export interface PredictionScenario {
   evidenceCount: number;
   decision: string;
   evidence: ThreatEvent[];
+  status?: string;
+  sourceCount?: number;
 }
 
 export interface AttackPredictionModel {
+  status: "assessed" | "insufficient_evidence" | "legacy_fallback";
   pressure7d: number;
   pressure14d: number;
   pressure30d: number;
+  pressure90d: number;
   signalRateDaily: number;
   evidenceConfidence: number;
   calibrated: false;
+  probabilityValue: number | null;
+  probabilityStatus: string;
+  trendDirection: "rising" | "stable" | "falling" | "insufficient_evidence";
+  trendChangeRatio: number | null;
+  modelVersion: string;
   leadingScenario?: PredictionScenario;
   drivers: PredictionDriver[];
   scenarios: PredictionScenario[];
@@ -245,11 +290,46 @@ export interface BrandRiskModel {
 
 export interface VulnerabilityIntelModel {
   confirmedCves: number;
+  candidateCves: number;
+  contextualCves: number;
   kevMatches: number;
+  publicExploitReferences: number;
+  cvssV4Records: number;
   observedTechnologies: number;
   surfaceAssets: number;
   patchFocus: string;
-  rows: Array<{ type: string; label: string; asset: string; status: string; decision: string; evidence_url?: string | null }>;
+  rows: Array<{
+    type: string;
+    label: string;
+    asset: string;
+    status: string;
+    decision: string;
+    cvssScore: number | null;
+    cvssVersion: string;
+    cvssVector: string;
+    product: string;
+    observedVersion: string;
+    affectedRange: string;
+    applicabilityBasis: string;
+    evidence_url?: string | null;
+  }>;
+}
+
+export interface QuantitativeRiskModel {
+  layered: {
+    status: string;
+    currency: string;
+    scenarioCount: number;
+    aggregateExpectedAnnualLoss: number | null;
+    modelVersion: string;
+    scenarios: Array<{
+      name: string;
+      resultingFrequency: number;
+      expectedAnnualLoss: number;
+      riskReduction: number;
+      layerCount: number;
+    }>;
+  };
 }
 
 export interface DashboardModel {
@@ -260,6 +340,7 @@ export interface DashboardModel {
   attackActions: RankedItem[];
   affectedStates: RankedItem[];
   regionalHeat: RankedItem[];
+  geographicCountries: GeographicCountryItem[];
   sectorMatrix: RankedItem[];
   sourceFreshness: number;
   socmintNodes: SocmintNode[];
@@ -281,10 +362,11 @@ export interface DashboardModel {
   darkwebEvents: ThreatEvent[];
   attackPrediction: AttackPredictionModel;
   vulnerabilityIntel: VulnerabilityIntelModel;
+  quantitativeRisk: QuantitativeRiskModel;
 }
 
 const platformNames = ["Facebook", "Instagram", "TikTok", "X", "Public web"];
-export const FRAMEWORK_REFERENCES_VERIFIED_AT = "2026-07-19";
+export const FRAMEWORK_REFERENCES_VERIFIED_AT = "2026-07-26";
 const frameworkCatalog = [
   {
     name: "NIST CSF",
@@ -395,6 +477,18 @@ const frameworkCatalog = [
     sourceDate: "2026-05-04"
   },
   {
+    name: "MITRE F3",
+    family: "Fraud behavior",
+    domains: ["Reconnaissance", "Resource development", "Initial access", "Stealth", "Defense impairment", "Positioning", "Execution", "Monetization"],
+    focus: ["fraud", "account_takeover", "brand_impersonation", "fake_domain", "phishing", "credential_stuffing"],
+    considerations: ["Fraud actor behavior", "identity and transaction abuse", "impersonation infrastructure", "monetization path"],
+    evidenceFocus: ["explicit F3 mappings", "assured current-run records", "fraud and brand evidence", "identity abuse signals"],
+    analysisUse: "Map assured fraud-related evidence to official F3 tactics and techniques without treating a behavioral match as a confirmed fraud incident.",
+    sourceLabel: "MITRE Fight Fraud Framework (F3) v1.1",
+    sourceUrl: "https://ctid.mitre.org/fraud",
+    sourceDate: "2026-06-23"
+  },
+  {
     name: "COBIT",
     family: "Governance",
     domains: ["Evaluate", "Align", "Build", "Deliver", "Monitor"],
@@ -412,14 +506,14 @@ export function buildDashboardModel(run: RunRecord | undefined, filters: Dashboa
   const events = filterEvents(run?.summary.events ?? [], filters);
   const findings = run?.summary.findings ?? [];
   const statuses = run?.summary.source_statuses ?? [];
-  const categories = topCounts(events.map((event) => event.category || "uncategorized"));
+  const categories = topCounts(events.map(dashboardCategory));
   const actors = actorCounts(events, findings);
   const ttpImpact = buildTtpImpact(events, findings);
   const socmintEvents = events.filter(isSocmintEvent);
   const socmintNodes = buildSocmintNodes(socmintEvents);
   const socmintLinks = buildSocmintLinks(socmintEvents);
   const threatGraphNodes = buildThreatGraphNodes(events, actors, ttpImpact);
-  const threatGraphLinks = buildThreatGraphLinks(threatGraphNodes);
+  const threatGraphLinks = buildThreatGraphLinks(threatGraphNodes, events);
   const strategicNews = objectMetric(run?.summary.metrics?.strategic_news);
   const strategicSnapshots = Array.isArray(strategicNews.snapshots) ? strategicNews.snapshots : [];
   return {
@@ -430,6 +524,7 @@ export function buildDashboardModel(run: RunRecord | undefined, filters: Dashboa
     attackActions: buildAttackActions(events, findings),
     affectedStates: buildAffectedStates(events, run, findings),
     regionalHeat: buildRegionalHeat(events, run),
+    geographicCountries: buildGeographicCountries(events, run),
     sectorMatrix: buildSectorMatrix(run, findings, events),
     sourceFreshness: buildSourceFreshness(statuses),
     socmintNodes,
@@ -446,11 +541,12 @@ export function buildDashboardModel(run: RunRecord | undefined, filters: Dashboa
     riskHeatRows: buildRiskHeatRows(run?.summary.metrics?.risk_heat_radar, findings, events),
     platformMentions: buildPlatformMentions(socmintEvents),
     latestHeadlines: events.slice(0, 8),
-    groupHeadlines: buildGroupHeadlines(events, filters),
+    groupHeadlines: buildGroupHeadlines(events, filters, run?.summary.metrics),
     osintEvents: events.filter(isOsintEvent),
     darkwebEvents: events.filter(isDarkwebEvent),
     attackPrediction: buildAttackPrediction(run, events, findings),
-    vulnerabilityIntel: buildVulnerabilityIntel(run?.summary.metrics)
+    vulnerabilityIntel: buildVulnerabilityIntel(run?.summary.metrics),
+    quantitativeRisk: buildQuantitativeRisk(run?.summary.metrics)
   };
 }
 
@@ -459,7 +555,11 @@ function buildVulnerabilityIntel(metrics?: Record<string, unknown>): Vulnerabili
   const rows = Array.isArray(data.rows) ? data.rows.slice(0, 8) : [];
   return {
     confirmedCves: Math.round(numberMetric(data.confirmed_cves, 0)),
+    candidateCves: Math.round(numberMetric(data.candidate_cves, 0)),
+    contextualCves: Math.round(numberMetric(data.contextual_cves, 0)),
     kevMatches: Math.round(numberMetric(data.kev_matches, 0)),
+    publicExploitReferences: Math.round(numberMetric(data.public_exploit_references, 0)),
+    cvssV4Records: Math.round(numberMetric(data.cvss_v4_records, 0)),
     observedTechnologies: Math.round(numberMetric(data.observed_technologies, 0)),
     surfaceAssets: Math.round(numberMetric(data.surface_assets, 0)),
     patchFocus: stringMetric(data.patch_focus, "Sin datos de vulnerabilidades en la corrida actual."),
@@ -471,9 +571,41 @@ function buildVulnerabilityIntel(metrics?: Record<string, unknown>): Vulnerabili
         asset: stringMetric(item.asset, "scope"),
         status: stringMetric(item.status, "sin estado"),
         decision: stringMetric(item.decision, ""),
+        cvssScore: optionalNumber(item.cvss_score),
+        cvssVersion: stringMetric(item.cvss_version, ""),
+        cvssVector: stringMetric(item.cvss_vector, ""),
+        product: stringMetric(item.product, ""),
+        observedVersion: stringMetric(item.observed_version, ""),
+        affectedRange: stringMetric(item.affected_range, ""),
+        applicabilityBasis: stringMetric(item.applicability_basis, ""),
         evidence_url: stringMetric(item.evidence_url, "")
       };
     })
+  };
+}
+
+function buildQuantitativeRisk(metrics?: Record<string, unknown>): QuantitativeRiskModel {
+  const layered = objectMetric(metrics?.layered_scenario_risk);
+  const scenarios = Array.isArray(layered.scenarios) ? layered.scenarios : [];
+  return {
+    layered: {
+      status: stringMetric(layered.status, "no_data"),
+      currency: stringMetric(layered.currency, ""),
+      scenarioCount: Math.round(numberMetric(layered.scenario_count, 0)),
+      aggregateExpectedAnnualLoss: optionalNumber(layered.aggregate_expected_annual_loss),
+      modelVersion: stringMetric(layered.model_version, "CDE-LAYERED-SCENARIO-1.0"),
+      scenarios: scenarios.map((value) => {
+        const item = objectMetric(value);
+        const protectionLayers = Array.isArray(item.protection_layers) ? item.protection_layers : [];
+        return {
+          name: stringMetric(item.scenario_name, "Scenario"),
+          resultingFrequency: numberMetric(item.resulting_event_frequency, 0),
+          expectedAnnualLoss: numberMetric(item.expected_annual_loss, 0),
+          riskReduction: numberMetric(item.relative_risk_reduction, 0),
+          layerCount: protectionLayers.length
+        };
+      })
+    }
   };
 }
 
@@ -525,30 +657,89 @@ function topCounts(values: string[]): RankedItem[] {
   return rows.slice(0, 8);
 }
 
-function actorCounts(events: ThreatEvent[], findings: Finding[]): RankedItem[] {
-  const actorValues = events.map((event) => event.actor || inferActor(event)).filter(Boolean);
-  const findingValues = findings.map((finding) => finding.category);
-  return topCounts([...actorValues, ...findingValues]);
+function actorCounts(events: ThreatEvent[], _findings: Finding[]): RankedItem[] {
+  return topCounts(events.map((event) => explicitActor(event.actor)).filter(Boolean));
 }
 
-function inferActor(event: ThreatEvent): string {
-  const text = `${event.title} ${(event.tags ?? []).join(" ")}`.toLowerCase();
-  if (text.includes("ransom")) return "ransomware";
-  if (text.includes("phishing") || text.includes("fraud")) return "brand_impersonation";
-  if (text.includes("cve") || text.includes("kev")) return "exploit_broker";
-  return "open_web";
+function explicitActor(value?: string | null): string {
+  if (!value) return "";
+  return ["unattributed", "unknown", "sin atribución", "no atribuido", "open_web", "public_web"].includes(
+    value.toLowerCase()
+  )
+    ? ""
+    : value;
 }
 
 function buildRegionalHeat(events: ThreatEvent[], run: RunRecord | undefined): RankedItem[] {
+  const geographic = objectMetric(run?.summary.metrics?.geographic_intelligence);
+  const supportedRows = Array.isArray(geographic.evidence_supported_countries)
+    ? geographic.evidence_supported_countries
+    : [];
+  const supported = supportedRows
+    .map((value) => {
+      const row = objectMetric(value);
+      const count = Math.round(numberMetric(row.records, 0));
+      return {
+        name: stringMetric(row.country, ""),
+        value: count,
+        tone: toneForCount(count)
+      };
+    })
+    .filter((item) => item.name && item.value > 0);
+  if (supported.length) return supported;
   const explicitLocations = topCounts(events.flatMap(extractLocations));
-  if (explicitLocations.length) return explicitLocations.map((item) => ({ ...item, tone: toneForCount(item.value) }));
-  const fallbackLocation = run?.request?.country?.trim();
-  const signalCount = events.length || run?.summary.kpis.new_events || run?.summary.domain_signals.reduce((sum, signal) => sum + signal.events, 0) || 0;
-  if (!fallbackLocation || !signalCount) return [];
-  return [{ name: formatScopeName(fallbackLocation), value: signalCount, tone: toneForCount(signalCount) }];
+  return explicitLocations.map((item) => ({ ...item, tone: toneForCount(item.value) }));
+}
+
+function buildGeographicCountries(events: ThreatEvent[], run: RunRecord | undefined): GeographicCountryItem[] {
+  const geographic = objectMetric(run?.summary.metrics?.geographic_intelligence);
+  const rows = Array.isArray(geographic.country_inventory) ? geographic.country_inventory : [];
+  const inventory = rows
+    .map((value) => {
+      const row = objectMetric(value);
+      const status = stringMetric(row.status, "mention_only");
+      return {
+        name: stringMetric(row.country, ""),
+        code: stringMetric(row.code, ""),
+        records: Math.max(0, Math.round(numberMetric(row.records, 0))),
+        declared: Boolean(row.declared),
+        status: (
+          ["declared_scope", "declared_and_mentioned", "mention_only", "supported_operational_context"].includes(status)
+            ? status
+            : "mention_only"
+        ) as GeographicCountryItem["status"]
+      };
+    })
+    .filter((item) => item.name);
+  if (inventory.length) return inventory;
+  return buildRegionalHeat(events, run).map((item) => ({
+    name: item.name,
+    code: "",
+    records: item.value,
+    declared: false,
+    status: "mention_only"
+  }));
 }
 
 function buildSectorMatrix(run: RunRecord | undefined, findings: Finding[], events: ThreatEvent[]): RankedItem[] {
+  const sectorIntelligence = objectMetric(run?.summary.metrics?.sector_intelligence);
+  const supportedRows = Array.isArray(sectorIntelligence.evidence_supported_sectors)
+    ? sectorIntelligence.evidence_supported_sectors
+    : [];
+  const supported = supportedRows
+    .map((value) => {
+      const row = objectMetric(value);
+      const count = Math.round(numberMetric(row.records, 0));
+      return {
+        name: stringMetric(row.sector, ""),
+        value: count,
+        tone: toneForCount(count)
+      };
+    })
+    .filter((item) => item.name && item.value > 0)
+    .slice(0, 8);
+  if (supported.length) return supported;
+
   const sector = run?.request?.sector?.trim();
   const maxRisk = Math.max(...findings.map((finding) => finding.residual_risk), 0);
   const kpiRisk = run?.summary.kpis.max_residual_risk ?? 0;
@@ -603,35 +794,34 @@ function buildGraphMetrics(events: ThreatEvent[], nodes: SocmintNode[], links: S
 }
 
 function buildFrameworkMappings(findings: Finding[], events: ThreatEvent[], metrics: Record<string, unknown> | undefined): FrameworkMappingItem[] {
-  const maxRisk = Math.max(...findings.map((finding) => finding.residual_risk), 0);
-  const assuredEvents = events.filter((event) => ["direct", "validated", "confirmed"].includes(event.evidence_status ?? "raw"));
-  const hasEvidence = findings.length > 0 || assuredEvents.length > 0;
   const controlScores = objectMetric(metrics?.control_scores);
-  const mitreMetrics = objectMetric(metrics?.mitre);
-  const d3fendMetrics = objectMetric(metrics?.d3fend);
-  const atlasMetrics = objectMetric(metrics?.atlas);
-  const signalText = [
-    ...findings.map((finding) => `${finding.title} ${finding.category} ${finding.evidence.join(" ")}`),
-    ...assuredEvents.map((event) => `${event.title} ${event.category} ${event.actor ?? ""} ${(event.tags ?? []).join(" ")}`)
-  ]
-    .join(" ")
-    .toLowerCase();
+  const backendMapping = objectMetric(metrics?.framework_mapping);
+  const backendRows = Array.isArray(backendMapping.mappings) ? backendMapping.mappings.map((item) => objectMetric(item)) : [];
 
   return frameworkCatalog.map((framework) => {
-    const focusHits = framework.focus.filter((keyword) => keywordMatches(signalText, keyword)).length;
-    const hasFrameworkEvidence = frameworkEvidenceFor(framework.name, hasEvidence, focusHits, mitreMetrics, d3fendMetrics, atlasMetrics);
-    const signalLoad = Math.min(16, assuredEvents.length * 0.1);
-    const exposure = hasFrameworkEvidence ? clamp(Math.round(maxRisk * 2.4 + signalLoad + focusHits * 7), 0, 95) : 0;
+    const axisMappings = backendRows.length
+      ? backendRows.filter((row) => stringMetric(row.framework, "") === framework.name).map(parseFrameworkAxisMapping)
+      : deriveFrameworkAxisMappings(framework, events, findings);
+    const recordCount = new Set(axisMappings.flatMap((item) => item.evidence.map((evidence) => evidence.evidenceId))).size;
+    const validatedCount = new Set(
+      axisMappings.flatMap((item) => item.evidence.filter((evidence) => ["validated", "confirmed"].includes(evidence.status)).map((evidence) => evidence.evidenceId))
+    ).size;
+    const directCount = new Set(
+      axisMappings.flatMap((item) => item.evidence.filter((evidence) => evidence.status === "direct").map((evidence) => evidence.evidenceId))
+    ).size;
+    const hasFrameworkEvidence = recordCount > 0;
+    const exposure = recordCount;
     const coverageValue = frameworkCoverage(framework.name, controlScores);
     const coverage = coverageValue === null ? 0 : Math.round(coverageValue * 100);
-    const tone = toneForExposure(exposure);
+    const tone = validatedCount > 0 ? "high" : directCount > 0 ? "medium" : recordCount > 0 ? "low" : "low";
+    const mappedAxes = axisMappings.map((item) => item.axis.replace(/_/g, " "));
     return {
       name: framework.name,
       family: framework.family,
       domains: framework.domains,
-      affectedAspects: hasFrameworkEvidence ? affectedAspectsFor(framework.name, framework.focus, signalText) : ["No active evidence"],
+      affectedAspects: hasFrameworkEvidence ? mappedAxes : ["No active evidence"],
       considerations: framework.considerations,
-      evidenceFocus: framework.evidenceFocus,
+      evidenceFocus: axisMappings.flatMap((item) => item.evidence.map((evidence) => evidence.title)).slice(0, 8),
       analysisUse: framework.analysisUse,
       sourceLabel: framework.sourceLabel,
       sourceUrl: framework.sourceUrl,
@@ -640,8 +830,84 @@ function buildFrameworkMappings(findings: Finding[], events: ThreatEvent[], metr
       coverage,
       coverageAssessed: coverageValue !== null,
       tone,
-      decision: hasFrameworkEvidence ? decisionForTone(tone) : "No active evidence"
+      decision: hasFrameworkEvidence
+        ? `${recordCount} current-run record(s); ${validatedCount} validated and ${directCount} direct. Review linked evidence before deciding control treatment.`
+        : "No active evidence",
+      recordCount,
+      validatedCount,
+      directCount,
+      axisMappings
     };
+  });
+}
+
+function parseFrameworkAxisMapping(raw: Record<string, unknown>): FrameworkAxisMapping {
+  const evidenceRows = Array.isArray(raw.evidence) ? raw.evidence.map((item) => objectMetric(item)) : [];
+  return {
+    axis: stringMetric(raw.axis, "unmapped"),
+    controls: stringList(raw.controls),
+    recordCount: Math.round(numberMetric(raw.record_count, evidenceRows.length)),
+    validatedCount: Math.round(numberMetric(raw.validated_count, 0)),
+    directCount: Math.round(numberMetric(raw.direct_count, 0)),
+    relatedCount: Math.round(numberMetric(raw.related_count, 0)),
+    findingCount: Math.round(numberMetric(raw.finding_count, 0)),
+    domains: stringList(raw.domains),
+    evidence: evidenceRows.map((item) => ({
+      evidenceId: stringMetric(item.evidence_id, stringMetric(item.url, "evidence")),
+      title: stringMetric(item.title, stringMetric(item.url, "Evidence")),
+      url: stringMetric(item.url, ""),
+      source: stringMetric(item.source, ""),
+      status: stringMetric(item.evidence_status, "raw"),
+      relationship: stringMetric(item.relationship, "unassessed"),
+      domain: stringMetric(item.domain, ""),
+      observedAt: stringMetric(item.observed_at, "")
+    }))
+  };
+}
+
+function deriveFrameworkAxisMappings(
+  framework: (typeof frameworkCatalog)[number],
+  events: ThreatEvent[],
+  findings: Finding[]
+): FrameworkAxisMapping[] {
+  const axes = [
+    { axis: "governance", terms: ["govern", "risk", "legal", "regulat", "policy", "audit"] },
+    { axis: "identity", terms: ["identity", "credential", "account", "login", "password", "mfa", "session", "bec"] },
+    { axis: "protect", terms: ["protect", "hardening", "configuration", "encryption", "backup", "recover"] },
+    { axis: "detect", terms: ["detect", "monitor", "logging", "telemetry", "alert", "indicator"] },
+    { axis: "response", terms: ["incident", "respond", "response", "contain", "recover", "takedown"] },
+    { axis: "privacy", terms: ["privacy", "personal data", "pii", "confidential", "breach", "gdpr"] },
+    { axis: "vulnerability", terms: ["vulnerab", "cve-", "kev", "exploit", "patch", "exposure", "surface"] },
+    { axis: "fraud", terms: ["fraud", "phish", "scam", "estafa", "suplant", "imperson", "fake job", "empleo falso"] },
+    { axis: "ai", terms: ["artificial intelligence", "machine learning", "llm", "prompt", "model", "agent", "atlas"] },
+    { axis: "adversary", terms: ["attack", "ransom", "malware", "campaign", "campaña", "actor", "apt", "ttp"] }
+  ];
+  const frameworkText = normalizeDashboardText([framework.name, framework.family, ...framework.domains, ...framework.focus, ...framework.considerations].join(" "));
+  return axes.flatMap(({ axis, terms }) => {
+    if (!terms.some((term) => frameworkText.includes(term))) return [];
+    const related = events.filter((event) => event.evidence_url && terms.some((term) => eventText(event).toLowerCase().includes(term)));
+    if (!related.length) return [];
+    const evidence = related.map((event) => ({
+      evidenceId: event.canonical_id || event.id,
+      title: event.title,
+      url: event.evidence_url || "",
+      source: event.source,
+      status: event.evidence_status || "raw",
+      relationship: event.relationship_to_scope || "unassessed",
+      domain: event.host || event.asset || "",
+      observedAt: event.observed_at
+    }));
+    return [{
+      axis,
+      controls: framework.domains.filter((domain) => terms.some((term) => normalizeDashboardText(domain).includes(term))).slice(0, 5),
+      recordCount: evidence.length,
+      validatedCount: evidence.filter((item) => ["validated", "confirmed"].includes(item.status)).length,
+      directCount: evidence.filter((item) => item.status === "direct").length,
+      relatedCount: evidence.filter((item) => !["direct", "validated", "confirmed"].includes(item.status)).length,
+      findingCount: findings.filter((finding) => terms.some((term) => `${finding.title} ${finding.category}`.toLowerCase().includes(term))).length,
+      domains: [...new Set(evidence.map((item) => item.domain).filter(Boolean))],
+      evidence: evidence.slice(0, 12)
+    }];
   });
 }
 
@@ -778,6 +1044,10 @@ function buildRiskHeatRows(raw: unknown, findings: Finding[], events: ThreatEven
 
 function buildAttackPrediction(run: RunRecord | undefined, events: ThreatEvent[], findings: Finding[]): AttackPredictionModel {
   const metrics = objectMetric(run?.summary.metrics);
+  const prospective = objectMetric(metrics.prospective_attack_risk);
+  if (String(prospective.model_type ?? "") === "prospective_signal_pressure") {
+    return buildProspectiveAttackPrediction(run, prospective, events);
+  }
   const forecast30 = numberMetric(objectMetric(objectMetric(metrics.forecast)["30"]).signal_pressure_index, NaN);
   const analyticEvents = events.filter((event) =>
     !event.evidence_status || ["direct", "validated", "confirmed"].includes(event.evidence_status)
@@ -815,12 +1085,19 @@ function buildAttackPrediction(run: RunRecord | undefined, events: ThreatEvent[]
     ? clamp(Math.round((0.25 + Math.min(0.45, analyticEvents.length / 180) + Math.min(0.2, weightedEvents / 80) + Math.min(0.1, findings.length / 20)) * 100), 0, 95)
     : 0;
   return {
+    status: analyticEvents.length ? "legacy_fallback" : "insufficient_evidence",
     pressure7d,
     pressure14d,
     pressure30d,
+    pressure90d: pressureIndex(signalRateDaily, 90),
     signalRateDaily,
     evidenceConfidence,
     calibrated: false,
+    probabilityValue: null,
+    probabilityStatus: "not_calibrated",
+    trendDirection: "insufficient_evidence",
+    trendChangeRatio: null,
+    modelVersion: "legacy-frontend-fallback",
     leadingScenario: scenarios[0],
     drivers: [
       { name: "Frequency", value: Math.round(frequency * 100), explanation: `${analyticEvents.length} direct or validated signals, recency weighted ${weightedEvents.toFixed(1)}` },
@@ -836,6 +1113,86 @@ function buildAttackPrediction(run: RunRecord | undefined, events: ThreatEvent[]
   };
 }
 
+function buildProspectiveAttackPrediction(
+  run: RunRecord | undefined,
+  prospective: Record<string, unknown>,
+  events: ThreatEvent[]
+): AttackPredictionModel {
+  const horizons = objectMetric(prospective.horizons);
+  const horizonValue = (days: string) =>
+    clamp(numberMetric(objectMetric(horizons[days]).signal_pressure_index, 0), 0, 1);
+  const eventById = new Map<string, ThreatEvent>();
+  events.forEach((event) => {
+    eventById.set(event.id, event);
+    if (event.canonical_id) eventById.set(event.canonical_id, event);
+  });
+  const rawDrivers = Array.isArray(prospective.drivers) ? prospective.drivers : [];
+  const drivers = rawDrivers.map((raw) => {
+    const driver = objectMetric(raw);
+    return {
+      name: String(driver.name ?? ""),
+      value: Math.round(clamp(numberMetric(driver.value, 0), 0, 1) * 100),
+      explanation: String(driver.explanation ?? "")
+    };
+  }).filter((driver) => driver.name);
+  const rawScenarios = Array.isArray(prospective.scenarios) ? prospective.scenarios : [];
+  const scenarios = rawScenarios.map((raw) => {
+    const scenario = objectMetric(raw);
+    const evidenceIds = Array.isArray(scenario.evidence_ids)
+      ? scenario.evidence_ids.map((value) => String(value))
+      : [];
+    const evidence = evidenceIds
+      .map((id) => eventById.get(id))
+      .filter((event): event is ThreatEvent => Boolean(event));
+    const explicitActors = evidence
+      .map((event) => event.actor)
+      .filter((actor): actor is string => Boolean(actor && !["unknown", "unattributed"].includes(actor.toLowerCase())));
+    const explicitTechniques = evidence
+      .map((event) => event.technique)
+      .filter((technique): technique is string => Boolean(technique));
+    return {
+      id: String(scenario.id ?? ""),
+      modality: String(scenario.modality ?? ""),
+      technique: explicitTechniques[0] ?? "N/D",
+      group: explicitActors[0] ?? "N/D",
+      sector: run?.request?.sector || "N/D",
+      supportScore: clamp(numberMetric(scenario.support_score, 0), 0, 1),
+      evidenceCount: Math.max(0, Math.round(numberMetric(scenario.evidence_count, evidence.length))),
+      sourceCount: Math.max(0, Math.round(numberMetric(scenario.source_count, 0))),
+      decision: String(scenario.decision ?? ""),
+      evidence,
+      status: String(scenario.status ?? "candidate")
+    };
+  }).filter((scenario) => scenario.modality && scenario.evidenceCount > 0);
+  const trend = objectMetric(prospective.trend);
+  const trendDirection = String(trend.direction ?? "insufficient_evidence");
+  const probability = objectMetric(prospective.attack_probability);
+  const status = String(prospective.status ?? "insufficient_evidence") === "assessed"
+    ? "assessed"
+    : "insufficient_evidence";
+  return {
+    status,
+    pressure7d: horizonValue("7"),
+    pressure14d: horizonValue("14"),
+    pressure30d: horizonValue("30"),
+    pressure90d: horizonValue("90"),
+    signalRateDaily: Math.max(0, numberMetric(prospective.daily_signal_rate, 0)),
+    evidenceConfidence: clamp(numberMetric(prospective.evidence_confidence, 0), 0, 100),
+    calibrated: false,
+    probabilityValue: typeof probability.value === "number" ? probability.value : null,
+    probabilityStatus: String(probability.status ?? "not_calibrated"),
+    trendDirection: ["rising", "stable", "falling"].includes(trendDirection)
+      ? trendDirection as "rising" | "stable" | "falling"
+      : "insufficient_evidence",
+    trendChangeRatio: typeof trend.change_ratio === "number" ? trend.change_ratio : null,
+    modelVersion: String(prospective.model_version ?? "unknown"),
+    leadingScenario: scenarios[0],
+    drivers,
+    scenarios,
+    methodology: "Índice prospectivo de presión de señales sustentado exclusivamente en evidencia directa, validada o confirmada. No representa una probabilidad calibrada de ataque."
+  };
+}
+
 function buildPredictionScenarios(run: RunRecord | undefined, events: ThreatEvent[], pressure30d: number, inferredSector?: string): PredictionScenario[] {
   if (!events.length) return [];
   const sector = run?.request?.sector || inferredSector || "current sector";
@@ -845,7 +1202,7 @@ function buildPredictionScenarios(run: RunRecord | undefined, events: ThreatEven
       return mode.keywords.some((keyword) => keywordMatches(text, keyword)) || text.includes(mode.technique.toLowerCase().split(" ")[0]);
     });
     const weighted = recencyWeightedEvents(evidence);
-    const actor = topCounts(evidence.map((event) => event.actor || inferActor(event)))[0]?.name ?? "unattributed";
+    const actor = topCounts(evidence.map((event) => explicitActor(event.actor)).filter(Boolean))[0]?.name ?? "unattributed";
     const score = weighted * 0.62 + evidence.length * 0.22 + mode.baseWeight * 10 + sectorWeight(sector) * 2;
     return { mode, evidence, actor, score };
   });
@@ -1465,7 +1822,7 @@ function frameworkCoverage(name: string, controlScores: Record<string, unknown>)
 
 function extractLocations(event: ThreatEvent): string[] {
   return (event.tags ?? [])
-    .filter((tag) => /^(geo|country|city|region):/i.test(tag))
+    .filter((tag) => /^(geo|country|city|region|country_mention|country_operation_supported):/i.test(tag))
     .map((tag) => tag.split(":").slice(1).join(":").trim())
     .filter(Boolean);
 }
@@ -1485,8 +1842,20 @@ function numberMetric(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function optionalNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function stringMetric(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())) : [];
+}
+
+function normalizeDashboardText(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 function heatTone(value: string): "low" | "medium" | "high" | "critical" {
@@ -1577,10 +1946,26 @@ function buildTtpImpact(events: ThreatEvent[], findings: Finding[]): RankedItem[
 }
 
 function buildAttackActions(events: ThreatEvent[], findings: Finding[]): RankedItem[] {
+  const observedEvents = events.filter((event) => {
+    if (event.incident_confirmed) return true;
+    if (!["direct", "validated", "confirmed"].includes(event.evidence_status ?? "")) return false;
+    const validation = String(event.validation_result ?? "").toLowerCase();
+    return validation === "validated" || validation === "confirmed" || event.attack_mapping_status === "observed";
+  });
   return topCounts([
-    ...events.map((event) => inferAction(`${event.title} ${event.category}`)),
+    ...observedEvents.map((event) => inferAction(`${event.title} ${event.category}`)),
     ...findings.map((finding) => inferAction(`${finding.title} ${finding.category}`))
   ]);
+}
+
+function dashboardCategory(event: ThreatEvent): string {
+  if (!["vulnerability", "vulnerability_probability"].includes(event.category)) {
+    return event.category || "uncategorized";
+  }
+  const status = event.vulnerability_status ?? "";
+  if (["cve_applicable", "kev_applicable", "confirmed"].includes(status)) return "vulnerability";
+  if (status === "candidate_product_match") return "vulnerability_candidate";
+  return "vulnerability_context";
 }
 
 function buildAffectedStates(events: ThreatEvent[], run: RunRecord | undefined, findings: Finding[]): RankedItem[] {
@@ -1604,33 +1989,47 @@ function buildAffectedStates(events: ThreatEvent[], run: RunRecord | undefined, 
   return topCounts(events.map((event) => event.source)).map((item) => ({ ...item, tone: toneForCount(item.value) }));
 }
 
-function buildGroupHeadlines(events: ThreatEvent[], filters: DashboardFilters): ThreatEvent[] {
+function buildGroupHeadlines(events: ThreatEvent[], filters: DashboardFilters, metrics?: Record<string, unknown>): ThreatEvent[] {
   const scoped = includesAll(filters.threatGroups, ALL_GROUPS)
     ? events
     : events.filter((event) => matchesAny(filters.threatGroups, ALL_GROUPS, `${event.title} ${event.actor ?? ""} ${(event.tags ?? []).join(" ")}`.toLowerCase()));
-  const ranked = scoped
-    .map((event) => ({ event, score: headlineScore(event) }))
-    .filter((item) => item.score > 0)
-    .sort((left, right) => {
-      if (right.score !== left.score) return right.score - left.score;
-      return Date.parse(right.event.observed_at || "") - Date.parse(left.event.observed_at || "");
-    })
-    .map((item) => item.event);
-  if (ranked.length) return ranked.slice(0, 10);
-  return scoped.filter((event) => event.evidence_url).slice(0, 8);
+  const metric = objectMetric(metrics?.threat_news);
+  const rows = Array.isArray(metric.rows) ? metric.rows.map((item) => objectMetric(item)) : [];
+  if (rows.length) {
+    return rows.slice(0, 10).map((row) => ({
+      id: stringMetric(row.evidence_id, stringMetric(row.url, "news")),
+      title: stringMetric(row.title, "Threat intelligence record"),
+      category: stringMetric(row.classification, "threat_intelligence"),
+      source: stringMetric(row.source, "public_source"),
+      observed_at: stringMetric(row.observed_at, ""),
+      actor: stringMetric(row.actor, "") || null,
+      technique: stringMetric(row.technique, "") || null,
+      evidence_url: stringMetric(row.url, ""),
+      evidence_status: stringMetric(row.evidence_status, "raw"),
+      relationship_to_scope: stringMetric(row.relationship, "unassessed"),
+      incident_confirmed: Boolean(row.observed_attack)
+    }));
+  }
+  return scoped
+    .filter(isAttributedThreatHeadline)
+    .sort((left, right) => Date.parse(right.observed_at || "") - Date.parse(left.observed_at || ""))
+    .slice(0, 10);
 }
 
-function headlineScore(event: ThreatEvent): number {
+function isAttributedThreatHeadline(event: ThreatEvent): boolean {
+  if (!event.evidence_url || ["false_positive", "discarded"].includes(event.evidence_status ?? "")) return false;
   const text = eventText(event).toLowerCase();
-  let score = 0;
-  if (event.evidence_url) score += 3;
-  if (event.actor && event.actor !== "unattributed" && event.actor !== "unknown") score += 4;
-  if (event.technique) score += 2;
-  if (/hacker news|thehackernews|bleepingcomputer|securityweek|news|rss|gdelt|cisa|kev|nvd|github/i.test(`${event.source} ${event.title}`)) score += 2;
-  if (/ransom|breach|ataque|attack|intrusion|exploit|vulnerab|cve|kev|phishing|fraud|suplant|credential|leak|filtraci|malware|campaign|campana|campaña/.test(text)) score += 5;
-  if (/mitre|ttp|technique|tactic|actor|apt|grupo|group/.test(text)) score += 2;
-  if (/brand|marca|reputaci|social|facebook|instagram|tiktok|linkedin|twitter|\bx\b/.test(text)) score += 1;
-  return score;
+  const cyberAction = /ransom|malware|breach|intrusion|exploit|vulnerab|cve-\d+|attack|ataque|extortion|filtraci|credential|suplant|imperson|fraud|estafa|scam|botnet|ddos/.test(text);
+  const attributed =
+    Boolean(
+      event.actor &&
+        !["unattributed", "unknown", "sin atribución", "no atribuido", "open_web", "public_web"].includes(
+          event.actor.toLowerCase()
+        )
+    ) ||
+    /apt[- ]?\d+|fin\d+|unc\d+|uat[- ]?\d+|ta\d+|lazarus|scattered spider|lockbit|cl0p|akira|black basta|ransomhouse|threat actor|grupo de ransomware/.test(text) ||
+    (event.tags ?? []).some((tag) => ["threat_actor", "actor_attribution"].includes(tag.toLowerCase()));
+  return cyberAction && attributed;
 }
 
 function buildThreatGraphNodes(events: ThreatEvent[], actors: RankedItem[], ttps: RankedItem[]): SocmintNode[] {
@@ -1647,10 +2046,24 @@ function buildThreatGraphNodes(events: ThreatEvent[], actors: RankedItem[], ttps
   return nodes;
 }
 
-function buildThreatGraphLinks(nodes: SocmintNode[]): SocmintLink[] {
+function buildThreatGraphLinks(nodes: SocmintNode[], events: ThreatEvent[]): SocmintLink[] {
   const hub = nodes[0]?.id;
   if (!hub) return [];
-  return nodes.slice(1).map((node) => ({ from: hub, to: node.id }));
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const links = new Map<string, SocmintLink>();
+  const connectedNodeIds = new Set<string>();
+  events.forEach((event) => {
+    const actorId = event.actor ? `actor:${event.actor}` : "";
+    const techniqueId = event.technique ? `ttp:${event.technique}` : "";
+    if (!nodeIds.has(actorId) || !nodeIds.has(techniqueId)) return;
+    links.set(`${actorId}|${techniqueId}`, { from: actorId, to: techniqueId });
+    connectedNodeIds.add(actorId);
+    connectedNodeIds.add(techniqueId);
+  });
+  nodes.slice(1).forEach((node) => {
+    if (!connectedNodeIds.has(node.id)) links.set(`${hub}|${node.id}`, { from: hub, to: node.id });
+  });
+  return [...links.values()];
 }
 
 function inferTechnique(text: string): string {
@@ -1661,7 +2074,7 @@ function inferTechnique(text: string): string {
   if (/supply|third.party|dependency/.test(lower)) return "T1195 Supply Chain Compromise";
   if (/email|bec|invoice/.test(lower)) return "T1566.002 Spearphishing Link";
   if (/leak|privacy|data/.test(lower)) return "T1530 Data from Cloud Storage";
-  return "T1595 Active Scanning";
+  return "";
 }
 
 function inferAction(text: string): string {
@@ -1671,7 +2084,7 @@ function inferAction(text: string): string {
   if (/ransom|encrypt|extortion/.test(lower)) return "Impact / extortion";
   if (/fraud|brand|impersonation/.test(lower)) return "Brand abuse";
   if (/leak|privacy|data/.test(lower)) return "Data exposure";
-  return "Reconnaissance";
+  return "";
 }
 
 function matchesAny(values: string[], allValue: string, text: string): boolean {

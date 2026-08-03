@@ -79,8 +79,8 @@ def test_frontend_and_report_term_artifacts_share_registry():
     subprocess.run([sys.executable, "scripts/generate_semantic_terms.py", "--check"], check=True)
     executive = Path("cyberdeck/reporting/templates/executive_report.html.j2").read_text(encoding="utf-8")
     dashboard = Path("web/src/components/StrategicDashboard.tsx").read_text(encoding="utf-8")
-    assert "terms.connector_operational_coverage" in executive
-    assert 'semanticLabel("connector_operational_coverage"' in dashboard
+    assert "terms.signal_pressure_index" in executive
+    assert 'semanticLabel("signal_pressure_index"' in dashboard
 
 
 def test_report_renderer_does_not_require_opencti():

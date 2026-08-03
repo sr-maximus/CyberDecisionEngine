@@ -36,7 +36,8 @@ def test_fixture_run_is_reclassified_without_inflated_claims(tmp_path, regressio
     assert prepared.connector_coverage["darkweb"]["direct_or_validated_records"] == 0
     assert prepared.connector_coverage["socmint"]["direct_or_validated_records"] == 0
     assert prepared.metrics["forecast"]["30"]["prediction_is_calibrated"] is False
-    assert prepared.metrics["forecast"]["30"]["signal_pressure_index"] < 0.2
+    assert prepared.metrics["forecast"]["30"]["signal_pressure_index"] is None
+    assert prepared.metrics["prospective_attack_risk"]["status"] == "insufficient_evidence"
     scenario_matches = _build_report_scenario_matches(
         _local_scenario_library()["scenarios"],
         prepared.model_dump(),

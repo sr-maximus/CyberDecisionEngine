@@ -2,7 +2,7 @@
 
 ## Decisión arquitectónica
 
-OpenClaw es una capa reemplazable de orquestación analítica. No es fuente de verdad, recolector, motor de riesgo ni requisito para dashboard o informes. En Docker Compose el gateway está habilitado por defecto con `OPENCLAW_ENABLED=true`, imagen fijada a una versión estable y acceso exclusivo desde la red interna `ai_net`. Si no existe credencial de proveedor, el gateway permanece saludable pero el modelo se reporta `configured_unverified`; nunca se simula una respuesta.
+OpenClaw es una capa reemplazable de orquestación analítica. No es fuente de verdad, recolector, motor de riesgo ni requisito para dashboard o informes. En Docker Compose el gateway está habilitado por defecto con `OPENCLAW_ENABLED=true`, imagen fijada a una versión estable y acceso exclusivo desde la red interna `ai_net`. El despliegue local validado usa Ollama y el modelo `cyberdecision-cti`; si el gateway o el modelo dejan de estar disponibles, la plataforma conserva el flujo determinista y nunca simula una respuesta.
 
 ```mermaid
 flowchart LR
@@ -12,7 +12,7 @@ flowchart LR
     D --> S["Decision snapshot"]
     S --> R["Dashboard e informes"]
     S -. "paquete mínimo aprobado" .-> G["Gateway OpenClaw aislado"]
-    G --> M["Proveedor IA intercambiable"]
+    G --> M["Ollama local: cyberdecision-cti"]
     M --> P["Propuesta estructurada"]
     P --> H["Revisión humana"]
 ```
@@ -64,6 +64,11 @@ La salida es una propuesta. No altera evidencia, scores, estados o informes fina
 - sin cambiar cálculos deterministas.
 
 El contenedor aplica filesystem de solo lectura, `cap_drop: ALL`, `no-new-privileges`, límites de CPU/memoria, autenticación mediante token generado en un volumen efímero compartido y denegación expresa de navegador, shell, cron, escritura, búsqueda web y control del gateway. Habilitar una herramienta nueva exige cambio explícito de política y revisión humana.
+
+El modelo local opera con contexto de 32 768 tokens, caché KV cuantizada y
+salida acotada. La API rechaza respuestas vacías, `NO_REPLY`, referencias de
+evidencia desconocidas y desbordamientos de contexto como resultados
+publicables. Cada ejecución requiere aprobación previa.
 
 ## Degradación
 

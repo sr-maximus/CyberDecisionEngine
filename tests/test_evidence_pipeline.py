@@ -60,7 +60,7 @@ def test_transient_dns_error_is_potential_evidence_not_a_finding():
     assert _build_general_findings([processed], _organization()) == []
 
 
-def test_cve_without_confirmed_product_version_remains_candidate():
+def test_cve_without_product_correlation_remains_context_only():
     event = _event(
         "cve-candidate",
         category="vulnerability",
@@ -70,9 +70,80 @@ def test_cve_without_confirmed_product_version_remains_candidate():
 
     processed = process_evidence_records([event], ["example.com"]).records[0]
 
-    assert processed.vulnerability_status == "cve_candidate"
+    assert processed.vulnerability_status == "cve_context_only"
     assert processed.record_kind != RecordKind.APPLICABLE_VULNERABILITY
     assert _build_general_findings([processed], _organization()) == []
+
+
+def test_cve_becomes_applicable_only_when_observed_product_and_version_match():
+    technology = _event(
+        "tech-nginx",
+        title="nginx 1.24.0 observed on app.example.com",
+        category="attack_surface_web",
+        evidence_url="https://app.example.com",
+        asset="app.example.com",
+        host="app.example.com",
+        tags=["domain:example.com", "host:app.example.com", "technology:nginx:1.24.0"],
+        technical_validation={
+            "observed_technologies": [{"product": "nginx", "version": "1.24.0"}],
+        },
+    )
+    vulnerability = _event(
+        "nvd-nginx",
+        title="NVD enrichment for CVE-2026-0002",
+        category="vulnerability",
+        evidence_url="https://nvd.nist.gov/vuln/detail/CVE-2026-0002",
+        cve="CVE-2026-0002",
+        technical_validation={
+            "affected_configurations": [
+                {
+                    "criteria": "cpe:2.3:a:f5:nginx:*:*:*:*:*:*:*:*",
+                    "product": "nginx",
+                    "version": "*",
+                    "version_start_including": "1.20.0",
+                    "version_end_excluding": "1.25.0",
+                }
+            ]
+        },
+    )
+
+    records = process_evidence_records([technology, vulnerability], ["example.com"]).records
+    correlated = next(item for item in records if item.cve == "CVE-2026-0002")
+
+    assert correlated.vulnerability_status == "cve_applicable"
+    assert correlated.record_kind == RecordKind.APPLICABLE_VULNERABILITY
+    assert correlated.asset == "app.example.com"
+    assert correlated.technical_validation["matched_product"] == "nginx"
+    assert correlated.technical_validation["observed_version"] == "1.24.0"
+    assert correlated.technical_validation["correlated_evidence_ids"]
+
+
+def test_product_match_without_observed_version_is_not_marked_applicable():
+    technology = _event(
+        "tech-nginx-no-version",
+        title="nginx observed on app.example.com",
+        category="attack_surface_web",
+        evidence_url="https://app.example.com",
+        asset="app.example.com",
+        tags=["domain:example.com", "technology:nginx"],
+        technical_validation={"observed_technologies": [{"product": "nginx", "version": ""}]},
+    )
+    vulnerability = _event(
+        "nvd-nginx-candidate",
+        category="vulnerability",
+        cve="CVE-2026-0003",
+        evidence_url="https://nvd.nist.gov/vuln/detail/CVE-2026-0003",
+        technical_validation={
+            "affected_configurations": [{"product": "nginx", "version": "*", "version_end_excluding": "1.25.0"}]
+        },
+    )
+
+    records = process_evidence_records([technology, vulnerability], ["example.com"]).records
+    correlated = next(item for item in records if item.cve == "CVE-2026-0003")
+
+    assert correlated.vulnerability_status == "candidate_product_match"
+    assert correlated.record_kind != RecordKind.APPLICABLE_VULNERABILITY
+    assert correlated.technical_validation["validation_result"] == "requires_version_validation"
 
 
 def test_attack_mapping_requires_validated_behavior_evidence():

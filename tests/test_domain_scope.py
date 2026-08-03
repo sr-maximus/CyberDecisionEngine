@@ -44,8 +44,8 @@ def test_build_source_config_injects_domain_queries():
     assert '"competitor.com" phishing' in config["web_search"]["queries"]
     assert '"Example Holding" fraude OR phishing OR suplantacion' in config["web_search"]["queries"]
     assert '"Example Holding" "Energy" ciberseguridad OR riesgo digital' in config["web_search"]["queries"]
-    assert '"Example Holding" "Market Rival" competencia OR mercado OR tecnologia OR ciberseguridad' in config["web_search"]["queries"]
-    assert '"Example Holding" "Cloud Supplier" proveedor OR interrupcion OR dependencia OR ciberseguridad' in config["web_search"]["queries"]
+    assert '"Example Holding" "Market Rival" competencia digital OR mercado OR tecnologia OR ciberseguridad' in config["web_search"]["queries"]
+    assert '"Example Holding" "Cloud Supplier" proveedor tecnologico OR interrupcion OR dependencia OR cadena de suministro de software OR ciberseguridad' in config["web_search"]["queries"]
     assert '"Example Holding" "Digital Platform" mercado OR clientes OR sustituto OR riesgo digital' in config["web_search"]["queries"]
     assert any("site:example.com" in query for query in config["web_search"]["queries"])
     assert any("credential" in query for query in config["web_search"]["queries"])
@@ -54,7 +54,9 @@ def test_build_source_config_injects_domain_queries():
     assert config["osint_tools"]["enabled"] is True
     assert {"example", "competitor", "exampleholding"}.issubset(set(config["osint_tools"]["targets"]))
     assert config["kali_surface"]["domains"] == ["example.com"]
-    assert config["kali_surface"]["mode"] == "light"
+    assert config["kali_surface"]["mode"] == "deep"
+    assert config["kali_surface"]["web_crawl"] is True
+    assert config["kali_surface"]["crawl_depth"] == 2
     assert config["spiderfoot"]["domains"] == ["example.com"]
     assert config["spiderfoot"]["depth"] == "deep"
     assert config["spiderfoot"]["include_raw"] is False
@@ -71,10 +73,19 @@ def test_build_source_config_honors_scan_time_budget():
     assert config["scan_budget"]["minutes"] == 30
     assert config["scan_budget"]["mode"] == "user_defined"
     assert config["web_search"]["collection_timeout_seconds"] >= 600
-    assert config["spiderfoot"]["timeout_seconds"] >= 600
+    assert config["spiderfoot"]["timeout_seconds"] == 0
+    assert config["spiderfoot"]["completion_policy"] == "wait_until_configured_modules_finish"
     assert config["kali_surface"]["timeout_seconds"] >= 300
     assert config["osint_tools"]["timeout_seconds"] >= 180
     assert all(domain in config["spiderfoot"]["domains"] for domain in domains)
+
+
+def test_default_collection_waits_for_configured_plan_completion():
+    config = build_source_config({"web_search": {"enabled": False}}, ["example.com"], "Example Holding")
+
+    assert config["scan_budget"]["mode"] == "until_complete"
+    assert config["web_search"]["collection_timeout_seconds"] == 0
+    assert config["spiderfoot"]["timeout_seconds"] == 0
 
 
 def test_build_source_config_injects_colombia_public_queries():
@@ -88,6 +99,26 @@ def test_build_source_config_injects_colombia_public_queries():
     assert '"grupoaval.com" Colombia phishing OR fraude OR suplantacion' in queries
 
 
+def test_actionable_queries_precede_broad_strategic_context():
+    config = build_source_config(
+        {"web_search": {"enabled": False}},
+        ["example.com"],
+        "Example Group",
+        [],
+        "Colombia",
+        sector="financial",
+    )
+    queries = config["web_search"]["queries"]
+
+    fake_job_index = queries.index(
+        '"example.com" "oferta laboral falsa" OR "empleo falso" OR "fake job" OR "recruitment scam"'
+    )
+    strategic_index = queries.index(
+        '"Example Group" regulator OR regulacion OR regulation OR gobierno'
+    )
+    assert fake_job_index < strategic_index
+
+
 def test_build_source_config_does_not_truncate_many_domains():
     domains = [f"brand{i}.example.com" for i in range(1, 21)]
     config = build_source_config({"web_search": {"enabled": False}}, domains, "Holding Regional", [], "CO")
@@ -98,7 +129,9 @@ def test_build_source_config_does_not_truncate_many_domains():
     assert all(domain in config["kali_surface"]["domains"] for domain in domains)
     assert all(domain in config["spiderfoot"]["domains"] for domain in domains)
     assert all(domain.split(".", 1)[0] in config["osint_tools"]["targets"] for domain in domains)
-    assert config["web_search"]["max_queries"] >= len(domains)
+    assert config["web_search"]["max_queries"] == 0
+    assert config["web_search"]["max_records"] == 0
+    assert config["scan_budget"]["mode"] == "until_complete"
     assert config["osint_tools"]["max_records"] >= len(domains)
 
 

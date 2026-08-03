@@ -23,7 +23,7 @@
     @media print { body { background:#fff; } .layout { display:block; padding:0; } aside { display:none; } main { border:0; box-shadow:none; padding:0; } }
   </style>
 </head>
-<body><div class="layout"><aside><strong>CyberDecisionEngine</strong><a class="toc-level-1" href="#manual-de-cyberdecisionengine">Manual de CyberDecisionEngine</a><a class="toc-level-2" href="#1-introduccion">1. Introducción</a><a class="toc-level-2" href="#2-objetivo">2. Objetivo</a><a class="toc-level-2" href="#3-casos-de-uso">3. Casos de uso</a><a class="toc-level-2" href="#4-arquitectura">4. Arquitectura</a><a class="toc-level-3" href="#contenedores">Contenedores</a><a class="toc-level-3" href="#fuente-de-verdad">Fuente de verdad</a><a class="toc-level-2" href="#5-despliegue-y-operacion">5. Despliegue y operación</a><a class="toc-level-2" href="#6-configuracion">6. Configuración</a><a class="toc-level-3" href="#organizacion-y-alcance">Organización y alcance</a><a class="toc-level-3" href="#fuentes">Fuentes</a><a class="toc-level-2" href="#7-operacion-paso-a-paso">7. Operación paso a paso</a><a class="toc-level-2" href="#8-proceso-de-inteligencia">8. Proceso de inteligencia</a><a class="toc-level-2" href="#9-fuentes-y-estados">9. Fuentes y estados</a><a class="toc-level-2" href="#10-normalizacion-y-deduplicacion">10. Normalización y deduplicación</a><a class="toc-level-2" href="#11-analisis-realizados">11. Análisis realizados</a><a class="toc-level-3" href="#osint">OSINT</a><a class="toc-level-3" href="#socmint">SOCMINT</a><a class="toc-level-3" href="#superficie-externa">Superficie externa</a><a class="toc-level-3" href="#marca-y-fraude">Marca y fraude</a><a class="toc-level-3" href="#dark-web">Dark web</a><a class="toc-level-3" href="#desinformacion">Desinformación</a><a class="toc-level-3" href="#vulnerabilidades">Vulnerabilidades</a><a class="toc-level-3" href="#pestel-y-porter">PESTEL y Porter</a><a class="toc-level-3" href="#escenarios-y-plantillas-preventivas">Escenarios y plantillas preventivas</a><a class="toc-level-2" href="#12-matematicas-y-calculos">12. Matemáticas y cálculos</a><a class="toc-level-3" href="#actividad-de-amenazas">Actividad de amenazas</a><a class="toc-level-3" href="#likelihood-contextual-heuristico">Likelihood contextual heurístico</a><a class="toc-level-3" href="#impacto">Impacto</a><a class="toc-level-3" href="#efectividad-de-controles">Efectividad de controles</a><a class="toc-level-3" href="#riesgo">Riesgo</a><a class="toc-level-3" href="#matriz-4x4">Matriz 4x4</a><a class="toc-level-3" href="#monte-carlo">Monte Carlo</a><a class="toc-level-3" href="#indice-de-presion-de-senales">Índice de presión de señales</a><a class="toc-level-3" href="#pestel-porter-operativo">PESTEL/Porter operativo</a><a class="toc-level-2" href="#13-marcos-de-referencia">13. Marcos de referencia</a><a class="toc-level-2" href="#14-dashboard">14. Dashboard</a><a class="toc-level-2" href="#15-distribucion-geografica">15. Distribución geográfica</a><a class="toc-level-2" href="#16-inteligencia-socmint-y-grafos">16. Inteligencia SOCMINT y grafos</a><a class="toc-level-2" href="#17-lectura-de-informes">17. Lectura de informes</a><a class="toc-level-3" href="#ejecutivo">Ejecutivo</a><a class="toc-level-3" href="#tecnico">Técnico</a><a class="toc-level-3" href="#estados">Estados</a><a class="toc-level-2" href="#18-modelo-claim-evidence">18. Modelo claim-evidence</a><a class="toc-level-2" href="#19-openclaw-e-ia">19. OpenClaw e IA</a><a class="toc-level-2" href="#20-opencti">20. OpenCTI</a><a class="toc-level-2" href="#21-seguridad-y-privacidad">21. Seguridad y privacidad</a><a class="toc-level-2" href="#22-administracion">22. Administración</a><a class="toc-level-2" href="#23-solucion-de-problemas">23. Solución de problemas</a><a class="toc-level-2" href="#24-glosario-y-anexos">24. Glosario y anexos</a><a class="toc-level-3" href="#checklist-operativo">Checklist operativo</a><a class="toc-level-3" href="#documentos-relacionados">Documentos relacionados</a></aside><main><h1 id="manual-de-cyberdecisionengine">Manual de CyberDecisionEngine</h1>
+<body><div class="layout"><aside><strong>CyberDecisionEngine</strong><a class="toc-level-1" href="#manual-de-cyberdecisionengine">Manual de CyberDecisionEngine</a><a class="toc-level-2" href="#1-introduccion">1. Introducción</a><a class="toc-level-2" href="#2-objetivo">2. Objetivo</a><a class="toc-level-2" href="#3-casos-de-uso">3. Casos de uso</a><a class="toc-level-2" href="#4-arquitectura">4. Arquitectura</a><a class="toc-level-3" href="#contenedores">Contenedores</a><a class="toc-level-3" href="#fuente-de-verdad">Fuente de verdad</a><a class="toc-level-2" href="#5-despliegue-y-operacion">5. Despliegue y operación</a><a class="toc-level-2" href="#6-configuracion">6. Configuración</a><a class="toc-level-3" href="#organizacion-y-alcance">Organización y alcance</a><a class="toc-level-3" href="#fuentes">Fuentes</a><a class="toc-level-2" href="#7-operacion-paso-a-paso">7. Operación paso a paso</a><a class="toc-level-2" href="#8-proceso-de-inteligencia">8. Proceso de inteligencia</a><a class="toc-level-2" href="#9-fuentes-y-estados">9. Fuentes y estados</a><a class="toc-level-2" href="#10-normalizacion-y-deduplicacion">10. Normalización y deduplicación</a><a class="toc-level-2" href="#11-analisis-realizados">11. Análisis realizados</a><a class="toc-level-3" href="#osint">OSINT</a><a class="toc-level-3" href="#socmint">SOCMINT</a><a class="toc-level-3" href="#superficie-externa">Superficie externa</a><a class="toc-level-3" href="#marca-y-fraude">Marca y fraude</a><a class="toc-level-3" href="#dark-web">Dark web</a><a class="toc-level-3" href="#desinformacion">Desinformación</a><a class="toc-level-3" href="#vulnerabilidades">Vulnerabilidades</a><a class="toc-level-3" href="#pestel-y-porter">PESTEL y Porter</a><a class="toc-level-3" href="#escenarios-y-plantillas-preventivas">Escenarios y plantillas preventivas</a><a class="toc-level-2" href="#12-matematicas-y-calculos">12. Matemáticas y cálculos</a><a class="toc-level-3" href="#actividad-de-amenazas">Actividad de amenazas</a><a class="toc-level-3" href="#plausibilidad-contextual-p-cider">Plausibilidad contextual P-CIDER</a><a class="toc-level-3" href="#impacto">Impacto</a><a class="toc-level-3" href="#efectividad-de-controles">Efectividad de controles</a><a class="toc-level-3" href="#riesgo">Riesgo</a><a class="toc-level-3" href="#matriz-4x4">Matriz 4x4</a><a class="toc-level-3" href="#monte-carlo">Monte Carlo</a><a class="toc-level-3" href="#indice-de-presion-de-senales">Índice de presión de señales</a><a class="toc-level-3" href="#pestel-porter-operativo">PESTEL/Porter operativo</a><a class="toc-level-2" href="#13-marcos-de-referencia">13. Marcos de referencia</a><a class="toc-level-2" href="#14-dashboard">14. Dashboard</a><a class="toc-level-2" href="#15-distribucion-geografica">15. Distribución geográfica</a><a class="toc-level-2" href="#16-inteligencia-socmint-y-grafos">16. Inteligencia SOCMINT y grafos</a><a class="toc-level-2" href="#17-lectura-de-informes">17. Lectura de informes</a><a class="toc-level-3" href="#ejecutivo">Ejecutivo</a><a class="toc-level-3" href="#tecnico">Técnico</a><a class="toc-level-3" href="#estados">Estados</a><a class="toc-level-2" href="#18-modelo-claim-evidence">18. Modelo claim-evidence</a><a class="toc-level-2" href="#19-asistencia-analitica-opcional">19. Asistencia analítica opcional</a><a class="toc-level-2" href="#20-opencti">20. OpenCTI</a><a class="toc-level-2" href="#21-seguridad-y-privacidad">21. Seguridad y privacidad</a><a class="toc-level-2" href="#22-administracion">22. Administración</a><a class="toc-level-2" href="#23-solucion-de-problemas">23. Solución de problemas</a><a class="toc-level-2" href="#24-glosario-y-anexos">24. Glosario y anexos</a><a class="toc-level-3" href="#checklist-operativo">Checklist operativo</a><a class="toc-level-3" href="#documentos-relacionados">Documentos relacionados</a></aside><main><h1 id="manual-de-cyberdecisionengine">Manual de CyberDecisionEngine</h1>
 <table>
 <thead>
 <tr>
@@ -276,7 +276,7 @@
 <h3 id="escenarios-y-plantillas-preventivas">Escenarios y plantillas preventivas</h3>
 <p>El catálogo contiene 1.500 <strong>plantillas preventivas de referencia</strong>, no 1.500 escenarios ejecutables. Actualmente existen 0 definiciones que satisfagan el contrato completo de escenario ejecutable. Una posibilidad se muestra como soportada solo cuando evidencia de la corrida satisface criterios explícitos; esto no confirma un ataque ni un incidente. El detalle auditable está en <code>docs/auditoria/escenarios-inventario.md</code>.</p>
 <h2 id="12-matematicas-y-calculos">12. Matemáticas y cálculos</h2>
-<p><strong>Versión de riesgo residual:</strong> <code>2.0.0</code>.<br />
+<p><strong>Versión de riesgo residual:</strong> <code>P-CIDER 1.0.0</code>.<br />
 <strong>Versión de evidencia:</strong> <code>1.0.0</code>.<br />
 <strong>Versión claim-evidence:</strong> registrada en cada contexto.</p>
 <h3 id="actividad-de-amenazas">Actividad de amenazas</h3>
@@ -284,14 +284,19 @@
 <p><code>T = sum(sourceWeight_i * confidence_i * 2^(-ageDays_i / halfLife_i))</code></p>
 <p><code>A = 1 - exp(-0.35 * T)</code></p>
 <p>El resultado está acotado a <code>[0,1]</code> y normaliza saturación de volumen. No es probabilidad.</p>
-<h3 id="likelihood-contextual-heuristico">Likelihood contextual heurístico</h3>
-<p><code>L = sigmoid(-2.10 + 0.70A + 0.85E + 0.75V + 0.90logit(P)/6 + 0.85K + 0.70TTP + 0.55S + 0.35G - 0.80C - 0.60D - 0.45R)</code></p>
-<p>Variables: actividad, exposición, vulnerabilidad, prior EPSS, KEV, TTP, sector, geografía, controles, detección y respuesta. Es una heurística versionada, no un modelo predictivo calibrado.</p>
+<h3 id="plausibilidad-contextual-p-cider">Plausibilidad contextual P-CIDER</h3>
+<p><code>L_raw = sigmoid(-2.10 + 0.70A + 0.85E + 0.75V + 0.90logit(P)/6 + 0.85K + 0.70TTP + 0.55S + 0.35G)</code></p>
+<p><code>L = DS*L_raw + (1-DS)*base_rate</code></p>
+<p>Variables: actividad, exposición, vulnerabilidad, prior EPSS, KEV, TTP, sector,
+geografía, suficiencia de datos y tasa base conservadora. Es una heurística
+versionada, no un modelo predictivo calibrado. Los controles, detección y
+respuesta no reducen <code>L</code>; se aplican una sola vez al riesgo residual.</p>
 <h3 id="impacto">Impacto</h3>
 <p><code>I = 0.25F + 0.20O + 0.20C + 0.15In + 0.10A + 0.05L + 0.05R</code></p>
 <p>Los pesos suman 1.0. Datos ausentes no deben sustituirse por cero observado.</p>
 <h3 id="efectividad-de-controles">Efectividad de controles</h3>
-<p><code>CE = 0.25ISO + 0.25NIST + 0.15SOC2 + 0.15D3FEND + 0.10Detection + 0.10IR</code></p>
+<p><code>CE_raw = 1 - product((1 - e_c)^w_c)</code></p>
+<p><code>CE = min(0.85, CE_raw)</code></p>
 <p>El valor máximo aplicado al riesgo residual es 0.85 para evitar una reducción total no justificable.</p>
 <h3 id="riesgo">Riesgo</h3>
 <p><code>R_inherent = 100 * L * I</code></p>
@@ -361,11 +366,46 @@
 <p>Toda afirmación importante recorre:</p>
 <p><code>Claim -&gt; Evidence -&gt; Interpretation -&gt; Limitation -&gt; Decision -&gt; Closure</code></p>
 <p>Cada hallazgo explica qué se encontró, qué demuestra, qué no demuestra, cómo se validó, confianza, limitaciones, decisión, responsable y criterio de cierre.</p>
-<h2 id="19-openclaw-e-ia">19. OpenClaw e IA</h2>
-<p>OpenClaw es una capa reemplazable de orquestación, no el núcleo. En el despliegue local actual su gateway se inicia en una red Docker interna con autenticación por token, filesystem de solo lectura, límites de CPU/memoria y herramientas de ejecución denegadas. Puede preparar borradores, explicar scores, detectar contradicciones y proponer consultas; no publica, no cambia scores, no evade controles y no ejecuta comandos arbitrarios. Para producir texto necesita además un proveedor/modelo configurado: <code>ready</code> describe el gateway y <code>model_available</code> confirma el modelo. Si falta esa credencial, la plataforma sigue operando y lo informa como <code>configured_unverified</code>, sin simular una respuesta de IA.</p>
-<p>El contenido web se trata como dato no confiable. Las salidas deben registrar hechos, inferencias, evidencia, confianza, modelo, prompt y herramientas. La aprobación humana permanece obligatoria.</p>
+<h2 id="19-asistencia-analitica-opcional">19. Asistencia analítica opcional</h2>
+<p>OpenClaw es una capa reemplazable de orquestación analítica, no el núcleo. En el despliegue local actual su gateway se inicia en una red Docker interna con autenticación por token, filesystem de solo lectura, límites de CPU/memoria y herramientas de ejecución denegadas. Puede preparar borradores, explicar scores, detectar contradicciones y proponer consultas; no publica, no cambia scores ni ejecuta comandos arbitrarios.</p>
+<p>El tablero <strong>Asistente estratégico</strong> trabaja siempre sobre la corrida seleccionada. El usuario puede elegir los módulos que forman el contexto, formular preguntas ejecutivas o técnicas, abrir los tableros relacionados y solicitar con lenguaje natural la generación de los informes ejecutivo y técnico. La conversación se separa por <code>runId</code>; el historial del usuario se trata como solicitud no confiable y nunca como evidencia.</p>
+<p>El botón <strong>Análisis profundo</strong> prepara un paquete acotado a la corrida y activa,
+según los módulos elegidos, agentes especializados de calidad de recolección,
+confiabilidad de fuentes, evidencia estratégica, causalidad, narrativas,
+contradicciones, escenarios, riesgo, síntesis ejecutiva y consistencia.</p>
+<p>La ejecución usa una arquitectura híbrida:</p>
+<ol>
+<li>un planificador selecciona hasta tres especialistas en modo interactivo o
+seis en modo profundo;</li>
+<li>cada especialista reduce de forma determinista solo los datos de su alcance;</li>
+<li>un sintetizador determinista produce la respuesta interactiva inmediata, u
+OpenClaw realiza una única síntesis profunda con el modelo local de mayor
+capacidad;</li>
+<li>un verificador determinista comprueba que las referencias pertenezcan al
+<code>runId</code>;</li>
+<li>la interfaz muestra la traza, el estado y las limitaciones de cada etapa.</li>
+</ol>
+<p>No se ejecuta un modelo generativo independiente por agente. Así se evita
+duplicar contexto, competir por memoria y multiplicar latencia. Los agentes son
+roles lógicos sin acceso a shell, navegación ni escritura.</p>
+<p>La ejecución local usa dos perfiles Ollama:</p>
+<ul>
+<li><code>cyberdecision-cti-chat</code>, derivado de <code>qwen3:0.6b</code>, disponible como capacidad
+local de respaldo y prueba;</li>
+<li><code>cyberdecision-cti</code>, derivado de <code>qwen3:1.7b</code>, para análisis profundo orquestado por OpenClaw.</li>
+</ul>
+<p>Las cifras, estados, cobertura y enlaces no los calcula un modelo generativo. Se leen directamente de la fuente de verdad de la corrida y llevan referencias <code>kpi:*</code>. La conversación interactiva sintetiza de forma determinista las reducciones especializadas; el análisis profundo puede usar OpenClaw. Si el modelo solicitado falla, la respuesta se limita a esa lectura verificable y registra la limitación. Sin hallazgos validados, ninguna ruta puede convertir registros relacionados o contextuales en hechos. La generación de informes continúa siendo determinista y solo ocurre por una acción explícita del usuario.</p>
+<p><code>ollama_chat.ready</code> describe el respaldo conversacional y
+<code>openclaw_gateway.ready</code> la orquestación analítica principal. La configuración
+publica además <code>agent_architecture</code>, con el modo, número máximo de especialistas,
+síntesis y validación posterior. Los modelos se descargan de memoria tras tres
+minutos de inactividad. Si cualquiera falla, la recolección, los cálculos, los
+tableros y los informes continúan operando. Una salida incompleta del modelo se
+reemplaza por una respuesta segura basada en KPI; nunca se publica como
+conclusión.</p>
+<p>El contenido web se trata como dato no confiable. Las salidas deben registrar hechos, inferencias, evidencia, confianza, versión del motor y limitaciones. La aprobación humana permanece obligatoria. Una respuesta vacía, <code>NO_REPLY</code>, una referencia desconocida o un desbordamiento de contexto no se marca como análisis completado.</p>
 <h2 id="20-opencti">20. OpenCTI</h2>
-<p>OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto. Modos: <code>disabled</code>, <code>read_context</code>, <code>sync_validated</code>, <code>system_of_record</code>. Solo <code>sync_validated</code> envía entidades y relaciones validadas; nunca datos brutos, caché, falsos positivos o propuestas de IA.</p>
+<p>OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto. Modos: <code>disabled</code>, <code>read_context</code>, <code>sync_validated</code>, <code>system_of_record</code>. Solo <code>sync_validated</code> envía entidades y relaciones validadas; nunca datos brutos, caché, falsos positivos o propuestas no aprobadas.</p>
 <h2 id="21-seguridad-y-privacidad">21. Seguridad y privacidad</h2>
 <ul>
 <li>alcance autorizado obligatorio;</li>

@@ -236,7 +236,7 @@ El catálogo contiene 1.500 **plantillas preventivas de referencia**, no 1.500 e
 
 ## 12. Matemáticas y cálculos
 
-**Versión de riesgo residual:** `2.0.0`.  
+**Versión de riesgo residual:** `P-CIDER 1.0.0`.  
 **Versión de evidencia:** `1.0.0`.  
 **Versión claim-evidence:** registrada en cada contexto.
 
@@ -250,11 +250,16 @@ Para cada registro `i`:
 
 El resultado está acotado a `[0,1]` y normaliza saturación de volumen. No es probabilidad.
 
-### Likelihood contextual heurístico
+### Plausibilidad contextual P-CIDER
 
-`L = sigmoid(-2.10 + 0.70A + 0.85E + 0.75V + 0.90logit(P)/6 + 0.85K + 0.70TTP + 0.55S + 0.35G - 0.80C - 0.60D - 0.45R)`
+`L_raw = sigmoid(-2.10 + 0.70A + 0.85E + 0.75V + 0.90logit(P)/6 + 0.85K + 0.70TTP + 0.55S + 0.35G)`
 
-Variables: actividad, exposición, vulnerabilidad, prior EPSS, KEV, TTP, sector, geografía, controles, detección y respuesta. Es una heurística versionada, no un modelo predictivo calibrado.
+`L = DS*L_raw + (1-DS)*base_rate`
+
+Variables: actividad, exposición, vulnerabilidad, prior EPSS, KEV, TTP, sector,
+geografía, suficiencia de datos y tasa base conservadora. Es una heurística
+versionada, no un modelo predictivo calibrado. Los controles, detección y
+respuesta no reducen `L`; se aplican una sola vez al riesgo residual.
 
 ### Impacto
 
@@ -264,7 +269,9 @@ Los pesos suman 1.0. Datos ausentes no deben sustituirse por cero observado.
 
 ### Efectividad de controles
 
-`CE = 0.25ISO + 0.25NIST + 0.15SOC2 + 0.15D3FEND + 0.10Detection + 0.10IR`
+`CE_raw = 1 - product((1 - e_c)^w_c)`
+
+`CE = min(0.85, CE_raw)`
 
 El valor máximo aplicado al riesgo residual es 0.85 para evitar una reducción total no justificable.
 
@@ -363,15 +370,55 @@ Toda afirmación importante recorre:
 
 Cada hallazgo explica qué se encontró, qué demuestra, qué no demuestra, cómo se validó, confianza, limitaciones, decisión, responsable y criterio de cierre.
 
-## 19. OpenClaw e IA
+## 19. Asistencia analítica opcional
 
-OpenClaw es una capa reemplazable de orquestación, no el núcleo. En el despliegue local actual su gateway se inicia en una red Docker interna con autenticación por token, filesystem de solo lectura, límites de CPU/memoria y herramientas de ejecución denegadas. Puede preparar borradores, explicar scores, detectar contradicciones y proponer consultas; no publica, no cambia scores, no evade controles y no ejecuta comandos arbitrarios. Para producir texto necesita además un proveedor/modelo configurado: `ready` describe el gateway y `model_available` confirma el modelo. Si falta esa credencial, la plataforma sigue operando y lo informa como `configured_unverified`, sin simular una respuesta de IA.
+OpenClaw es una capa reemplazable de orquestación analítica, no el núcleo. En el despliegue local actual su gateway se inicia en una red Docker interna con autenticación por token, filesystem de solo lectura, límites de CPU/memoria y herramientas de ejecución denegadas. Puede preparar borradores, explicar scores, detectar contradicciones y proponer consultas; no publica, no cambia scores ni ejecuta comandos arbitrarios.
 
-El contenido web se trata como dato no confiable. Las salidas deben registrar hechos, inferencias, evidencia, confianza, modelo, prompt y herramientas. La aprobación humana permanece obligatoria.
+El tablero **Asistente estratégico** trabaja siempre sobre la corrida seleccionada. El usuario puede elegir los módulos que forman el contexto, formular preguntas ejecutivas o técnicas, abrir los tableros relacionados y solicitar con lenguaje natural la generación de los informes ejecutivo y técnico. La conversación se separa por `runId`; el historial del usuario se trata como solicitud no confiable y nunca como evidencia.
+
+El botón **Análisis profundo** prepara un paquete acotado a la corrida y activa,
+según los módulos elegidos, agentes especializados de calidad de recolección,
+confiabilidad de fuentes, evidencia estratégica, causalidad, narrativas,
+contradicciones, escenarios, riesgo, síntesis ejecutiva y consistencia.
+
+La ejecución usa una arquitectura híbrida:
+
+1. un planificador selecciona hasta tres especialistas en modo interactivo o
+   seis en modo profundo;
+2. cada especialista reduce de forma determinista solo los datos de su alcance;
+3. un sintetizador determinista produce la respuesta interactiva inmediata, u
+   OpenClaw realiza una única síntesis profunda con el modelo local de mayor
+   capacidad;
+4. un verificador determinista comprueba que las referencias pertenezcan al
+   `runId`;
+5. la interfaz muestra la traza, el estado y las limitaciones de cada etapa.
+
+No se ejecuta un modelo generativo independiente por agente. Así se evita
+duplicar contexto, competir por memoria y multiplicar latencia. Los agentes son
+roles lógicos sin acceso a shell, navegación ni escritura.
+
+La ejecución local usa dos perfiles Ollama:
+
+- `cyberdecision-cti-chat`, derivado de `qwen3:0.6b`, disponible como capacidad
+  local de respaldo y prueba;
+- `cyberdecision-cti`, derivado de `qwen3:1.7b`, para análisis profundo orquestado por OpenClaw.
+
+Las cifras, estados, cobertura y enlaces no los calcula un modelo generativo. Se leen directamente de la fuente de verdad de la corrida y llevan referencias `kpi:*`. La conversación interactiva sintetiza de forma determinista las reducciones especializadas; el análisis profundo puede usar OpenClaw. Si el modelo solicitado falla, la respuesta se limita a esa lectura verificable y registra la limitación. Sin hallazgos validados, ninguna ruta puede convertir registros relacionados o contextuales en hechos. La generación de informes continúa siendo determinista y solo ocurre por una acción explícita del usuario.
+
+`ollama_chat.ready` describe el respaldo conversacional y
+`openclaw_gateway.ready` la orquestación analítica principal. La configuración
+publica además `agent_architecture`, con el modo, número máximo de especialistas,
+síntesis y validación posterior. Los modelos se descargan de memoria tras tres
+minutos de inactividad. Si cualquiera falla, la recolección, los cálculos, los
+tableros y los informes continúan operando. Una salida incompleta del modelo se
+reemplaza por una respuesta segura basada en KPI; nunca se publica como
+conclusión.
+
+El contenido web se trata como dato no confiable. Las salidas deben registrar hechos, inferencias, evidencia, confianza, versión del motor y limitaciones. La aprobación humana permanece obligatoria. Una respuesta vacía, `NO_REPLY`, una referencia desconocida o un desbordamiento de contexto no se marca como análisis completado.
 
 ## 20. OpenCTI
 
-OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto. Modos: `disabled`, `read_context`, `sync_validated`, `system_of_record`. Solo `sync_validated` envía entidades y relaciones validadas; nunca datos brutos, caché, falsos positivos o propuestas de IA.
+OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto. Modos: `disabled`, `read_context`, `sync_validated`, `system_of_record`. Solo `sync_validated` envía entidades y relaciones validadas; nunca datos brutos, caché, falsos positivos o propuestas no aprobadas.
 
 ## 21. Seguridad y privacidad
 

@@ -2,7 +2,7 @@ organization:
   name: "Grupo Aval"
   sector: "multi_sector_financial_holding"
   country: "CO"
-  author: "Edwin Penuela"
+  author: "Edwin Javier Peñuela Camacho"
   authorized_scope: true
   business_units:
     - banking

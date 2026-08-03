@@ -63,6 +63,20 @@ def test_generic_contextual_fraud_news_is_not_attached_to_subject():
     assert result["claimCount"] == 0
 
 
+def test_fake_recruitment_signal_is_classified_for_the_subject():
+    event = _event(
+        "jobs-1",
+        "Example Group warns about fake job and recruitment scam offers",
+        ["fake_recruitment"],
+    )
+    event.relationship_to_scope = "direct"
+
+    result = build_narrative_intelligence([event], _organization())
+
+    assert result["claimCount"] == 1
+    assert result["claims"][0]["contentType"] == "fake_recruitment"
+
+
 def test_contextual_result_with_subject_in_content_remains_visible():
     event = _event("related-1", "Customer warning about suspicious Example Group messages", ["fraud"])
     event.relationship_to_scope = "contextual"

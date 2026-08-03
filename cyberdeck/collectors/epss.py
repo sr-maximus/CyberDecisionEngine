@@ -42,6 +42,15 @@ class EpssCollector(Collector):
                         tags=["epss"],
                         evidence_url=self.api,
                         demo=False,
+                        technical_validation={
+                            "validation_method": "first_epss_api",
+                            "validation_result": "official_probability_record",
+                            "direct_relationship": False,
+                            "epss": epss,
+                            "percentile": item.get("percentile"),
+                            "model_date": item.get("date"),
+                            "does_not_demonstrate": "asset applicability or exploitation",
+                        },
                     )
                 )
             return CollectionResult(SourceStatus(name=self.name, status="ok", records=len(events), mode="real"), events)

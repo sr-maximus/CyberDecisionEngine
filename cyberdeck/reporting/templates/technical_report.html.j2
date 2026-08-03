@@ -6,9 +6,14 @@
 {% set disinformation_summary = disinformation_summary | default({"risk_statement": ("No disinformation context was attached to this report." if report_lang == "en" else "No se adjuntó contexto de desinformación a este informe."), "active_evidence": 0, "active_rows": [], "tactic_counts": [], "techniques_count": 0, "tactics_count": 0, "source": "DISARM Foundation", "source_url": none}, true) %}
 {% set brand_fraud_summary = brand_fraud_summary | default({"total_mentions": 0, "positive": 0, "neutral": 0, "negative": 0, "fraud_pressure_label": "0%", "reputation_impact": 0, "domain_rows": [], "lookalikes": [], "mentions": [], "narrative": ""}, true) %}
 {% set model_summary = model_summary | default({"purpose": metrics.risk_methodology.purpose, "formulas": [], "assumptions": []}, true) %}
-{% set work_plan = work_plan | default({"summary": "", "vendor_note": "", "openclaw_note": "", "items": []}, true) %}
+{% set work_plan = work_plan | default({"status": "not_supported", "summary": "", "decision_gate": "", "items": []}, true) %}
 {% set methodology_summary = methodology_summary | default({"steps": [], "percent_note": "", "risk_note": "", "calculation_basis": []}, true) %}
 {% set vuln_intel = metrics.vulnerability_intelligence | default({"confirmed_cves": 0, "kev_matches": 0, "observed_technologies": 0, "surface_assets": 0, "patch_focus": "", "method": "", "rows": []}, true) %}
+{% set geo_intel = metrics.geographic_intelligence | default({"incorporation_country": organization.country, "incorporation_country_label": organization.country, "declared_countries_of_operation": [], "declared_country_labels": [], "country_inventory": [], "evidence_supported_countries": [], "contextual_country_mentions": [], "method": "", "limitations": ""}, true) %}
+{% set sector_intel = metrics.sector_intelligence | default({"declared_sectors": [organization.sector], "declared_subsector": organization.subsector, "evidence_supported_sectors": [], "contextual_sector_mentions": [], "method": "", "limitations": ""}, true) %}
+{% set public_entities = metrics.public_entity_intelligence | default({"total_candidates": 0, "emails": 0, "phones": 0, "people_profiles": 0, "rows": [], "method": ""}, true) %}
+{% set layered_risk = metrics.layered_scenario_risk | default({"status": "no_data", "model_version": "CDE-LAYERED-SCENARIO-1.0", "scenarios": []}, true) %}
+{% set prospective = metrics.prospective_attack_risk | default({"status": "insufficient_evidence", "model_version": "N/D", "pressure_index_30d": none, "evidence_confidence": 0, "trend": {"direction": "insufficient_evidence", "change_ratio": none}, "attack_probability": {"value": none, "status": "not_calibrated"}, "drivers": [], "scenarios": []}, true) %}
 {% set attack_surface_inventory = attack_surface_inventory | default({"summary": "", "rows": []}, true) %}
 {% set evidence_preview_gallery = evidence_preview_gallery | default([], true) %}
 {% set strategic_labels_en = {'cyber_geopolitics': 'Geopolitics, public policy and state threat', 'cyber_economy': 'Digital economy, fraud and financial pressure', 'cyber_human': 'Human factors, digital trust and social manipulation', 'cyber_technology': 'Technology dependency, vulnerabilities and attack surface', 'cyber_resilience': 'Physical, energy and environmental resilience and digital continuity', 'cyber_legal': 'Regulation, privacy, compliance and cyber liability', 'cyber_rivalry': 'Digital rivalry and competitive cybersecurity pressure', 'cyber_new_entrants': 'New digital entrants and attack-surface expansion', 'cyber_suppliers': 'Cyber power and dependency of suppliers and third parties', 'cyber_customers': 'Security power and demands of customers, partners and channels', 'cyber_substitutes': 'Technology substitution and cyber-risk displacement'} %}
@@ -47,6 +52,7 @@
     <a href="#metodo">{{ "Method" if report_lang == "en" else "Método" }}</a>
     <a href="#fuentes">{{ "Sources" if report_lang == "en" else "Fuentes" }}</a>
     <a href="#vulnerabilidades">{{ "Vulnerabilities" if report_lang == "en" else "Vulnerabilidades" }}</a>
+    <a href="#riesgo-cuantitativo">{{ "Quantitative risk" if report_lang == "en" else "Riesgo cuantitativo" }}</a>
     <a href="#mitre">MITRE</a>
     <a href="#d3fend">D3FEND</a>
     <a href="#atlas">ATLAS</a>
@@ -67,7 +73,17 @@
       <div class="metric"><span>{{ "Fraud pressure" if report_lang == "en" else "Presión de fraude" }}</span>{% if metrics.fraud_pressure > 0 %}<strong>{{ "%.2f"|format(metrics.fraud_pressure) }}</strong>{% else %}<strong>{{ "No validated signals" if report_lang == "en" else "Sin señales validadas" }}</strong><small>{{ "within available coverage" if report_lang == "en" else "en la cobertura disponible" }}</small>{% endif %}</div>
       <div class="metric"><span>{{ "Max residual risk" if report_lang == "en" else "Riesgo residual máx." }}</span><strong>{% if risk_digest.max_residual is not none %}{{ "%.1f"|format(risk_digest.max_residual) }}{% else %}N/D{% endif %}</strong><small>{{ risk_digest.max_label }}</small></div>
       <div class="metric"><span>{{ "Window" if report_lang == "en" else "Ventana" }}</span><strong>{{ report_scope.analysis_window }}</strong></div>
-      <div class="metric"><span>{{ "Productive / attempted sources" if report_lang == "en" else "Fuentes productivas / consultadas" }}</span><strong>{{ decision_snapshot.metrics.productive_sources.value | int }}/{{ decision_snapshot.metrics.queried_sources.value | int }}</strong><small>{{ decision_snapshot.metrics.total_sources.value | int }} {{ "eligible" if report_lang == "en" else "elegibles" }}</small></div>
+      <div class="metric">
+        <span>{{ "Source lifecycle" if report_lang == "en" else "Ciclo de fuentes" }}</span>
+        <strong>{{ decision_snapshot.metrics.productive_sources.value | int }}/{{ decision_snapshot.metrics.queried_sources.value | int }}</strong>
+        <small>
+          {{ decision_snapshot.metrics.registered_sources.value | int }} {{ "registered" if report_lang == "en" else "registradas" }} ·
+          {{ decision_snapshot.metrics.eligible_sources.value | int }} {{ "eligible" if report_lang == "en" else "elegibles" }} ·
+          {{ decision_snapshot.metrics.queried_sources.value | int }} {{ "queried" if report_lang == "en" else "consultadas" }} ·
+          {{ decision_snapshot.metrics.successful_sources.value | int }} {{ "successful" if report_lang == "en" else "exitosas" }} ·
+          {{ decision_snapshot.metrics.productive_sources.value | int }} {{ "productive" if report_lang == "en" else "productivas" }}
+        </small>
+      </div>
     </div>
     <div class="callout">
       {{ "This file preserves operational detail for SOC, CTI, fraud, GRC, legal and response. The executive report prioritizes decisions; this report prioritizes traceability, method and evidence." if report_lang == "en" else "Este archivo conserva detalle operativo para SOC, CTI, fraude, GRC, legal y respuesta. El informe ejecutivo prioriza decisiones; este informe prioriza trazabilidad, método y evidencia." }}
@@ -107,7 +123,60 @@
         <p class="small">{{ report_scope.data_basis }}</p>
         <p class="small">{{ report_scope.comparison_basis }}</p>
       </div>
+      <div>
+        <h3>{{ "Declared geography" if report_lang == "en" else "Geografía declarada" }}</h3>
+        <p class="small"><strong>{{ "Reference country" if report_lang == "en" else "País de referencia" }}:</strong> {{ geo_intel.incorporation_country_label or geo_intel.incorporation_country or "N/D" }}</p>
+        <div class="chip-list">{% for country in geo_intel.declared_country_labels %}<span class="chip">{{ country }}</span>{% else %}<span class="chip muted">{{ "Not declared" if report_lang == "en" else "No declarada" }}</span>{% endfor %}</div>
+      </div>
+      <div>
+        <h3>{{ "Declared sector scope" if report_lang == "en" else "Alcance sectorial declarado" }}</h3>
+        <div class="chip-list">{% for sector in sector_intel.declared_sectors %}<span class="chip">{{ sector }}</span>{% else %}<span class="chip muted">{{ "Not declared" if report_lang == "en" else "No declarado" }}</span>{% endfor %}</div>
+        {% if sector_intel.declared_subsector %}<p class="small"><strong>{{ "Subsector" if report_lang == "en" else "Subsector" }}:</strong> {{ sector_intel.declared_subsector }}</p>{% endif %}
+      </div>
     </div>
+    {% if geo_intel.country_inventory %}
+    <h3>{{ "Location and geographic evidence relationships" if report_lang == "en" else "Ubicación y relaciones geográficas de evidencia" }}</h3>
+    <p class="small">{{ geo_intel.method }} {{ geo_intel.limitations }}</p>
+    <div class="evidence-table comparison-table">
+      <table>
+        <tr><th>{{ "Country" if report_lang == "en" else "País" }}</th><th>{{ "State" if report_lang == "en" else "Estado" }}</th><th>{{ "Records / assured / official" if report_lang == "en" else "Registros / asegurados / oficiales" }}</th><th>{{ "What it demonstrates" if report_lang == "en" else "Qué demuestra" }}</th><th>{{ "What it does not demonstrate" if report_lang == "en" else "Qué no demuestra" }}</th><th>URL</th></tr>
+        {% for row in geo_intel.country_inventory %}
+        <tr><td>{{ row.country }}</td><td>{% if report_lang == "en" %}{{ "Supported operational context" if row.status == "supported_operational_context" else "Declared and mentioned" if row.status == "declared_and_mentioned" else "Declared scope" if row.status == "declared_scope" else "Related mention" }}{% else %}{{ "Contexto operativo sustentado" if row.status == "supported_operational_context" else "Declarado y mencionado" if row.status == "declared_and_mentioned" else "Alcance declarado" if row.status == "declared_scope" else "Mención relacionada" }}{% endif %}</td><td>{{ row.records }} / {{ row.assured_records }} / {{ row.official_records }}</td><td>{{ row.what_it_demonstrates }}</td><td>{{ row.what_it_does_not_demonstrate }}</td><td>{% for url in row.evidence_urls[:3] %}<a class="compact-source-link" href="{{ url }}" title="{{ url }}">{{ "Open source" if report_lang == "en" else "Abrir fuente" }} {{ loop.index }}</a>{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">N/D</span>{% endfor %}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+    {% if sector_intel.evidence_supported_sectors %}
+    <h3>{{ "Sector evidence relationships" if report_lang == "en" else "Relaciones sectoriales de evidencia" }}</h3>
+    <p class="small">{{ sector_intel.method }} {{ sector_intel.limitations }}</p>
+    <div class="evidence-table comparison-table">
+      <table>
+        <tr><th>{{ "Sector" if report_lang == "en" else "Sector" }}</th><th>{{ "State" if report_lang == "en" else "Estado" }}</th><th>{{ "Records / direct / assured" if report_lang == "en" else "Registros / directos / asegurados" }}</th><th>{{ "What it demonstrates" if report_lang == "en" else "Qué demuestra" }}</th><th>{{ "What it does not demonstrate" if report_lang == "en" else "Qué no demuestra" }}</th><th>{{ "Sources" if report_lang == "en" else "Fuentes" }}</th></tr>
+        {% for row in sector_intel.evidence_supported_sectors %}
+        <tr>
+          <td><strong>{{ row.code }}</strong> · {{ row.sector }}</td>
+          <td>{% if report_lang == "en" %}{{ "Supported sector context" if row.status == "supported_sector_context" else "Observed context" }}{% else %}{{ "Contexto sectorial sustentado" if row.status == "supported_sector_context" else "Contexto observado" }}{% endif %}</td>
+          <td>{{ row.records }} / {{ row.direct_records }} / {{ row.assured_records }}</td>
+          <td>{{ row.what_it_demonstrates }}</td>
+          <td>{{ row.what_it_does_not_demonstrate }}</td>
+          <td>{% for link in row.evidence_links[:3] %}<a class="compact-source-link" href="{{ link.url }}" title="{{ link.url }}">{{ link.label }}</a>{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+    {% if public_entities.rows %}
+    <h3>{{ "Public contact and profile candidates" if report_lang == "en" else "Candidatos públicos de contacto y perfil" }}</h3>
+    <p class="small">{{ public_entities.method }}</p>
+    <div class="evidence-table comparison-table">
+      <table>
+        <tr><th>{{ "Type" if report_lang == "en" else "Tipo" }}</th><th>{{ "Value" if report_lang == "en" else "Valor" }}</th><th>{{ "Scope relationship" if report_lang == "en" else "Relación con alcance" }}</th><th>{{ "What it demonstrates" if report_lang == "en" else "Qué demuestra" }}</th><th>{{ "What it does not demonstrate" if report_lang == "en" else "Qué no demuestra" }}</th><th>{{ "Evidence URLs" if report_lang == "en" else "URL de evidencia" }}</th></tr>
+        {% for row in public_entities.rows %}
+        <tr><td>{{ row.type }}</td><td>{{ row.value }}</td><td>{{ row.relationship_to_scope }}</td><td>{{ row.what_it_demonstrates }}</td><td>{{ row.what_it_does_not_demonstrate }}</td><td>{% for url in row.evidence_urls[:3] %}<a class="compact-source-link" href="{{ url }}" title="{{ url }}">{{ "Open source" if report_lang == "en" else "Abrir fuente" }} {{ loop.index }}</a>{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
     <div class="evidence-table comparison-table">
       <table>
         <tr><th>{{ "Role" if report_lang == "en" else "Rol" }}</th><th>{{ "Domain" if report_lang == "en" else "Dominio" }}</th><th>{{ "Results" if report_lang == "en" else "Resultados" }}</th><th>{{ "Sources" if report_lang == "en" else "Fuentes" }}</th><th>{{ "Categories" if report_lang == "en" else "Categorías" }}</th></tr>
@@ -247,6 +316,38 @@
         {% endfor %}
       </table>
     </div>
+    {% if f3_summary.techniques %}
+    <h3>MITRE Fight Fraud Framework (F3) v{{ f3_summary.version }}</h3>
+    <p class="small">{{ f3_summary.interpretation }}</p>
+    <div class="evidence-table search-table">
+      <table>
+        <tr>
+          <th>{{ "Technique" if report_lang == "en" else "Técnica" }}</th>
+          <th>{{ "Tactics" if report_lang == "en" else "Tácticas" }}</th>
+          <th>{{ "Related records" if report_lang == "en" else "Registros relacionados" }}</th>
+          <th>{{ "Validated" if report_lang == "en" else "Validados" }}</th>
+          <th>{{ "Evidence references" if report_lang == "en" else "Referencias de evidencia" }}</th>
+        </tr>
+        {% for item in f3_summary.techniques %}
+        <tr>
+          <td><strong>{{ item.id }}</strong><br>{{ item.name }}</td>
+          <td>{{ item.tactics | join(" · ") }}</td>
+          <td>{{ item.record_count }}</td>
+          <td>{{ item.validated_count }}</td>
+          <td>
+            {% for evidence in item.evidence %}
+              {% if evidence.url %}<a class="full-url" href="{{ evidence.url }}">{{ evidence.evidence_id or evidence.title }}</a>{% else %}<span>{{ evidence.evidence_id or evidence.title }}</span>{% endif %}{% if not loop.last %}<br>{% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    <p class="small">
+      {{ "Limitation: F3 compatibility is a decision aid and must not be read as confirmed fraud." if report_lang == "en" else "Limitación: la compatibilidad F3 apoya la decisión y no debe leerse como fraude confirmado." }}
+      <a href="{{ f3_summary.source_url }}">{{ "Official reference" if report_lang == "en" else "Referencia oficial" }}</a>
+    </p>
+    {% endif %}
   </section>
 
   <section id="inteligencia-estrategica">
@@ -346,10 +447,25 @@
       {% endfor %}
     </div>
     <h3>{{ "Signal-pressure sensitivity bands" if report_lang == "en" else "Bandas de sensibilidad de presión de señales" }}</h3>
+    <div class="callout compact">
+      <strong>{{ "Prospective model" if report_lang == "en" else "Modelo prospectivo" }}:</strong>
+      {{ prospective.model_version }} · {{ prospective.status }} ·
+      {{ "attack probability not published because the model is not calibrated" if report_lang == "en" else "no se publica probabilidad de ataque porque el modelo no está calibrado" }}.
+      {% if prospective.trend.change_ratio is not none %}<br><span class="small">{{ "Validated-evidence trend" if report_lang == "en" else "Tendencia de evidencia validada" }}: {{ prospective.trend.direction }} ({{ "%+.1f"|format(prospective.trend.change_ratio * 100) }}%).</span>{% endif %}
+    </div>
     <table>
       <tr><th>{{ "Horizon" if report_lang == "en" else "Horizonte" }}</th><th>{{ "Lower" if report_lang == "en" else "Inferior" }}</th><th>{{ "Base" if report_lang == "en" else "Base" }}</th><th>{{ "Upper" if report_lang == "en" else "Superior" }}</th><th>{{ "Interpretation" if report_lang == "en" else "Interpretación" }}</th></tr>
       {% for days, forecast in metrics.forecast.items() %}
-      <tr><td>{{ days }} {{ "days" if report_lang == "en" else "días" }}</td><td>{{ "%.1f"|format(forecast.get('lower_sensitivity', forecast.get('p10', 0)) * 100) }}/100</td><td>{{ "%.1f"|format(forecast.get('base_sensitivity', forecast.get('p50', 0)) * 100) }}/100</td><td>{{ "%.1f"|format(forecast.get('upper_sensitivity', forecast.get('p90', 0)) * 100) }}/100</td><td>{{ forecast.language }}</td></tr>
+      {% set lower = forecast.get('lower_sensitivity') if forecast.get('lower_sensitivity') is not none else forecast.get('p10') %}
+      {% set base = forecast.get('base_sensitivity') if forecast.get('base_sensitivity') is not none else forecast.get('p50') %}
+      {% set upper = forecast.get('upper_sensitivity') if forecast.get('upper_sensitivity') is not none else forecast.get('p90') %}
+      <tr>
+        <td>{{ days }} {{ "days" if report_lang == "en" else "días" }}</td>
+        <td>{% if lower is not none %}{{ "%.1f"|format(lower * 100) }}/100{% else %}N/D{% endif %}</td>
+        <td>{% if base is not none %}{{ "%.1f"|format(base * 100) }}/100{% else %}N/D{% endif %}</td>
+        <td>{% if upper is not none %}{{ "%.1f"|format(upper * 100) }}/100{% else %}N/D{% endif %}</td>
+        <td>{{ forecast.language }}</td>
+      </tr>
       {% endfor %}
     </table>
   </section>
@@ -370,11 +486,19 @@
       <details class="search-panel" {% if group.rows %}open{% endif %}>
         <summary><span>{{ group.title_en if report_lang == "en" else group.title }}</span><strong>{{ group.count }}</strong></summary>
         {% if group.rows %}
-        <div class="evidence-table search-table">
+        <div class="evidence-table search-table search-result-table">
           <table>
-            <tr><th>{{ "Source" if report_lang == "en" else "Fuente" }}</th><th>{{ "Category" if report_lang == "en" else "Categoría" }}</th><th>{{ "Title" if report_lang == "en" else "Título" }}</th><th>{{ "Age" if report_lang == "en" else "Edad" }}</th><th>Tags</th><th>URL</th></tr>
+            <tr><th>{{ "Source" if report_lang == "en" else "Fuente" }}</th><th>{{ "Type" if report_lang == "en" else "Tipo" }}</th><th>{{ "Result" if report_lang == "en" else "Resultado" }}</th><th>{{ "Observed" if report_lang == "en" else "Observado" }}</th><th>{{ "Classification" if report_lang == "en" else "Clasificación" }}</th><th>{{ "Relationship" if report_lang == "en" else "Relación" }}</th><th>URL</th></tr>
             {% for row in group.rows %}
-            <tr><td>{{ row.source }}</td><td>{{ row.category }}</td><td>{{ row.title }}</td><td>{{ row.age_days }}</td><td>{{ row.tags }}</td><td>{% if row.evidence_url %}<a class="full-url" href="{{ row.evidence_url }}">{{ row.evidence_url }}</a>{% else %}<span class="small">n/a</span>{% endif %}</td></tr>
+            <tr>
+              <td>{{ row.source }}</td>
+              <td><strong>{{ row.evidence_type_label }}</strong><br><span class="small">{{ row.category_label }}</span></td>
+              <td>{{ row.title }}</td>
+              <td class="observation-cell"><strong>{{ row.observed_date }}</strong><span>{{ row.recency_label }}</span></td>
+              <td>{{ row.tags or ("Unclassified" if report_lang == "en" else "Sin etiquetas relevantes") }}</td>
+              <td>{{ row.relationship }}<br><span class="small">{{ row.validation }}</span></td>
+              <td>{% if row.evidence_url %}<a class="full-url" href="{{ row.evidence_url }}">{{ row.evidence_url }}</a>{% else %}<span class="small">{{ "No direct URL" if report_lang == "en" else "Sin URL directa" }}</span>{% endif %}</td>
+            </tr>
             {% endfor %}
           </table>
         </div>
@@ -390,23 +514,79 @@
     <h2>{{ "Vulnerability Intelligence and Patch Focus" if report_lang == "en" else "Inteligencia de vulnerabilidades y foco de parches" }}</h2>
     <p class="small">{{ vuln_intel.method }}</p>
     <div class="brand-report-grid">
-      <article class="brand-score-card"><span>{{ "Confirmed CVEs" if report_lang == "en" else "CVE confirmadas" }}</span><strong>{{ vuln_intel.confirmed_cves }}</strong></article>
+      {% if vuln_intel.confirmed_cves %}
+      <article class="brand-score-card"><span>{{ "Applicable CVEs" if report_lang == "en" else "CVE aplicables" }}</span><strong>{{ vuln_intel.confirmed_cves }}</strong></article>
+      {% endif %}
+      {% if vuln_intel.technology_matches_pending_version | default(0, true) %}
+      <article class="brand-score-card"><span>{{ "Product matches pending version" if report_lang == "en" else "Producto coincidente pendiente de versión" }}</span><strong>{{ vuln_intel.technology_matches_pending_version | default(0, true) }}</strong></article>
+      {% endif %}
+      {% if vuln_intel.contextual_cves | default(0, true) %}
+      <article class="brand-score-card"><span>{{ "Context-only CVEs" if report_lang == "en" else "CVE solo contextuales" }}</span><strong>{{ vuln_intel.contextual_cves | default(0, true) }}</strong></article>
+      {% endif %}
+      {% if vuln_intel.kev_matches %}
       <article class="brand-score-card"><span>KEV</span><strong>{{ vuln_intel.kev_matches }}</strong></article>
+      {% endif %}
+      {% if vuln_intel.public_exploit_references | default(0, true) %}
+      <article class="brand-score-card"><span>{{ "Public exploit references" if report_lang == "en" else "Referencias públicas de exploit" }}</span><strong>{{ vuln_intel.public_exploit_references | default(0, true) }}</strong></article>
+      {% endif %}
+      {% if vuln_intel.cvss_v4_records | default(0, true) %}
+      <article class="brand-score-card"><span>CVSS v4</span><strong>{{ vuln_intel.cvss_v4_records | default(0, true) }}</strong></article>
+      {% endif %}
+      {% if vuln_intel.observed_technologies %}
       <article class="brand-score-card"><span>{{ "Observed technologies" if report_lang == "en" else "Tecnologías observadas" }}</span><strong>{{ vuln_intel.observed_technologies }}</strong></article>
+      {% endif %}
+      {% if vuln_intel.surface_assets %}
       <article class="brand-score-card"><span>{{ "Surface assets" if report_lang == "en" else "Activos de superficie" }}</span><strong>{{ vuln_intel.surface_assets }}</strong></article>
+      {% endif %}
     </div>
     <div class="callout compact"><strong>{{ "Patch focus" if report_lang == "en" else "Foco de parches" }}:</strong> {{ vuln_intel.patch_focus }}</div>
+    {% if vuln_intel.rows %}
+    <div class="vulnerability-card-grid">
+      {% for row in vuln_intel.rows %}
+      <article class="vulnerability-card {{ row.type }}">
+        <div class="vulnerability-card-head">
+          <div>
+            <span>{{ row.type_label }}</span>
+            <h3>{{ row.label }}</h3>
+          </div>
+          {% if row.cvss_score is not none %}<strong>CVSS {{ "%.1f"|format(row.cvss_score) }}</strong>{% endif %}
+        </div>
+        <div class="vulnerability-meta">
+          <div><small>{{ "Asset" if report_lang == "en" else "Activo" }}</small><b>{{ row.asset }}</b></div>
+          <div><small>{{ "Product / version" if report_lang == "en" else "Producto / versión" }}</small><b>{{ row.product or row.label }}{% if row.observed_version %} {{ row.observed_version }}{% else %} · {{ "version not determined" if report_lang == "en" else "versión no determinada" }}{% endif %}</b></div>
+        </div>
+        <div class="vulnerability-reading">
+          <p><b>{{ "Observation" if report_lang == "en" else "Observación" }}:</b> {{ row.status }}</p>
+          <p><b>{{ "What it demonstrates" if report_lang == "en" else "Qué demuestra" }}:</b> {{ row.what_it_demonstrates }}</p>
+          <p><b>{{ "What it does not demonstrate" if report_lang == "en" else "Qué no demuestra" }}:</b> {{ row.what_it_does_not_demonstrate }}</p>
+          <p><b>{{ "Next validation" if report_lang == "en" else "Siguiente validación" }}:</b> {{ row.decision }}</p>
+        </div>
+        {% if row.evidence_url %}<a class="vulnerability-evidence-link" href="{{ row.evidence_url }}" target="_blank" rel="noreferrer">{{ "View supporting record" if report_lang == "en" else "Ver registro de soporte" }}</a>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">{{ "No applicable vulnerability or product-matched candidate was established in this run." if report_lang == "en" else "No se estableció vulnerabilidad aplicable ni candidata con coincidencia de producto en esta corrida." }}</div>
+    {% endif %}
+  </section>
+
+  {% if layered_risk.status == "calculated" %}
+  <section id="riesgo-cuantitativo">
+    <h2>{{ "Layered organizational scenario analysis" if report_lang == "en" else "Análisis de escenarios organizacionales por capas" }}</h2>
+    <p class="small">{{ "This optional model uses only scenario frequency, consequence and protection layers declared for the run. It does not infer values from public intelligence and does not predict an attack." if report_lang == "en" else "Este modelo opcional usa únicamente frecuencia, consecuencia y capas de protección declaradas para la corrida. No infiere valores desde inteligencia pública ni predice un ataque." }}</p>
+    <div class="brand-report-grid">
+      <article class="brand-score-card"><span>{{ "Layered scenarios" if report_lang == "en" else "Escenarios por capas" }}</span><strong>{{ ("Calculated" if report_lang == "en" else "Calculado") if layered_risk.status == "calculated" else "N/D" }}</strong><small>{{ layered_risk.model_version }}</small></article>
+    </div>
     <div class="evidence-table search-table">
       <table>
-        <tr><th>{{ "Type" if report_lang == "en" else "Tipo" }}</th><th>{{ "Signal" if report_lang == "en" else "Señal" }}</th><th>{{ "Asset" if report_lang == "en" else "Activo" }}</th><th>{{ "Status" if report_lang == "en" else "Estado" }}</th><th>{{ "Decision" if report_lang == "en" else "Decisión" }}</th><th>URL</th></tr>
-        {% for row in vuln_intel.rows %}
-        <tr><td>{{ row.type }}</td><td>{{ row.label }}</td><td>{{ row.asset }}</td><td>{{ row.status }}</td><td>{{ row.decision }}</td><td>{% if row.evidence_url %}<a class="full-url" href="{{ row.evidence_url }}">{{ row.evidence_url }}</a>{% else %}<span class="small">n/a</span>{% endif %}</td></tr>
-        {% else %}
-        <tr><td colspan="6"><span class="small">{{ "No confirmed vulnerability or technology evidence was collected in this run." if report_lang == "en" else "No se recolectó evidencia confirmada de vulnerabilidad o tecnología en esta corrida." }}</span></td></tr>
+        <tr><th>{{ "Scenario" if report_lang == "en" else "Escenario" }}</th><th>{{ "Initial frequency/year" if report_lang == "en" else "Frecuencia inicial/año" }}</th><th>{{ "Combined layer failure" if report_lang == "en" else "Fallo combinado de capas" }}</th><th>{{ "Resulting frequency/year" if report_lang == "en" else "Frecuencia resultante/año" }}</th><th>{{ "Consequence" if report_lang == "en" else "Consecuencia" }}</th><th>{{ "Expected annual loss" if report_lang == "en" else "Pérdida anual esperada" }}</th><th>{{ "Layers" if report_lang == "en" else "Capas" }}</th></tr>
+        {% for row in layered_risk.scenarios %}
+        <tr><td>{{ row.scenario_name }}</td><td>{{ "%.6f"|format(row.initiating_event_frequency) }}</td><td>{{ "%.2f"|format(row.combined_layer_failure_probability * 100) }}%</td><td>{{ "%.6f"|format(row.resulting_event_frequency) }}</td><td>{{ row.currency }} {{ "%.2f"|format(row.consequence_value) }}</td><td>{{ row.currency }} {{ "%.2f"|format(row.expected_annual_loss) }}</td><td>{{ row.protection_layers | length }}</td></tr>
         {% endfor %}
       </table>
     </div>
   </section>
+  {% endif %}
 
   <section id="mitre">
     <h2>MITRE ATT&CK</h2>
@@ -458,6 +638,51 @@
     </table>
   </section>
 
+  <section id="framework-evidence-crosswalk">
+    <h2>{{ "Evidence and control alignment" if report_lang == "en" else "Alineación de evidencia y controles" }}</h2>
+    <p class="small">
+      {{ "Evidence is grouped by affected aspect. When one record maps to several frameworks it appears once, with all related frameworks and control families together. This does not measure compliance, maturity or control effectiveness." if report_lang == "en" else "La evidencia se agrupa por aspecto afectado. Cuando un registro se relaciona con varios marcos aparece una sola vez, acompañado por todos los frameworks y familias de control relacionados. Esto no mide cumplimiento, madurez ni eficacia de controles." }}
+    </p>
+    {% if framework_summary.affected_axes %}
+    <div class="framework-chip-row">
+      {% for framework in framework_summary.related_frameworks %}<span>{{ framework }}</span>{% endfor %}
+    </div>
+    <div class="evidence-table framework-crosswalk-table">
+      <table>
+        <tr>
+          <th>{{ "Affected aspect" if report_lang == "en" else "Aspecto afectado" }}</th>
+          <th>{{ "Related frameworks" if report_lang == "en" else "Frameworks relacionados" }}</th>
+          <th>{{ "Reference control families" if report_lang == "en" else "Familias de control de referencia" }}</th>
+          <th>{{ "Unique evidence" if report_lang == "en" else "Evidencia única" }}</th>
+          <th>{{ "Evidence" if report_lang == "en" else "Evidencia" }}</th>
+        </tr>
+        {% for item in framework_summary.affected_axes %}
+        <tr>
+          <td>{{ item.axis }}</td>
+          <td><div class="framework-chip-row compact">{% for framework in item.frameworks %}<span>{{ framework }}</span>{% endfor %}</div></td>
+          <td>
+            {% for control_line in item.control_lines %}
+            <div class="control-reference-line"><b>{{ control_line.framework }}:</b> {{ control_line.controls | join(", ") }}</div>
+            {% endfor %}
+          </td>
+          <td><strong>{{ item.record_count }}</strong><br><span class="small">{{ item.validated_count }} {{ "validated" if report_lang == "en" else "validados" }} · {{ item.direct_count }} {{ "with a direct relationship" if report_lang == "en" else "con relación directa" }}</span></td>
+          <td>
+            {% for evidence in item.evidence %}
+            <div>
+              {% if evidence.url %}<a class="full-url" href="{{ evidence.url }}" target="_blank" rel="noreferrer">{{ evidence.url }}</a>{% else %}<span class="small">{{ evidence.title }}</span>{% endif %}
+              <span class="small">{{ evidence.status }} · {{ evidence.relationship }} · {{ evidence.domain or evidence.source }}</span>
+            </div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">{{ "No current-run records support a framework crosswalk." if report_lang == "en" else "Ningún registro de la corrida sustenta un cruce con frameworks." }}</div>
+    {% endif %}
+  </section>
+
   <section id="disarm">
     <h2>{{ "Narrative intelligence, disinformation and reputational risk" if report_lang == "en" else "Inteligencia de narrativas, desinformación y riesgo reputacional" }}</h2>
     <div class="scope-grid">
@@ -495,7 +720,7 @@
 
   <section id="escenarios">
     <h2>{{ "Evidence-Activated Multi-Framework Scenarios" if report_lang == "en" else "Escenarios multi-framework activados por evidencia" }}</h2>
-    <p class="small">{{ scenario_library.status }} {{ "Preventive reference templates" if report_lang == "en" else "Plantillas preventivas de referencia" }}: {{ scenario_library.reference_template_count }}. {{ "Executable definitions" if report_lang == "en" else "Definiciones ejecutables" }}: {{ scenario_library.executable_count }}.</p>
+    <p class="small">{{ "Only scenarios supported by current-run evidence are included in this report." if report_lang == "en" else "Este informe incluye únicamente escenarios respaldados por evidencia de la corrida actual." }}</p>
     <div class="framework-grid compact-frameworks">
       {% for item in scenario_library.framework_counts %}
       <article class="framework-score">
@@ -553,6 +778,8 @@
   <section id="plan">
     <h2>{{ "Technical Work Plan Traceability" if report_lang == "en" else "Trazabilidad técnica del plan de trabajo" }}</h2>
     <p class="small">{{ work_plan.summary }}</p>
+    <div class="callout compact"><strong>{{ "Decision rule" if report_lang == "en" else "Regla de decisión" }}:</strong> {{ work_plan.decision_gate }}</div>
+    {% if work_plan["items"] %}
     <div class="evidence-table plan-table">
       <table>
         <tr>
@@ -560,8 +787,9 @@
           <th>{{ "Priority" if report_lang == "en" else "Prioridad" }}</th>
           <th>{{ "Time" if report_lang == "en" else "Tiempo" }}</th>
           <th>{{ "Responsible roles" if report_lang == "en" else "Roles responsables" }}</th>
-          <th>{{ "Execution mode" if report_lang == "en" else "Modo de ejecución" }}</th>
+          <th>{{ "Scenario rationale" if report_lang == "en" else "Sustento del escenario" }}</th>
           <th>{{ "Basis" if report_lang == "en" else "Base" }}</th>
+          <th>{{ "Control alignment" if report_lang == "en" else "Alineación de controles" }}</th>
           <th>{{ "Validation" if report_lang == "en" else "Validación" }}</th>
           <th>{{ "Evidence URLs" if report_lang == "en" else "URLs de evidencia" }}</th>
         </tr>
@@ -571,8 +799,15 @@
           <td>{{ item.priority }}</td>
           <td>{{ item.timeframe }}</td>
           <td>{{ item.owners | join(" · ") }}</td>
-          <td>{{ item.provider }}</td>
+          <td>{{ item.argument }}</td>
           <td>{{ item.basis }}{% if item.scenarios %}<br>{{ "Scenarios" if report_lang == "en" else "Escenarios" }}: {{ item.scenarios | join(", ") }}{% endif %}</td>
+          <td>
+            {% for mapping in item.control_mappings %}
+            <strong>{{ mapping.framework }}</strong> · {{ mapping.aspect }}{% if mapping.controls %}: {{ mapping.controls | join(", ") }}{% endif %}{% if not loop.last %}<br>{% endif %}
+            {% else %}
+            <span class="small">{{ "No evidence-linked control crosswalk." if report_lang == "en" else "Sin cruce de control enlazado a la evidencia." }}</span>
+            {% endfor %}
+          </td>
           <td>{{ item.validation }}</td>
           <td>
             {% for url in item.evidence_urls %}
@@ -585,12 +820,19 @@
         {% endfor %}
       </table>
     </div>
-    <div class="callout compact"><strong>{{ "Execution criteria" if report_lang == "en" else "Criterio de ejecución" }}:</strong> {{ work_plan.openclaw_note }}</div>
+    {% else %}
+    <div class="empty-state decision-gate">{{ work_plan.decision_gate }}</div>
+    {% endif %}
   </section>
 
   <section id="evidencia">
     <h2>{{ "URL-by-URL Evidence" if report_lang == "en" else "Evidencia URL por URL" }}</h2>
     <p class="small">{{ "The table separates the review URL, visual preview when available, relationship to the scope and validation note. Evidence can still require analyst confirmation before action." if report_lang == "en" else "La tabla separa URL de revisión, vista previa cuando existe, relación con el alcance y nota de validación. La evidencia puede requerir confirmación analítica antes de ejecutar acciones." }}</p>
+    <div class="evidence-type-grid">
+      {% for item in evidence_type_summary %}
+      <div class="evidence-type-item"><span>{{ item.label }}</span><strong>{{ item.count }}</strong></div>
+      {% endfor %}
+    </div>
     <div class="claim-grid technical-claims">
       {% for row in claim_evidence_rows %}
       <article id="claim-{{ row.claim_id }}" class="claim-card claim-detail">
@@ -633,9 +875,9 @@
       </article>
       {% endfor %}
     </div>
-    <div class="evidence-table audit-table">
+    <div class="evidence-table audit-table technical-audit-table">
       <table>
-        <tr><th>{{ "Evidence" if report_lang == "en" else "Evidencia" }}</th><th>{{ "Source" if report_lang == "en" else "Fuente" }}</th><th>{{ "Category" if report_lang == "en" else "Categoría" }}</th><th>{{ "Title" if report_lang == "en" else "Título" }}</th><th>{{ "Relation" if report_lang == "en" else "Relación" }}</th><th>{{ "Validation" if report_lang == "en" else "Validación" }}</th><th>Actor</th><th>ATT&CK</th><th>CVE</th><th>Tags</th><th>URL</th></tr>
+        <tr><th>{{ "Evidence" if report_lang == "en" else "Evidencia" }}</th><th>{{ "Type and source" if report_lang == "en" else "Tipo y fuente" }}</th><th>{{ "Collected result" if report_lang == "en" else "Resultado recolectado" }}</th><th>{{ "Relationship and validation" if report_lang == "en" else "Relación y validación" }}</th><th>{{ "Technical mapping" if report_lang == "en" else "Mapeo técnico" }}</th><th>{{ "Tags" if report_lang == "en" else "Etiquetas" }}</th><th>{{ "Source" if report_lang == "en" else "Fuente" }}</th></tr>
         {% for row in evidence_rows %}
         <tr>
           <td>
@@ -660,16 +902,16 @@
             <span class="evidence-mini">{{ "URL" if row.evidence_url else "n/a" }}</span>
             {% endif %}
           </td>
-          <td>{{ row.source }}</td>
-          <td>{{ row.category }}</td>
-          <td>{{ row.title }}</td>
-          <td>{{ row.relationship }}</td>
-          <td>{{ row.validation }}</td>
-          <td>{{ row.actor or "unattributed" }}</td>
-          <td>{{ row.technique or "unmapped" }}</td>
-          <td>{{ row.cve or "" }}</td>
-          <td>{{ row.tags }}</td>
-          <td>{% if row.evidence_url %}<a class="full-url" href="{{ row.evidence_url }}">{{ row.evidence_url }}</a>{% else %}<span class="small">{{ "no direct URL" if report_lang == "en" else "sin URL directa" }}</span>{% endif %}</td>
+          <td><strong>{{ row.evidence_type_label }}</strong><span>{{ row.source }}</span></td>
+          <td><strong>{{ row.category_label }}</strong><span>{{ row.title }}</span></td>
+          <td><strong>{{ row.relationship }}</strong><span>{{ row.validation }}</span></td>
+          <td>
+            <span><strong>{{ "Actor" if report_lang == "en" else "Actor" }}:</strong> {{ row.actor or ("unattributed" if report_lang == "en" else "sin atribución") }}</span>
+            <span><strong>ATT&CK:</strong> {{ row.technique or ("unmapped" if report_lang == "en" else "sin mapeo") }}</span>
+            {% if row.cve %}<span><strong>CVE:</strong> {{ row.cve }}</span>{% endif %}
+          </td>
+          <td>{{ row.tags or ("No public tags" if report_lang == "en" else "Sin etiquetas públicas") }}</td>
+          <td>{% if row.evidence_url %}<a class="compact-source-link" href="{{ row.evidence_url }}" title="{{ row.evidence_url }}">{{ row.evidence_url_label }}</a>{% else %}<span class="small">{{ "no direct URL" if report_lang == "en" else "sin URL directa" }}</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </table>

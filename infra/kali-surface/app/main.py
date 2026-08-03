@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+import hashlib
 import json
 import os
 import re
+import signal
 import shutil
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field, field_validator
@@ -29,6 +32,9 @@ class SurfaceRequest(BaseModel):
     max_hosts: int = Field(default=40, ge=1, le=120)
     timeout_seconds: int = Field(default=22, ge=5, le=300)
     light_probe: bool = True
+    web_crawl: bool = True
+    crawl_depth: int = Field(default=1, ge=1, le=3)
+    crawl_concurrency: int = Field(default=4, ge=1, le=12)
 
     @field_validator("domains")
     @classmethod
@@ -44,6 +50,28 @@ class SurfaceRequest(BaseModel):
                 output.append(domain)
         if not output:
             raise ValueError("At least one domain is required.")
+        return output
+
+
+class ExploitSearchRequest(BaseModel):
+    cves: list[str] = Field(default_factory=list, max_length=40)
+    max_records: int = Field(default=40, ge=1, le=100)
+    timeout_seconds: int = Field(default=30, ge=5, le=90)
+
+    @field_validator("cves")
+    @classmethod
+    def validate_cves(cls, values: list[str]) -> list[str]:
+        output: list[str] = []
+        seen: set[str] = set()
+        for raw in values:
+            value = raw.strip().upper()
+            if not re.fullmatch(r"CVE-\d{4}-\d{4,7}", value):
+                raise ValueError(f"Invalid CVE identifier: {raw}")
+            if value not in seen:
+                seen.add(value)
+                output.append(value)
+        if not output:
+            raise ValueError("At least one CVE identifier is required.")
         return output
 
 
@@ -65,24 +93,111 @@ async def health() -> dict[str, Any]:
     }
 
 
+@app.post("/exploit-search")
+async def exploit_search(request: ExploitSearchRequest) -> dict[str, Any]:
+    binary = _tool_path("searchsploit")
+    if not binary:
+        return {
+            "status": "unavailable",
+            "results": [],
+            "warnings": ["searchsploit is not installed"],
+        }
+
+    results: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for cve in request.cves:
+        completed = await _run(
+            [binary, "--cve", cve, "--json"],
+            request.timeout_seconds,
+        )
+        if completed.get("timeout"):
+            warnings.append(f"{cve}: search timeout")
+            continue
+        payload = _parse_searchsploit_json(completed.get("stdout") or "")
+        for item in payload:
+            edb_id = str(item.get("EDB-ID") or item.get("edb_id") or "").strip()
+            key = (cve, edb_id or str(item.get("Title") or ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append(
+                {
+                    "cve": cve,
+                    "edb_id": edb_id,
+                    "title": str(item.get("Title") or item.get("title") or "Public exploit reference"),
+                    "date": item.get("Date") or item.get("date"),
+                    "author": item.get("Author") or item.get("author"),
+                    "type": item.get("Type") or item.get("type"),
+                    "platform": item.get("Platform") or item.get("platform"),
+                    "url": f"https://www.exploit-db.com/exploits/{edb_id}" if edb_id else "https://www.exploit-db.com/",
+                }
+            )
+            if len(results) >= request.max_records:
+                break
+        if len(results) >= request.max_records:
+            break
+    return {
+        "status": "ok",
+        "results": results,
+        "warnings": warnings,
+        "interpretation": "Public exploit references only; no asset applicability or exploitation is asserted.",
+    }
+
+
 @app.post("/surface-scan")
 async def surface_scan(request: SurfaceRequest) -> dict[str, Any]:
     light_probe = request.light_probe and request.mode != "passive" and _allow_light_probe()
-    domains = await asyncio.gather(
-        *[_safe_scan_domain(domain, request.max_hosts, request.timeout_seconds, light_probe) for domain in request.domains]
-    )
+    web_crawl = request.web_crawl and request.mode != "passive" and _allow_web_crawl()
+    semaphore = asyncio.Semaphore(_domain_concurrency())
+
+    async def scan(domain: str) -> dict[str, Any]:
+        async with semaphore:
+            return await _safe_scan_domain(
+                domain,
+                request.max_hosts,
+                request.timeout_seconds,
+                light_probe,
+                web_crawl,
+                request.mode,
+                request.crawl_depth,
+                request.crawl_concurrency,
+            )
+
+    domains = await asyncio.gather(*(scan(domain) for domain in request.domains))
     warnings = [warning for result in domains for warning in result.get("warnings", [])]
     return {
         "status": "ok",
-        "mode": "light" if light_probe else "passive",
+        "mode": request.mode,
         "domains": domains,
         "warnings": warnings[:20],
     }
 
 
-async def _safe_scan_domain(domain: str, max_hosts: int, timeout_seconds: int, light_probe: bool) -> dict[str, Any]:
+async def _safe_scan_domain(
+    domain: str,
+    max_hosts: int,
+    timeout_seconds: int,
+    light_probe: bool,
+    web_crawl: bool,
+    mode: str,
+    crawl_depth: int,
+    crawl_concurrency: int,
+) -> dict[str, Any]:
     try:
-        return await asyncio.wait_for(_scan_domain(domain, max_hosts, timeout_seconds, light_probe), timeout=max(8, timeout_seconds + 5))
+        return await asyncio.wait_for(
+            _scan_domain(
+                domain,
+                max_hosts,
+                timeout_seconds,
+                light_probe,
+                web_crawl,
+                mode,
+                crawl_depth,
+                crawl_concurrency,
+            ),
+            timeout=max(12, timeout_seconds + 10),
+        )
     except Exception as exc:
         return {
             "domain": domain,
@@ -95,7 +210,16 @@ async def _safe_scan_domain(domain: str, max_hosts: int, timeout_seconds: int, l
         }
 
 
-async def _scan_domain(domain: str, max_hosts: int, timeout_seconds: int, light_probe: bool) -> dict[str, Any]:
+async def _scan_domain(
+    domain: str,
+    max_hosts: int,
+    timeout_seconds: int,
+    light_probe: bool,
+    web_crawl: bool,
+    mode: str,
+    crawl_depth: int,
+    crawl_concurrency: int,
+) -> dict[str, Any]:
     tool_runs: list[CommandResult] = []
     warnings: list[str] = []
     subdomains: set[str] = {domain}
@@ -153,6 +277,24 @@ async def _scan_domain(domain: str, max_hosts: int, timeout_seconds: int, light_
         tls_items, run = tls_result
         tool_runs.append(run)
         findings.extend(tls_items)
+        if web_crawl:
+            crawl_urls = [
+                str(item.get("url") or "").strip()
+                for item in web_assets
+                if str(item.get("url") or "").startswith(("http://", "https://"))
+            ]
+            if not crawl_urls:
+                crawl_urls = [f"https://{domain}"]
+            crawl_assets, crawl_findings, run = await _run_cariddi(
+                crawl_urls,
+                mode=mode,
+                timeout_seconds=max(15, min(60, timeout_seconds // 2)),
+                max_depth=crawl_depth,
+                concurrency=crawl_concurrency,
+            )
+            tool_runs.append(run)
+            web_assets.extend(crawl_assets)
+            findings.extend(crawl_findings)
     elif request_nuclei := _allow_nuclei():
         warnings.append(f"nuclei_enabled={request_nuclei} ignored in passive mode")
 
@@ -384,16 +526,200 @@ async def _run_sslscan(domain: str, timeout_seconds: int) -> tuple[list[dict[str
     return findings, _command_status("sslscan", completed, len(findings))
 
 
+async def _run_cariddi(
+    urls: list[str],
+    *,
+    mode: str,
+    timeout_seconds: int,
+    max_depth: int,
+    concurrency: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], CommandResult]:
+    binary = _tool_path("cariddi")
+    if not binary:
+        return [], [], CommandResult("web-crawler", "missing", warning="web crawler not installed")
+
+    target_limit = 6 if mode == "deep" else 3
+    targets = list(dict.fromkeys(url.rstrip("/") + "/" for url in urls if url))[:target_limit]
+    command = [
+        binary,
+        "-json",
+        "-e",
+        "-info",
+        "-err",
+        "-ext",
+        "3",
+        "-md",
+        str(max_depth),
+        "-c",
+        str(concurrency),
+        "-d",
+        "1",
+        "-t",
+        "8",
+    ]
+    if mode == "deep":
+        command.append("-s")
+    completed = await _run(command, timeout_seconds, input_data="\n".join(targets) + "\n")
+
+    assets: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
+    for line in completed.get("stdout", "").splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            continue
+        host = (urlsplit(url).hostname or "").lower()
+        matches = item.get("matches") if isinstance(item.get("matches"), dict) else {}
+        assets.append(
+            {
+                "url": url,
+                "host": host,
+                "status_code": item.get("status_code"),
+                "content_type": item.get("content_type"),
+                "content_length": item.get("content_length"),
+                "tool": "web-crawler",
+            }
+        )
+        filetype = matches.get("filetype") if isinstance(matches.get("filetype"), dict) else {}
+        extension = str(filetype.get("extension") or "").strip().lower()
+        if extension:
+            findings.append(
+                _crawl_finding(
+                    "public_file",
+                    "info",
+                    f"Archivo publico indexado ({extension})",
+                    url,
+                    {
+                        "artifact_type": "file",
+                        "extension": extension,
+                        "crawler_severity_reference": filetype.get("severity"),
+                    },
+                )
+            )
+        parameters = matches.get("parameters") if isinstance(matches.get("parameters"), list) else []
+        names = sorted(
+            {
+                str(value.get("name") or "").strip()
+                for value in parameters
+                if isinstance(value, dict) and str(value.get("name") or "").strip()
+            }
+        )
+        if names:
+            findings.append(
+                _crawl_finding(
+                    "web_parameter",
+                    "info",
+                    f"Parametros publicos observados: {', '.join(names[:8])}",
+                    url,
+                    {
+                        "artifact_type": "web_parameter",
+                        "parameter_names": names[:20],
+                        "does_not_demonstrate": "explotabilidad, vulnerabilidad o acceso no autorizado",
+                    },
+                )
+            )
+        for match_type, severity, artifact_type in (
+            ("errors", "low", "application_error_candidate"),
+            ("infos", "info", "information_indicator"),
+        ):
+            rows = matches.get(match_type) if isinstance(matches.get(match_type), list) else []
+            for row in rows[:12]:
+                if not isinstance(row, dict):
+                    continue
+                name = str(row.get("name") or artifact_type).strip()
+                findings.append(
+                    _crawl_finding(
+                        artifact_type,
+                        severity,
+                        f"Indicador web recolectado: {name}",
+                        url,
+                        {
+                            "artifact_type": artifact_type,
+                            "indicator_name": name,
+                            "match_preview": _redacted_preview(str(row.get("match") or "")),
+                            "does_not_demonstrate": "una vulnerabilidad aplicable ni un incidente confirmado",
+                        },
+                    )
+                )
+        secrets = matches.get("secrets") if isinstance(matches.get("secrets"), list) else []
+        for row in secrets[:12]:
+            if not isinstance(row, dict):
+                continue
+            raw_match = str(row.get("match") or "")
+            findings.append(
+                _crawl_finding(
+                    "secret_indicator_candidate",
+                    "medium",
+                    f"Indicador de secreto candidato: {str(row.get('name') or 'patron sensible')}",
+                    url,
+                    {
+                        "artifact_type": "secret_indicator_candidate",
+                        "indicator_name": str(row.get("name") or "sensitive_pattern"),
+                        "value_hash": hashlib.sha256(raw_match.encode("utf-8", errors="ignore")).hexdigest(),
+                        "raw_value_stored": False,
+                        "requires_manual_validation": True,
+                        "does_not_demonstrate": "que el valor sea vigente, utilizable o perteneciente al alcance",
+                    },
+                )
+            )
+    records = len(assets) + len(findings)
+    return assets, findings, _command_status("web-crawler", completed, records)
+
+
+def _crawl_finding(
+    finding_type: str,
+    severity: str,
+    title: str,
+    url: str,
+    validation: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "type": finding_type,
+        "severity": severity,
+        "title": title,
+        "asset": urlsplit(url).hostname or url,
+        "url": url,
+        "validation": {
+            "validation_method": "bounded_public_web_crawl",
+            "validation_result": "collected_candidate",
+            "canonical_url": url,
+            "direct_relationship": False,
+            **validation,
+        },
+    }
+
+
+def _redacted_preview(value: str) -> str:
+    compact = " ".join(value.split())
+    if not compact:
+        return ""
+    return compact[:80] + ("..." if len(compact) > 80 else "")
+
+
 async def _run(command: list[str], timeout_seconds: int, input_data: str | None = None) -> dict[str, Any]:
+    process: asyncio.subprocess.Process | None = None
     try:
         process = await asyncio.create_subprocess_exec(
             *command,
             stdin=asyncio.subprocess.PIPE if input_data is not None else None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
         )
-        stdout, stderr = await asyncio.wait_for(
-            process.communicate(input_data.encode() if input_data is not None else None),
+        if process.stdin is not None and input_data is not None:
+            process.stdin.write(input_data.encode())
+            await process.stdin.drain()
+            process.stdin.close()
+        output_limit = _command_output_limit()
+        stdout_task = asyncio.create_task(_read_stream_limited(process.stdout, output_limit))
+        stderr_task = asyncio.create_task(_read_stream_limited(process.stderr, min(output_limit, 1_000_000)))
+        stdout, stderr, _ = await asyncio.wait_for(
+            asyncio.gather(stdout_task, stderr_task, process.wait()),
             timeout=timeout_seconds,
         )
         return {
@@ -403,11 +729,33 @@ async def _run(command: list[str], timeout_seconds: int, input_data: str | None 
             "timeout": False,
         }
     except asyncio.TimeoutError:
-        with suppress(Exception):
-            process.kill()
+        if process is not None:
+            with suppress(Exception):
+                os.killpg(process.pid, signal.SIGKILL)
+            with suppress(Exception):
+                await process.wait()
         return {"returncode": -1, "stdout": "", "stderr": "timeout", "timeout": True}
     except Exception as exc:
         return {"returncode": -1, "stdout": "", "stderr": str(exc), "timeout": False}
+
+
+async def _read_stream_limited(
+    stream: asyncio.StreamReader | None,
+    limit: int,
+) -> bytes:
+    if stream is None:
+        return b""
+    chunks: list[bytes] = []
+    captured = 0
+    while True:
+        chunk = await stream.read(64 * 1024)
+        if not chunk:
+            break
+        if captured < limit:
+            remaining = limit - captured
+            chunks.append(chunk[:remaining])
+            captured += min(len(chunk), remaining)
+    return b"".join(chunks)
 
 
 def _command_status(tool: str, completed: dict[str, Any], records: int) -> CommandResult:
@@ -439,6 +787,21 @@ def _dedupe_web_assets(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
+def _parse_searchsploit_json(value: str) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    rows: list[dict[str, Any]] = []
+    for key in ("RESULTS_EXPLOIT", "RESULTS_SHELLCODE", "results"):
+        items = payload.get(key)
+        if isinstance(items, list):
+            rows.extend(item for item in items if isinstance(item, dict))
+    return rows
+
+
 def _tool_names() -> list[str]:
     return [
         "amass",
@@ -451,6 +814,8 @@ def _tool_names() -> list[str]:
         "wafw00f",
         "sslscan",
         "nuclei",
+        "searchsploit",
+        "cariddi",
     ]
 
 
@@ -464,3 +829,15 @@ def _allow_light_probe() -> bool:
 
 def _allow_nuclei() -> bool:
     return os.getenv("KALI_SURFACE_ALLOW_NUCLEI", "false").lower() == "true"
+
+
+def _allow_web_crawl() -> bool:
+    return os.getenv("KALI_SURFACE_ALLOW_WEB_CRAWL", "true").lower() == "true"
+
+
+def _domain_concurrency() -> int:
+    return max(1, min(6, int(os.getenv("KALI_SURFACE_DOMAIN_CONCURRENCY", "2"))))
+
+
+def _command_output_limit() -> int:
+    return max(1_000_000, min(50_000_000, int(os.getenv("KALI_SURFACE_MAX_OUTPUT_BYTES", "12000000"))))

@@ -29,14 +29,25 @@ class CisaKevCollector(Collector):
                     confidence=0.95,
                     age_days=age_days(item.get("dateAdded")),
                     severity=0.82,
-                    epss=0.20,
-                    cvss=8.0,
+                    epss=0.0,
+                    cvss=0.0,
                     cve=item.get("cveID"),
                     actor="unknown",
                     technique="T1190",
                     tags=["kev", "exploitation", "ransomware_signal"] if str(item.get("knownRansomwareCampaignUse", "")).lower() == "known" else ["kev", "exploitation"],
                     evidence_url=self.url,
                     demo=False,
+                    technical_validation={
+                        "validation_method": "cisa_kev_catalog",
+                        "validation_result": "known_exploited_vulnerability_catalog_entry",
+                        "direct_relationship": False,
+                        "vendor_project": item.get("vendorProject"),
+                        "product": item.get("product"),
+                        "date_added": item.get("dateAdded"),
+                        "due_date": item.get("dueDate"),
+                        "known_ransomware_campaign_use": item.get("knownRansomwareCampaignUse"),
+                        "does_not_demonstrate": "exposure or exploitation in the analysed organization",
+                    },
                 )
                 for index, item in enumerate(vulnerabilities)
             ]

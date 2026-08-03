@@ -1,5 +1,18 @@
-from cyberdeck.collectors.web_search import _classify_search_result, _parse_google_cse
+from cyberdeck.collectors.web_search import _classify_search_result, _parse_google_cse, _public_entity_candidates
 from cyberdeck.reporting.html_report import _search_groups
+
+
+def test_public_entity_candidates_extract_contacts_and_linkedin_profile_without_asserting_employment():
+    tags, entities = _public_entity_candidates(
+        "Jane Doe - Security Director | LinkedIn",
+        "https://www.linkedin.com/in/jane-doe-security/",
+        "Contact: jane.doe@example.com +57 300 123 4567",
+    )
+
+    assert "email:jane.doe@example.com" in tags
+    assert "phone:+573001234567" in tags
+    assert "person_candidate:Jane Doe" in tags
+    assert {item["status"] for item in entities} == {"public_contact_candidate", "public_profile_candidate"}
 
 
 def test_social_urls_found_by_web_search_are_routed_to_socmint():
@@ -53,6 +66,20 @@ def test_reputation_checker_result_is_validation_context_not_phishing():
     assert "reputation_checker" in tags
     assert "validation_required" in tags
     assert "fraud" not in tags
+
+
+def test_fake_recruitment_is_classified_as_brand_fraud():
+    category, tags, technique = _classify_search_result(
+        "Alerta: falsa oferta de empleo suplanta a Empresa Ejemplo",
+        '"empresa.example" empleo falso',
+        "https://news.example/falsa-oferta-empleo",
+        "La organización advirtió sobre una estafa de reclutamiento.",
+    )
+
+    assert category == "fake_recruitment"
+    assert "fake_recruitment" in tags
+    assert "brand_impersonation" in tags
+    assert technique == "T1566"
 
 
 def test_query_intent_does_not_become_observed_classification():

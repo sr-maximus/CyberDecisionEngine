@@ -25,7 +25,13 @@ const decisionCopy = {
     reset: "Restablecer grafo",
     nodeFocus: "Nodo en foco",
     nodeType: "Tipo",
-    zoomLevel: "Zoom"
+    zoomLevel: "Zoom",
+    directConnections: "Conexiones directas",
+    networkNodes: "Nodos",
+    networkLinks: "Relaciones",
+    networkGroups: "Tipos de entidad",
+    networkDensity: "Densidad",
+    networkLegend: "Leyenda de entidades"
   },
   en: {
     noGraph: "No graph relationships available for the selected intelligence.",
@@ -46,7 +52,13 @@ const decisionCopy = {
     reset: "Reset graph",
     nodeFocus: "Focused node",
     nodeType: "Type",
-    zoomLevel: "Zoom"
+    zoomLevel: "Zoom",
+    directConnections: "Direct connections",
+    networkNodes: "Nodes",
+    networkLinks: "Relationships",
+    networkGroups: "Entity types",
+    networkDensity: "Density",
+    networkLegend: "Entity legend"
   }
 };
 
@@ -54,52 +66,49 @@ export function GraphInsight({
   metrics,
   nodes,
   links,
-  language = "en"
+  language = "en",
+  hideConfidenceMetric = false
 }: {
   metrics: GraphMetric[];
   nodes: SocmintNode[];
   links: SocmintLink[];
   language?: LanguageMode;
+  hideConfidenceMetric?: boolean;
 }) {
   const copy = decisionCopy[language];
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [activeNode, setActiveNode] = useState<string | null>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState<{ clientX: number; clientY: number; x: number; y: number } | null>(null);
+  const settledPositions = useMemo(() => settleGraphLayout(nodes, links), [links, nodes]);
 
   useEffect(() => {
-    setPositions(Object.fromEntries(nodes.map((node) => [node.id, { x: node.x, y: node.y * 0.8 }])));
+    setPositions(settledPositions);
     setActiveNode(null);
+    setSelectedNodeId(nodes[0]?.id ?? null);
     setPan({ x: 0, y: 0 });
     setZoom(1);
-  }, [nodes]);
-
-  useEffect(() => {
-    if (!nodes.length || activeNode || panStart) return;
-    const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reducedMotion) return;
-    let frame = 0;
-    let lastTick = 0;
-    const tick = (timestamp: number) => {
-      if (timestamp - lastTick > 110) {
-        setPositions((current) => simulateGraphLayout(nodes, links, current, timestamp));
-        lastTick = timestamp;
-      }
-      frame = window.requestAnimationFrame(tick);
-    };
-    frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeNode, links, nodes, panStart]);
+  }, [nodes, settledPositions]);
 
   const displayNodes = useMemo(
     () => nodes.map((node) => ({ ...node, ...(positions[node.id] ?? { x: node.x, y: node.y * 0.8 }) })),
     [nodes, positions]
   );
   const byId = new Map(displayNodes.map((node) => [node.id, node]));
-  const focusedNode = byId.get(activeNode ?? hoveredNode ?? displayNodes[0]?.id);
+  const focusedNode = byId.get(selectedNodeId ?? hoveredNode ?? displayNodes[0]?.id);
+  const focusedConnections = focusedNode
+    ? links.filter((link) => link.from === focusedNode.id || link.to === focusedNode.id).length
+    : 0;
+  const visibleMetrics = hideConfidenceMetric
+    ? metrics.filter((metric) => metric.label !== "Decision confidence")
+    : metrics;
+  const graphGroups = [...new Set(nodes.map((node) => node.group))];
+  const possibleLinks = nodes.length > 1 ? (nodes.length * (nodes.length - 1)) / 2 : 0;
+  const networkDensity = possibleLinks ? Math.min(100, Math.round((links.length / possibleLinks) * 100)) : 0;
 
   if (!nodes.length) {
     return <div className="chart-empty graph-empty">{copy.noGraph}</div>;
@@ -121,13 +130,19 @@ export function GraphInsight({
   }
 
   function resetGraph() {
-    setPositions(Object.fromEntries(nodes.map((node) => [node.id, { x: node.x, y: node.y * 0.8 }])));
+    setPositions(settledPositions);
     setPan({ x: 0, y: 0 });
     setZoom(1);
   }
 
   return (
     <div className="graph-insight">
+      <div className="graph-overview-strip" aria-label={copy.graphAria}>
+        <div><Network size={15} /><span>{copy.networkNodes}</span><strong>{nodes.length}</strong></div>
+        <div><GitBranch size={15} /><span>{copy.networkLinks}</span><strong>{links.length}</strong></div>
+        <div><ShieldCheck size={15} /><span>{copy.networkGroups}</span><strong>{graphGroups.length}</strong></div>
+        <div><Network size={15} /><span>{copy.networkDensity}</span><strong>{networkDensity}%</strong></div>
+      </div>
       <div className="graph-insight-map" aria-label={copy.graphAria}>
         <div className="graph-tools">
           <button type="button" onClick={() => updateZoom(0.18)} aria-label={copy.zoomIn} title={copy.zoomIn}>
@@ -140,15 +155,6 @@ export function GraphInsight({
             <RotateCcw size={14} />
           </button>
         </div>
-        {focusedNode ? (
-          <div className="graph-focus-card">
-            <span>{copy.nodeFocus}</span>
-            <strong>{graphNodeDisplayLabel(focusedNode.label, language)}</strong>
-            <em>
-              {copy.nodeType}: {graphGroupLabel(focusedNode.group, language)} · {copy.zoomLevel} {Math.round(zoom * 100)}%
-            </em>
-          </div>
-        ) : null}
         <svg
           ref={svgRef}
           viewBox="0 0 100 80"
@@ -191,7 +197,7 @@ export function GraphInsight({
               if (!from || !to) return null;
               return <line className="graph-link" key={`${link.from}-${link.to}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} />;
             })}
-            {displayNodes.map((node, index) => (
+            {displayNodes.map((node) => (
               <g
                 className={`graph-node ${node.group} ${activeNode === node.id ? "dragging" : ""}`}
                 key={node.id}
@@ -200,12 +206,13 @@ export function GraphInsight({
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   setActiveNode(node.id);
+                  setSelectedNodeId(node.id);
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }}
               >
                 <title>{graphNodeDisplayLabel(node.label, language)}</title>
-                <circle cx={node.x} cy={node.y} r={Math.max(3.2, node.size / 2.6)} style={{ animationDelay: `${index * 120}ms` }} />
-                {shouldShowGraphLabel(node, activeNode, hoveredNode) ? (
+                <circle cx={node.x} cy={node.y} r={Math.max(3.2, node.size / 2.6)} />
+                {shouldShowGraphLabel(node, selectedNodeId, hoveredNode) ? (
                   <text x={node.x} y={node.y + Math.max(6, node.size / 2.2)} textAnchor="middle">
                     {shortGraphLabel(graphNodeDisplayLabel(node.label, language))}
                   </text>
@@ -215,19 +222,42 @@ export function GraphInsight({
           </g>
         </svg>
       </div>
-      <div className="graph-metric-list">
-        {metrics.map((metric) => {
-          const visibleMetric = translateGraphMetric(metric, language);
-          return (
-            <div className={`graph-metric ${metric.tone ?? "medium"}`} key={metric.label}>
-              <Network size={16} />
-              <span>{visibleMetric.label}</span>
-              <strong>{visibleMetric.value}</strong>
-              <em>{visibleMetric.helper}</em>
-            </div>
-          );
-        })}
-      </div>
+      <aside className="graph-insight-sidebar">
+        {focusedNode ? (
+          <div className={`graph-selected-card ${focusedNode.group}`}>
+            <span>{copy.nodeFocus}</span>
+            <strong>{graphNodeDisplayLabel(focusedNode.label, language)}</strong>
+            <dl>
+              <div><dt>{copy.nodeType}</dt><dd>{graphGroupLabel(focusedNode.group, language)}</dd></div>
+              <div><dt>{copy.directConnections}</dt><dd>{focusedConnections}</dd></div>
+            </dl>
+          </div>
+        ) : null}
+        <div className="graph-node-legend">
+          <span>{copy.networkLegend}</span>
+          <div>
+            {graphGroups.map((group) => (
+              <b className={group} key={group}>
+                <i />
+                {graphGroupLabel(group, language)}
+              </b>
+            ))}
+          </div>
+        </div>
+        <div className="graph-metric-list">
+          {visibleMetrics.map((metric) => {
+            const visibleMetric = translateGraphMetric(metric, language);
+            return (
+              <div className={`graph-metric ${metric.tone ?? "medium"}`} key={metric.label}>
+                <Network size={16} />
+                <span>{visibleMetric.label}</span>
+                <strong>{visibleMetric.value}</strong>
+                <em>{visibleMetric.helper}</em>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
     </div>
   );
 }
@@ -236,11 +266,22 @@ function clampGraph(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function simulateGraphLayout(
+function settleGraphLayout(
+  nodes: SocmintNode[],
+  links: SocmintLink[]
+): Record<string, { x: number; y: number }> {
+  let positions = Object.fromEntries(nodes.map((node) => [node.id, initialGraphPosition(node)]));
+  const iterations = Math.min(180, Math.max(80, nodes.length * 7));
+  for (let index = 0; index < iterations; index += 1) {
+    positions = relaxGraphLayout(nodes, links, positions);
+  }
+  return positions;
+}
+
+function relaxGraphLayout(
   nodes: SocmintNode[],
   links: SocmintLink[],
-  positions: Record<string, { x: number; y: number }>,
-  timestamp: number
+  positions: Record<string, { x: number; y: number }>
 ): Record<string, { x: number; y: number }> {
   const next = Object.fromEntries(nodes.map((node) => [node.id, positions[node.id] ?? initialGraphPosition(node)]));
   const vectors = Object.fromEntries(nodes.map((node) => [node.id, { x: 0, y: 0 }]));
@@ -281,14 +322,12 @@ function simulateGraphLayout(
   });
 
   return Object.fromEntries(
-    nodes.map((node, index) => {
+    nodes.map((node) => {
       const point = next[node.id];
       const vector = vectors[node.id];
       const anchor = graphAnchor(node);
-      const drift = node.group === "platform" ? 0 : 0.032;
-      const phase = timestamp / 900 + index * 1.7;
-      const nextX = point.x + vector.x + (anchor.x - point.x) * 0.006 + Math.sin(phase) * drift;
-      const nextY = point.y + vector.y + (anchor.y - point.y) * 0.006 + Math.cos(phase) * drift;
+      const nextX = point.x + vector.x * 0.72 + (anchor.x - point.x) * 0.012;
+      const nextY = point.y + vector.y * 0.72 + (anchor.y - point.y) * 0.012;
       return [node.id, { x: clampGraph(nextX, 7, 93), y: clampGraph(nextY, 7, 73) }];
     })
   );

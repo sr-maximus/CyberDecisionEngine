@@ -1,6 +1,8 @@
 # CyberDecisionEngine: proceso, evidencia y modelos de cálculo
 
-Modelo de ciberinteligencia estratégica diseñado por Edwin Peñuela desde 2022.
+Modelo de ciberinteligencia estratégica diseñado por Edwin Javier Peñuela
+Camacho desde 2022 y formalizado como implementación de referencia de
+P-CIDER v1.0.
 
 ## 1. Propósito y límites
 
@@ -8,20 +10,27 @@ CyberDecisionEngine transforma registros públicos o autorizados en evidencia tr
 
 Los informes se generan bajo demanda a partir del contexto persistido de una corrida. Una fuente ausente, sin resultados o con timeout conserva ese estado y no se reemplaza con datos inventados.
 
-## 2. Flujo verificable
+La razón teórica del modelo es separar evidencia, interpretación, confianza,
+plausibilidad, impacto, control y decisión. La razón práctica es impedir que un
+dashboard, una noticia, una coincidencia CVE o un mapeo de framework se convierta
+en hallazgo accionable sin trazabilidad suficiente.
+
+## 2. Flujo verificable P-CIDER
 
 ```mermaid
 flowchart LR
-  A["Alcance autorizado"] --> B["Colectores y estado por fuente"]
-  B --> C["Registros crudos"]
-  C --> D["Normalización y deduplicación canónica"]
-  D --> E["Relación con alcance y validación técnica"]
-  E --> F["Evidencia contextual, potencial, relacionada, directa o validada"]
-  F --> G["Hallazgos y vulnerabilidades aplicables"]
-  G --> H["Riesgo, escenarios y opciones de decisión"]
-  H --> I["Dashboard"]
-  H --> J["Informe HTML bajo demanda"]
-  F --> K["JSON y CSV trazables"]
+  P["Prepare: alcance autorizado"] --> C["Collect: fuentes y estado"]
+  C --> I["Integrate: normalización, deduplicación y entidades"]
+  I --> D["Determine: evidencia, hipótesis y escenarios"]
+  D --> E["Estimate: plausibilidad, impacto, controles y riesgo"]
+  E --> R["Respond & Review: decisión, cierre y aprendizaje"]
+  R --> X["Dashboard, HTML, JSON y CSV por runId"]
+```
+
+Cadena obligatoria:
+
+```text
+Claim -> Evidence -> Interpretation -> Limitation -> Decision -> Closure
 ```
 
 ## 3. Taxonomía obligatoria
@@ -96,13 +105,22 @@ A = clip(1 - exp(-0.35·Σ(peso_fuente·confianza·decaimiento)))
 ### 9.2 Plausibilidad contextual
 
 ```text
-L = sigmoid(z)
 z = -2.10 + 0.70A + 0.85E + 0.75V + 0.90·logit(P)/6
     + 0.85K + 0.70T + 0.55S + 0.35G
-    - 0.80C - 0.60D - 0.45R
+L_raw = sigmoid(z)
+L = DS·L_raw + (1-DS)·base_rate
 ```
 
-`L` es un score acotado, no una probabilidad calibrada de ataque. `V`, `P` y `K` solo pesan si la vulnerabilidad es aplicable. `S` solo pesa si una evidencia asegurada contiene targeting sectorial explícito. `G` permanece en cero mientras no exista evidencia geográfica específica. Controles, detección y respuesta solo reducen riesgo si fueron declarados.
+`L` es un score acotado, no una probabilidad calibrada de ataque. `V`, `P` y
+`K` solo pesan si la vulnerabilidad es aplicable. `S` solo pesa si una evidencia
+asegurada contiene targeting sectorial explícito. `G` permanece en cero mientras
+no exista evidencia geográfica específica.
+
+P-CIDER excluye controles, detección y respuesta de la plausibilidad inherente.
+La razón teórica es mantener independiente la posibilidad del evento frente a la
+capacidad defensiva. La razón práctica es evitar doble reducción: si el control
+baja `L` y luego vuelve a reducir el riesgo residual, el resultado queda
+artificialmente optimista.
 
 ### 9.3 Impacto y controles
 
@@ -111,14 +129,19 @@ I = 0.25·financiero + 0.20·operacional + 0.20·confidencialidad
   + 0.15·integridad + 0.10·disponibilidad + 0.05·legal
   + 0.05·reputacional
 
-CE = 0.25·ISO + 0.25·NIST + 0.15·SOC2 + 0.15·D3FEND
-   + 0.10·detección_ATT&CK + 0.10·respuesta
+e_c = design · implementation · coverage · assurance · freshness
+CE_raw = 1 - Π(1 - e_c)^w_c
+CE = min(0.85, CE_raw)
 
 RI = 100·L·I
 RR = RI·(1 - min(0.85, CE))
 ```
 
-Los pesos de impacto son supuestos de priorización por categoría y se muestran como entradas del hallazgo. Los scores de control son autodeclarados y no equivalen a auditoría.
+Los pesos de impacto son supuestos de priorización por categoría y se muestran
+como entradas del hallazgo. Los scores de control son declarados o evidenciados y
+no equivalen a auditoría. En la implementación actual se usan proxies
+normalizados de ISO, NIST, SOC 2, D3FEND, detección ATT&CK y respuesta; cada
+proxy no evidenciado queda en cero o no reduce riesgo.
 
 ### 9.4 Matriz 4x4
 
@@ -133,7 +156,10 @@ El plan usa riesgo residual, confianza, exposición y urgencia del hallazgo. No 
 
 ### 9.5 Sensibilidad Monte Carlo
 
-El motor muestrea `L`, `I` y `CE` con distribuciones beta y semilla reproducible para obtener P10, P50 y P90 del riesgo calculado. Son bandas de sensibilidad, no intervalos de predicción de incidentes.
+El motor muestrea `L`, `I` y `CE` con distribuciones beta, confianza por entrada
+y semilla reproducible para obtener P10, P50 y P90 del riesgo calculado. También
+publica `inherent_mean`, `residual_mean`, `decision_risk`, `iterations` y
+`seed`. Son bandas de sensibilidad, no intervalos de predicción de incidentes.
 
 ## 10. Índice de presión de señales
 

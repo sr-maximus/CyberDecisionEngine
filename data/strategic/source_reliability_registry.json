@@ -1,9 +1,10 @@
 {
-  "version": "2026.07.1",
+  "version": "2026.07.2",
   "default": {"reliability_score": 0.45, "source_tier": "D", "independence_score": 0.60, "factual_reliability": 0.50, "bias_or_interest": "unknown", "validation_status": "registry_default"},
   "rules": [
-    {"match": ["gov", "government", "regulator", "tribunal", "court", "cert", "csirt", "cisa", "sic.gov.co", "superfinanciera.gov.co", "supersociedades.gov.co"], "reliability_score": 0.95, "source_tier": "A", "independence_score": 0.95, "factual_reliability": 0.95, "bias_or_interest": "official mandate", "validation_status": "configured"},
+    {"match": ["gov", "government", "regulator", "tribunal", "court", "cert", "csirt", "cisa", "nist", "sec.gov", "justice.gov", "un.org", "europa.eu", "eea.europa.eu", "sic.gov.co", "superfinanciera.gov.co", "supersociedades.gov.co"], "reliability_score": 0.95, "source_tier": "A", "independence_score": 0.95, "factual_reliability": 0.95, "bias_or_interest": "official mandate", "validation_status": "configured"},
     {"match": ["reuters", "associated press", "bloomberg", "financial times", "bbc", "agencia efe"], "reliability_score": 0.85, "source_tier": "B", "independence_score": 0.90, "factual_reliability": 0.85, "bias_or_interest": "editorial", "validation_status": "configured"},
+    {"match": ["the hacker news", "securityweek", "bleepingcomputer", "cisco talos", "unit 42", "google threat intelligence", "microsoft security"], "reliability_score": 0.74, "source_tier": "B", "independence_score": 0.68, "factual_reliability": 0.78, "bias_or_interest": "specialized or vendor research", "validation_status": "configured"},
     {"match": ["news", "noticias", "journal", "periodico", "newspaper", "hacker news"], "reliability_score": 0.67, "source_tier": "C", "independence_score": 0.75, "factual_reliability": 0.68, "bias_or_interest": "editorial", "validation_status": "configured"},
     {"match": ["blog", "aggregator", "social", "facebook", "instagram", "tiktok", "x.com"], "reliability_score": 0.40, "source_tier": "D", "independence_score": 0.45, "factual_reliability": 0.40, "bias_or_interest": "unverified public content", "validation_status": "configured"}
   ]

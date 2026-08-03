@@ -47,7 +47,7 @@ class SpiderFootScanRequest(BaseModel):
     domains: list[str] = Field(default_factory=list, min_length=1, max_length=50)
     use_case: Literal["passive"] = "passive"
     depth: Literal["standard", "deep"] = "deep"
-    timeout_seconds: int = Field(default=45, ge=15, le=600)
+    timeout_seconds: int = Field(default=0, ge=0, le=86_400)
     max_records: int = Field(default=160, ge=1, le=5000)
     max_threads: int = Field(default=4, ge=1, le=8)
     include_raw: bool = False
@@ -84,7 +84,7 @@ async def health() -> dict[str, Any]:
 async def scan(request: SpiderFootScanRequest) -> dict[str, Any]:
     warnings: list[str] = []
     domains = []
-    per_domain_timeout = max(15, min(request.timeout_seconds, 600))
+    per_domain_timeout = request.timeout_seconds
     semaphore = asyncio.Semaphore(SCAN_CONCURRENCY)
     domains = await asyncio.gather(
         *[
@@ -215,7 +215,7 @@ def _run_command_sync(command: list[str], timeout_seconds: int) -> dict[str, Any
                 start_new_session=True,
             )
             try:
-                returncode = process.wait(timeout=timeout_seconds)
+                returncode = process.wait(timeout=timeout_seconds) if timeout_seconds > 0 else process.wait()
             except subprocess.TimeoutExpired:
                 timed_out = True
                 try:

@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, CalendarX2, CheckCircle2, Clock3, Globe2, Loader2, Network, Save, ScanSearch, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Bot, CalendarX2, CheckCircle2, Clock3, Globe2, Layers3, Loader2, Network, Save, ScanSearch, ShieldAlert, X } from "lucide-react";
 import { ANALYSIS_WINDOWS, analysisWindowConfig } from "../data/analysisWindows";
 import { localizedCountryLabel, localizedSectorLabel } from "../data/catalog";
 import type { AnalysisMode, AnalysisWindow, LanguageMode } from "../types";
@@ -42,6 +42,16 @@ export interface DomainComposerProps {
   onSaveDefaults?: () => void;
   defaultScopeMessage?: string | null;
   reusableScopeName?: string | null;
+  riskContext: RiskContextDraft;
+  onRiskContextChange: (value: RiskContextDraft) => void;
+}
+
+export interface RiskContextDraft {
+  scenarioName: string;
+  initiatingEventFrequency: string;
+  consequenceValue: string;
+  scenarioCurrency: string;
+  protectionLayers: string;
 }
 
 const copy = {
@@ -66,8 +76,8 @@ const copy = {
     snapshot: "Snapshot",
     deep: "Profundo",
     lookback: "Rango de análisis",
-    scanBudget: "Tiempo máximo de corrida",
-    scanBudgetHint: "El backend sigue trabajando aunque cierres sesión; este valor ajusta profundidad y timeouts.",
+    scanBudget: "Finalización de recolección",
+    scanBudgetHint: "Hasta completar espera los módulos configurados. El backend sigue trabajando aunque cierres sesión.",
     reportDate: "Fecha/hora oficial del informe",
     reportDateHint: "Solo superadmin. Si queda vacía, el informe usa la fecha actual del backend.",
     reportDatePlaceholder: "Fecha actual del sistema",
@@ -83,7 +93,17 @@ const copy = {
     missingScope: "Ingresa al menos una organización o dominio autorizado. Sin alcance no se lanza recolección ni análisis.",
     missingGroupTitle: "Falta identificar el grupo",
     missingGroup: "Para varios dominios indica la marca, grupo o conglomerado. Así PESTEL, Porter, escenarios e informe comparten el mismo contexto.",
-    reusableProfile: "Se recuperará el perfil declarado de este alcance exacto. La evidencia y los enlaces se recolectarán de nuevo para esta corrida."
+    reusableProfile: "Se recuperará el perfil declarado de este alcance exacto. La evidencia y los enlaces se recolectarán de nuevo para esta corrida.",
+    quantitativeContext: "Escenario organizacional opcional",
+    quantitativeHint: "Solo calcula escenarios por capas con frecuencia, consecuencia y controles declarados. No estima valores desde inteligencia pública.",
+    currency: "Moneda",
+    layeredModel: "Escenario organizacional por capas",
+    scenarioName: "Nombre del escenario",
+    initiatingFrequency: "Frecuencia inicial por año",
+    consequenceValue: "Consecuencia monetaria por evento",
+    protectionLayers: "Capas de protección",
+    protectionLayersHint: "Una línea por capa: Nombre | probabilidad de fallo (0-1) | degradación cibernética (0-1).",
+    protectionLayersPlaceholder: "Prevención | 0.10 | 0.05\nDetección y respuesta | 0.20 | 0.10"
   },
   en: {
     title: "Configure and run analysis",
@@ -106,8 +126,8 @@ const copy = {
     snapshot: "Snapshot",
     deep: "Deep",
     lookback: "Analysis range",
-    scanBudget: "Run time limit",
-    scanBudgetHint: "The backend keeps working if the session closes; this tunes depth and timeouts.",
+    scanBudget: "Collection completion",
+    scanBudgetHint: "Until complete waits for configured modules. The backend keeps working after logout.",
     reportDate: "Official report date/time",
     reportDateHint: "Superadmin only. If empty, the report uses the current backend date.",
     reportDatePlaceholder: "Current system date",
@@ -123,7 +143,17 @@ const copy = {
     missingScope: "Enter at least one organization or authorized domain. Without scope, collection and analysis do not start.",
     missingGroupTitle: "Group identity missing",
     missingGroup: "For multiple domains, enter the brand, group or conglomerate so PESTEL, Porter, scenarios and reports share one context.",
-    reusableProfile: "The declared profile for this exact scope will be restored. Evidence and links will be collected again for this run."
+    reusableProfile: "The declared profile for this exact scope will be restored. Evidence and links will be collected again for this run.",
+    quantitativeContext: "Optional organizational scenario",
+    quantitativeHint: "Only layered scenarios with declared frequency, consequence and controls are calculated. Public intelligence does not estimate these values.",
+    currency: "Currency",
+    layeredModel: "Layered organizational scenario",
+    scenarioName: "Scenario name",
+    initiatingFrequency: "Initiating frequency per year",
+    consequenceValue: "Monetary consequence per event",
+    protectionLayers: "Protection layers",
+    protectionLayersHint: "One line per layer: Name | failure probability (0-1) | cyber degradation (0-1).",
+    protectionLayersPlaceholder: "Prevention | 0.10 | 0.05\nDetection and response | 0.20 | 0.10"
   }
 };
 
@@ -165,7 +195,9 @@ export function DomainComposer({
   canSaveDefaults,
   onSaveDefaults,
   defaultScopeMessage,
-  reusableScopeName
+  reusableScopeName,
+  riskContext,
+  onRiskContextChange
 }: DomainComposerProps) {
   const labels = copy[language];
   const currentWindow = analysisWindowConfig(analysisWindow);
@@ -173,12 +205,15 @@ export function DomainComposer({
   const hasRunnableScope = (domains.length > 0 || organizationName.trim().length > 0) && !needsOrganizationName;
   const targetCount = domains.length + (organizationName.trim() ? 1 : 0);
   const scanBudgetOptions = [
-    { value: 0, label: "Auto" },
+    { value: 0, label: language === "es" ? "Hasta completar" : "Until complete" },
     { value: 10, label: "10 min" },
     { value: 30, label: "30 min" },
     { value: 60, label: "60 min" },
     { value: 120, label: "120 min" }
   ];
+  const updateRiskContext = (field: keyof RiskContextDraft, value: string) => {
+    onRiskContextChange({ ...riskContext, [field]: value });
+  };
   return (
     <section className="domain-panel panel">
       <div className="panel-title-row">
@@ -309,6 +344,29 @@ export function DomainComposer({
           </span>
         ))}
       </div>
+
+      <details className="risk-context-panel">
+        <summary>
+          <span><Layers3 size={18} /> {labels.quantitativeContext}</span>
+          <small>{labels.quantitativeHint}</small>
+        </summary>
+        <div className="risk-context-content">
+          <section>
+            <h3><Layers3 size={17} /> {labels.layeredModel}</h3>
+            <div className="risk-context-grid scenario">
+              <label className="field-control"><span>{labels.scenarioName}</span><input value={riskContext.scenarioName} onChange={(event) => updateRiskContext("scenarioName", event.target.value)} /></label>
+              <label className="field-control"><span>{labels.initiatingFrequency}</span><input inputMode="decimal" value={riskContext.initiatingEventFrequency} onChange={(event) => updateRiskContext("initiatingEventFrequency", event.target.value)} /></label>
+              <label className="field-control"><span>{labels.consequenceValue}</span><input inputMode="decimal" value={riskContext.consequenceValue} onChange={(event) => updateRiskContext("consequenceValue", event.target.value)} /></label>
+              <label className="field-control"><span>{labels.currency}</span><input maxLength={3} value={riskContext.scenarioCurrency} onChange={(event) => updateRiskContext("scenarioCurrency", event.target.value.toUpperCase())} /></label>
+              <label className="field-control risk-layers-field">
+                <span>{labels.protectionLayers}</span>
+                <textarea rows={3} value={riskContext.protectionLayers} onChange={(event) => updateRiskContext("protectionLayers", event.target.value)} placeholder={labels.protectionLayersPlaceholder} />
+                <small>{labels.protectionLayersHint}</small>
+              </label>
+            </div>
+          </section>
+        </div>
+      </details>
 
       <div className="control-grid">
         <div className="segmented" aria-label={labels.mode}>

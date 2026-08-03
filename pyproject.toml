@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "cyberdecisionengine"
 version = "0.1.0"
-description = "CLI defensivo de ciberinteligencia, ciberriesgo y fraude financiero"
+description = "Motor defensivo de ciberinteligencia, evidencia, decision y riesgo basado en P-CIDER"
 readme = "README.md"
 requires-python = ">=3.13"
-license = { text = "MIT" }
-authors = [{ name = "Edwin Penuela" }]
+license = { text = "SDMC Source-Available Non-Commercial License" }
+authors = [{ name = "Edwin Javier Peñuela Camacho" }]
 dependencies = [
   "typer>=0.12.5",
   "rich>=13.9.0",
@@ -30,7 +30,8 @@ dependencies = [
   "matplotlib>=3.7.0",
   "rapidfuzz>=3.0.0",
   "tldextract>=5.0.0",
-  "beautifulsoup4>=4.12.0"
+  "beautifulsoup4>=4.12.0",
+  "cvss>=3.6"
 ]
 
 [project.optional-dependencies]

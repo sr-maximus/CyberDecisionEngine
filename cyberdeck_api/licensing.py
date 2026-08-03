@@ -29,6 +29,7 @@ SELLABLE_MODULES = [
     "disinformation",
     "osint",
     "socmint",
+    "relationshipGraph",
     "darkweb",
     "frameworks",
     "ai",
@@ -123,6 +124,15 @@ MODULE_CATALOG = [
         "description": {
             "es": "Menciones sociales, nodos, aristas, hashtags y comportamiento de tendencia.",
             "en": "Social mentions, nodes, edges, hashtags and trend behavior.",
+        },
+    },
+    {
+        "key": "relationshipGraph",
+        "group": "intelligence",
+        "label": {"es": "Grafo de relaciones", "en": "Relationship graph"},
+        "description": {
+            "es": "Analisis interactivo de entidades, vinculos, centralidad y evidencia trazable.",
+            "en": "Interactive analysis of entities, links, centrality and traceable evidence.",
         },
     },
     {
@@ -221,6 +231,7 @@ DEFAULT_PLANS = [
             "disinformation",
             "osint",
             "socmint",
+            "relationshipGraph",
             "frameworks",
             "ai",
             "runs",

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
+from cyberdeck.analysis.risk_engine import PCIDER_MODEL_VERSION
 from cyberdeck.schemas import EvidenceStatus, RunContext
 
 
@@ -219,6 +220,7 @@ class DecisionIntelligenceSnapshot(BaseModel):
     limitations: List[str]
     metric_definitions: Dict[str, Dict[str, Any]]
     reference_integrity: Dict[str, Any]
+    pcider_alignment: Dict[str, Any] = Field(default_factory=dict)
     formula_versions: Dict[str, str]
     generated_at: str
     run_id: str
@@ -305,6 +307,42 @@ METRIC_CATALOG: Dict[str, Dict[str, Any]] = {
         "formula": "count(source_statuses where registered = true)",
         "unit": "sources",
     },
+    "eligible_sources": {
+        "label": "Fuentes elegibles",
+        "definition": "Conectores registrados que estaban habilitados, configurados y eran aplicables al alcance de la corrida.",
+        "formula": "count(source_statuses where eligible = true)",
+        "unit": "sources",
+    },
+    "successful_sources": {
+        "label": "Fuentes exitosas",
+        "definition": "Conectores consultados que terminaron técnicamente sin fallo, aunque puedan no producir registros.",
+        "formula": "count(source_statuses where succeeded = true)",
+        "unit": "sources",
+    },
+    "empty_sources": {
+        "label": "Fuentes sin resultados",
+        "definition": "Conectores consultados correctamente que no devolvieron registros en la ventana analizada.",
+        "formula": "count(source_statuses where empty = true)",
+        "unit": "sources",
+    },
+    "degraded_sources": {
+        "label": "Fuentes degradadas",
+        "definition": "Conectores con ejecución parcial, limitación o cobertura incompleta.",
+        "formula": "count(source_statuses where degraded = true)",
+        "unit": "sources",
+    },
+    "failed_sources": {
+        "label": "Fuentes fallidas",
+        "definition": "Conectores cuya consulta fue intentada y terminó con fallo o timeout.",
+        "formula": "count(source_statuses where failed = true)",
+        "unit": "sources",
+    },
+    "skipped_sources": {
+        "label": "Fuentes omitidas",
+        "definition": "Conectores registrados que no se consultaron por elegibilidad, configuración, alcance o política de ejecución.",
+        "formula": "count(source_statuses where skipped = true)",
+        "unit": "sources",
+    },
     "max_residual_risk": {
         "label": "Riesgo residual maximo",
         "definition": "Mayor riesgo residual entre hallazgos validados; no se calcula sin hallazgos.",
@@ -344,6 +382,12 @@ for _metric_id, _definition in METRIC_CATALOG.items():
 METRIC_CATALOG["healthy_sources"].update({"numerator": "count(succeeded=true)", "denominator": "count(eligible=true)", "range": "0..eligible_sources"})
 METRIC_CATALOG["queried_sources"].update({"numerator": "count(attempted=true)", "denominator": "count(eligible=true)", "range": "0..eligible_sources"})
 METRIC_CATALOG["productive_sources"].update({"numerator": "count(productive=true)", "denominator": "count(attempted=true)", "range": "0..attempted_sources"})
+METRIC_CATALOG["eligible_sources"].update({"range": "0..registered_sources"})
+METRIC_CATALOG["successful_sources"].update({"range": "0..queried_sources"})
+METRIC_CATALOG["empty_sources"].update({"range": "0..queried_sources"})
+METRIC_CATALOG["degraded_sources"].update({"range": "0..queried_sources"})
+METRIC_CATALOG["failed_sources"].update({"range": "0..queried_sources"})
+METRIC_CATALOG["skipped_sources"].update({"range": "0..registered_sources"})
 METRIC_CATALOG["max_residual_risk"].update({"range": "0..100", "missing_data_status": "no_data"})
 METRIC_CATALOG["avg_residual_risk"].update({"range": "0..100", "missing_data_status": "no_data"})
 
@@ -524,8 +568,16 @@ def build_decision_snapshot(context: RunContext, run_id: str = "") -> DecisionIn
         if event.evidence_status == EvidenceStatus.DIRECT
     ]
     source_health = {
+        "registered": int(metrics["registered_sources"].value or 0),
+        "eligible": int(metrics["eligible_sources"].value or 0),
         "healthy": int(metrics["healthy_sources"].value or 0),
+        "successful": int(metrics["successful_sources"].value or 0),
         "queried": int(metrics["queried_sources"].value or 0),
+        "productive": int(metrics["productive_sources"].value or 0),
+        "empty": int(metrics["empty_sources"].value or 0),
+        "degraded": int(metrics["degraded_sources"].value or 0),
+        "failed": int(metrics["failed_sources"].value or 0),
+        "skipped": int(metrics["skipped_sources"].value or 0),
         "total": int(metrics["total_sources"].value or 0),
         "value_status": "partial_data" if int(metrics["healthy_sources"].value or 0) < int(metrics["total_sources"].value or 0) else "valid_value",
         "definition": METRIC_CATALOG["healthy_sources"]["definition"],
@@ -579,9 +631,34 @@ def build_decision_snapshot(context: RunContext, run_id: str = "") -> DecisionIn
         limitations=limitations,
         metric_definitions=METRIC_CATALOG,
         reference_integrity=integrity,
+        pcider_alignment={
+            "model": "P-CIDER",
+            "model_version": PCIDER_MODEL_VERSION,
+            "reference_implementation": "CyberDecisionEngine",
+            "creator": "Edwin Javier Peñuela Camacho",
+            "chain": [
+                "Claim",
+                "Evidence",
+                "Interpretation",
+                "Limitation",
+                "Decision",
+                "Closure",
+            ],
+            "invariants": {
+                "authorized_scope_required": bool(context.organization.authorized_scope),
+                "single_snapshot_per_run_id": True,
+                "controls_excluded_from_inherent_likelihood": True,
+                "controls_applied_once_to_residual_risk": True,
+                "no_evidence_no_finding": True,
+                "no_calibrated_attack_probability_claim": True,
+            },
+        },
         formula_versions={
+            "pcider": PCIDER_MODEL_VERSION,
+            "contextual_likelihood": f"P-CIDER {PCIDER_MODEL_VERSION}",
+            "control_effectiveness": f"P-CIDER {PCIDER_MODEL_VERSION}",
             "evidence_assurance": "1.0.0",
-            "residual_risk": "2.0.0",
+            "residual_risk": f"P-CIDER {PCIDER_MODEL_VERSION}",
             "scenario_deduplication": "1.0.0",
             "strategic_news": str(
                 (context.metrics.get("strategic_news") or {}).get("registry_versions", {}).get("model")
@@ -640,8 +717,14 @@ def _build_metrics(
         "healthy_sources": float(sum(1 for row in statuses if row.succeeded)),
         "queried_sources": float(sum(1 for row in statuses if row.attempted)),
         "total_sources": float(sum(1 for row in statuses if row.eligible)),
+        "eligible_sources": float(sum(1 for row in statuses if row.eligible)),
+        "successful_sources": float(sum(1 for row in statuses if row.succeeded)),
         "productive_sources": float(sum(1 for row in statuses if row.productive)),
         "registered_sources": float(len(statuses)),
+        "empty_sources": float(sum(1 for row in statuses if row.empty)),
+        "degraded_sources": float(sum(1 for row in statuses if row.degraded)),
+        "failed_sources": float(sum(1 for row in statuses if row.failed)),
+        "skipped_sources": float(sum(1 for row in statuses if row.skipped)),
         "max_residual_risk": max(residuals) if residuals else None,
         "avg_residual_risk": sum(residuals) / len(residuals) if residuals else None,
         "supported_scenarios": float(len(scenarios)),
@@ -662,6 +745,17 @@ def _build_metrics(
         if metric_id in {"healthy_sources", "queried_sources"}:
             numerator = value
             denominator = values["total_sources"]
+        elif metric_id in {
+            "successful_sources",
+            "empty_sources",
+            "degraded_sources",
+            "failed_sources",
+        }:
+            numerator = value
+            denominator = values["queried_sources"]
+        elif metric_id in {"eligible_sources", "skipped_sources"}:
+            numerator = value
+            denominator = values["registered_sources"]
         elif metric_id == "productive_sources":
             numerator = value
             denominator = values["queried_sources"]

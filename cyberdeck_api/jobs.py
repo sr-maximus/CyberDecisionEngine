@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,9 +10,14 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from cyberdeck.cli import run_pipeline
-from cyberdeck.decision_intelligence import snapshot_from_context
+from cyberdeck.decision_intelligence import (
+    DecisionIntelligenceSnapshot,
+    DecisionMetric,
+    METRIC_CATALOG,
+    snapshot_from_context,
+)
 from cyberdeck.reporting.html_report import prepare_context_for_report, render_report
-from cyberdeck.schemas import RunContext
+from cyberdeck.schemas import EvidenceStatus, RecordKind, RunContext
 from cyberdeck.semantics import get_term_registry
 from cyberdeck.settings import PROJECT_ROOT, load_sources_config, write_yaml
 from cyberdeck_api.domain_scope import (
@@ -115,6 +121,7 @@ class RunStore:
         for item in payload.get("runs", []):
             run = RunRecord(**item)
             _remove_legacy_opencti_source(run)
+            _hydrate_source_lifecycle(run)
             if run.status in {"queued", "running"}:
                 run.status = "failed"
                 run.stage = "Interrupted before completion"
@@ -208,22 +215,18 @@ class RunStore:
             report_path = self.report_dir / f"{run.id}-{slug}.html"
             context_path = self._context_path(run.id)
 
-            await self._update(run_id, stage="Collecting public OSINT, SOCMINT, dark web indexes and external-surface evidence", progress=35)
+            await self._update(run_id, stage="Collecting public OSINT, strategic RSS, SOCMINT, dark-web indexes and external-surface evidence", progress=35)
             progress_task = asyncio.create_task(self._progress_while_running(run_id, run.estimated_seconds))
-            pipeline_timeout = max(240, min(14400, int(run.estimated_seconds) + 180))
             try:
-                _, context = await asyncio.wait_for(
-                    run_pipeline(
-                        str(org_path),
-                        run.request.mode,
-                        run.request.lookback_days,
-                        str(report_path),
-                        real_only=run.request.real_only,
-                        source_config_override=source_config,
-                        return_context=True,
-                        render_html=False,
-                    ),
-                    timeout=pipeline_timeout,
+                _, context = await run_pipeline(
+                    str(org_path),
+                    run.request.mode,
+                    run.request.lookback_days,
+                    str(report_path),
+                    real_only=run.request.real_only,
+                    source_config_override=source_config,
+                    return_context=True,
+                    render_html=False,
                 )
             finally:
                 progress_task.cancel()
@@ -233,8 +236,6 @@ class RunStore:
             await asyncio.to_thread(self._write_context, context_path, context)
             await self._update(run_id, stage="Building decision dashboards", progress=94)
             await self._complete(run_id, context)
-        except asyncio.TimeoutError:  # pragma: no cover - runtime and network dependent
-            await self._fail(run_id, "Analysis exceeded the configured time budget. Partial collectors may still have produced external logs; relaunch with a longer monitoring duration if deeper collection is required.")
         except Exception as exc:  # pragma: no cover - runtime and network dependent
             await self._fail(run_id, str(exc))
 
@@ -242,16 +243,16 @@ class RunStore:
         loop = asyncio.get_running_loop()
         started_at = loop.time()
         stages = [
-            (42, "Checking public OSINT indexes and news/search evidence"),
-            (52, "Validating external attack-surface evidence"),
-            (64, "Reviewing SOCMINT, brand, fraud and public mention signals"),
-            (74, "Checking ransomware, dark web indexes and TOR policy status"),
-            (84, "Mapping ATT&CK, D3FEND, ATLAS, DISARM and compliance scenarios"),
-            (90, "Calculating risk, forecast and dashboard context"),
+            (42, "Consulting public search and strategic RSS sources"),
+            (52, "Running deep passive collection with SpiderFoot and external-surface collectors"),
+            (64, "Collecting SOCMINT, brand, fraud and public mention signals"),
+            (74, "Checking ransomware, authorized dark-web indexes and TOR policy status"),
+            (84, "Completing collectors and validating the collected records"),
+            (88, "Deep collection is still active; analysis will continue when configured collectors finish"),
         ]
         while True:
             elapsed = loop.time() - started_at
-            estimated_progress = min(90, max(35, int(35 + (elapsed / max(30, estimated_seconds)) * 55)))
+            estimated_progress = min(88, max(35, int(35 + (elapsed / max(30, estimated_seconds)) * 53)))
             stage = next((label for threshold, label in reversed(stages) if estimated_progress >= threshold), stages[0][1])
             await self._update(run_id, stage=stage, progress=estimated_progress)
             await asyncio.sleep(6)
@@ -321,6 +322,108 @@ class RunStore:
                 final=validation_status != "rejected",
             )
             current.summary = summarize_context(current.domains, context)
+            current.updated_at = utcnow_iso()
+            await self._persist_locked()
+            return current
+
+    async def review_evidence(
+        self,
+        run_id: str,
+        evidence_id: str,
+        status: str,
+        reviewer: str,
+        reason: str = "",
+    ) -> Optional[RunRecord]:
+        run = await self.get_run(run_id)
+        if run is None:
+            return None
+        if run.status != "completed":
+            raise ValueError("Evidence can only be reviewed after the analysis completes.")
+        context_path = self._context_path(run_id)
+        context = await asyncio.to_thread(self._read_context, context_path)
+        event = next(
+            (
+                item
+                for item in context.raw_events
+                if evidence_id in {str(item.id), str(item.canonical_id or "")}
+            ),
+            None,
+        )
+        if event is None:
+            raise ValueError("Evidence record was not found in the stored run context.")
+
+        validation = dict(event.technical_validation or {})
+        if "review_previous_evidence_status" not in validation:
+            validation["review_previous_evidence_status"] = str(
+                getattr(event.evidence_status, "value", event.evidence_status)
+            )
+            validation["review_previous_record_kind"] = str(
+                getattr(event.record_kind, "value", event.record_kind)
+            )
+        validation["human_review"] = {
+            "status": status,
+            "reviewer": reviewer,
+            "reason": reason,
+            "reviewed_at": utcnow_iso(),
+        }
+
+        if status == "validated":
+            event.evidence_status = EvidenceStatus.VALIDATED
+            event.record_kind = RecordKind.VALIDATED_TECHNICAL_EVIDENCE
+            event.validation_result = "human_review"
+            event.human_reviewed = True
+            validation["validation_method"] = "human_review"
+            validation["validator"] = reviewer
+        elif status == "false_positive":
+            event.evidence_status = EvidenceStatus.FALSE_POSITIVE
+            event.record_kind = RecordKind.FALSE_POSITIVE
+            event.validation_result = "human_false_positive"
+            event.human_reviewed = True
+            validation["validation_method"] = "human_review"
+            validation["validator"] = reviewer
+            if "false_positive" not in event.tags:
+                event.tags.append("false_positive")
+        elif status == "pending":
+            previous_status = str(validation.get("review_previous_evidence_status") or "related")
+            previous_kind = str(validation.get("review_previous_record_kind") or "collected_record")
+            event.evidence_status = EvidenceStatus(previous_status)
+            event.record_kind = RecordKind(previous_kind)
+            event.validation_result = "not_validated"
+            event.human_reviewed = False
+            event.tags = [tag for tag in event.tags if tag != "false_positive"]
+            validation.pop("validation_method", None)
+            validation.pop("validator", None)
+        else:
+            raise ValueError("Unsupported evidence review status.")
+        event.technical_validation = validation
+
+        false_positive_ids = {
+            str(item.canonical_id or item.id)
+            for item in context.raw_events
+            if item.evidence_status == EvidenceStatus.FALSE_POSITIVE
+        }
+        context.risk_findings = [
+            finding
+            for finding in context.risk_findings
+            if not finding.linked_evidence_ids
+            or not set(finding.linked_evidence_ids).issubset(false_positive_ids)
+        ]
+        context.processing_summary["false_positives"] = len(false_positive_ids)
+        context.claim_evidence_model_version = ""
+        context.claims = []
+        context.evidence_items = []
+        context.claim_evidence_links = []
+        context.contradicting_evidence = []
+        context.interpretations = []
+        context.decisions = []
+        context = await asyncio.to_thread(prepare_context_for_report, context, run_id)
+        await asyncio.to_thread(self._write_context, context_path, context)
+        summary = summarize_context(run.domains, context)
+        async with self._lock:
+            current = self._runs[run_id]
+            current.summary = summary
+            current.report = None
+            current.stage = "Evidence review applied - report regeneration required"
             current.updated_at = utcnow_iso()
             await self._persist_locked()
             return current
@@ -444,6 +547,7 @@ class RunStore:
             payload = _json_payload(row[0])
             run = RunRecord(**payload)
             _remove_legacy_opencti_source(run)
+            _hydrate_source_lifecycle(run)
             self._runs[run.id] = run
 
     def _persist_postgres(self, payloads: List[Dict[str, Any]]) -> None:
@@ -515,9 +619,15 @@ def summarize_context(domains: List[str], context: RunContext) -> AnalysisSummar
             avg_residual_risk=round(snapshot_metrics["avg_residual_risk"].value, 2) if snapshot_metrics["avg_residual_risk"].value is not None else None,
             healthy_sources=int(snapshot_metrics["healthy_sources"].value or 0),
             total_sources=int(snapshot_metrics["total_sources"].value or 0),
+            eligible_sources=int(snapshot_metrics["eligible_sources"].value or 0),
             queried_sources=int(snapshot_metrics["queried_sources"].value or 0),
+            successful_sources=int(snapshot_metrics["successful_sources"].value or 0),
             productive_sources=int(snapshot_metrics["productive_sources"].value or 0),
             registered_sources=int(snapshot_metrics["registered_sources"].value or 0),
+            empty_sources=int(snapshot_metrics["empty_sources"].value or 0),
+            degraded_sources=int(snapshot_metrics["degraded_sources"].value or 0),
+            failed_sources=int(snapshot_metrics["failed_sources"].value or 0),
+            skipped_sources=int(snapshot_metrics["skipped_sources"].value or 0),
         ),
         domain_signals=domain_signals,
         findings=findings,
@@ -548,6 +658,100 @@ def _remove_legacy_opencti_source(run: RunRecord) -> None:
     if removed:
         summary.kpis.total_sources = max(0, int(summary.kpis.total_sources or 0) - removed)
     _remove_opencti_from_coverage(summary.metrics.get("source_coverage", {}))
+
+
+def _hydrate_source_lifecycle(run: RunRecord) -> bool:
+    """Backfill lifecycle KPIs in historical runs from their persisted coverage."""
+    coverage = run.summary.metrics.get("source_coverage", {})
+    lifecycle = coverage.get("source_lifecycle", {}) if isinstance(coverage, dict) else {}
+    if not isinstance(lifecycle, dict) or not lifecycle:
+        return False
+
+    values = {
+        "registered_sources": int(lifecycle.get("registered") or 0),
+        "eligible_sources": int(lifecycle.get("eligible") or 0),
+        "queried_sources": int(lifecycle.get("attempted") or 0),
+        "successful_sources": int(lifecycle.get("succeeded") or 0),
+        "productive_sources": int(lifecycle.get("productive") or 0),
+        "empty_sources": int(lifecycle.get("empty") or 0),
+        "degraded_sources": int(lifecycle.get("degraded") or 0),
+        "failed_sources": int(lifecycle.get("failed") or 0),
+        "skipped_sources": int(lifecycle.get("skipped") or 0),
+    }
+    values["total_sources"] = values["eligible_sources"]
+    values["healthy_sources"] = values["successful_sources"]
+    for field_name, value in values.items():
+        setattr(run.summary.kpis, field_name, value)
+
+    snapshot = run.summary.decision_snapshot
+    if not isinstance(snapshot, dict) or not snapshot:
+        return True
+    snapshot_metrics = snapshot.setdefault("metrics", {})
+    existing_period = next(
+        (
+            str(metric.get("period"))
+            for metric in snapshot_metrics.values()
+            if isinstance(metric, dict) and metric.get("period")
+        ),
+        "",
+    )
+    for metric_id, value in values.items():
+        config = METRIC_CATALOG[metric_id]
+        denominator = None
+        if metric_id in {"healthy_sources", "queried_sources"}:
+            denominator = values["eligible_sources"]
+        elif metric_id in {
+            "successful_sources",
+            "productive_sources",
+            "empty_sources",
+            "degraded_sources",
+            "failed_sources",
+        }:
+            denominator = values["queried_sources"]
+        elif metric_id in {"eligible_sources", "skipped_sources"}:
+            denominator = values["registered_sources"]
+        snapshot_metrics[metric_id] = DecisionMetric(
+            metric_id=metric_id,
+            label=config["label"],
+            value=float(value),
+            unit=config["unit"],
+            value_status="observed_zero" if value == 0 else "valid_value",
+            numerator=float(value) if denominator is not None else None,
+            denominator=float(denominator) if denominator is not None else None,
+            period=existing_period,
+            confidence=1.0,
+            definition=config["definition"],
+            formula=config["formula"],
+        ).model_dump(mode="json")
+
+    snapshot["source_health"] = {
+        "registered": values["registered_sources"],
+        "eligible": values["eligible_sources"],
+        "healthy": values["successful_sources"],
+        "successful": values["successful_sources"],
+        "queried": values["queried_sources"],
+        "productive": values["productive_sources"],
+        "empty": values["empty_sources"],
+        "degraded": values["degraded_sources"],
+        "failed": values["failed_sources"],
+        "skipped": values["skipped_sources"],
+        "total": values["eligible_sources"],
+        "value_status": (
+            "partial_data"
+            if values["queried_sources"] < values["eligible_sources"]
+            or values["successful_sources"] < values["queried_sources"]
+            else "valid_value"
+        ),
+        "definition": METRIC_CATALOG["successful_sources"]["definition"],
+    }
+    try:
+        snapshot_model = DecisionIntelligenceSnapshot(**snapshot)
+        canonical = snapshot_model.model_dump_json(exclude={"snapshot_hash"})
+    except Exception:
+        canonical_payload = {key: value for key, value in snapshot.items() if key != "snapshot_hash"}
+        canonical = json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"), default=str)
+    snapshot["snapshot_hash"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return True
 
 
 def _remove_opencti_from_coverage(coverage: Any) -> None:
@@ -629,6 +833,9 @@ def _summary_event_matches(event: Any, terms: List[str]) -> bool:
 
 PLANNED_COLLECTORS = [
     "CISA KEV",
+    "NVD CVE",
+    "FIRST EPSS",
+    "Exploit-DB",
     "Busqueda publica",
     "Indice publico",
     "Indice historico publico",
@@ -713,6 +920,8 @@ def _planned_collector_warning(name: str, request: DomainAnalysisRequest) -> str
         return "Exploracion externa autorizada: DNS, subdominios, HTTP/TLS y controles de correo."
     if name == "SOCMINT Public":
         return "Public SOCMINT is rate-limit aware; private scraping is not performed."
+    if name == "Exploit-DB":
+        return "Consulta contextual por CVE; una referencia publica no demuestra aplicabilidad ni explotacion."
     if request.mode == "deep":
         return "Deep collector planned; records appear when the run completes or as a partial source status."
     return "Collector planned; records appear when the run completes or as a partial source status."

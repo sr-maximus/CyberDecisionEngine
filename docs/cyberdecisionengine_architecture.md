@@ -1,11 +1,21 @@
 # CyberDecisionEngine Architecture
 
-Created by Edwin Peñuela, model started in 2022.
+Created by Edwin Javier Peñuela Camacho. The model started in 2022 and is now
+formalized as the P-CIDER v1.0 reference implementation.
+
+## P-CIDER Implementation Rationale
+
+CyberDecisionEngine implements P-CIDER because public cyber intelligence needs a
+reproducible path from signal to decision. The theoretical reason is separation:
+evidence quality, analytic confidence, contextual plausibility, business impact,
+controls and residual risk are different variables. The practical reason is
+control: every dashboard, report and export must be rebuilt from the same
+`runId` snapshot, with no synthetic evidence and no double counting of controls.
 
 ## Integration Decisions
 
 - `lockfale/osint-framework` is integrated as a local reference catalog only. The platform loads `arf.json`, filters resources by scope, and exposes metadata for OSINT planning. It does not run the OSINT Framework UI, worker, tracking routes, or third-party tools listed in the catalog.
-- `openclaw/openclaw` is integrated as an optional AI gateway provider for CyberDecisionEngine prompt packages. It is disabled by default, uses proposal-only payloads, and must not execute shell, browser, channels, cron jobs, tools, or file writes from generated packages without explicit admin approval.
+- `openclaw/openclaw` is integrated as an optional analytical gateway for controlled proposal packages. It is disabled by default, uses proposal-only payloads, and must not execute shell, browser, channels, cron jobs, tools, or file writes from generated packages without explicit admin approval.
 
 ## Container Layout
 
@@ -19,7 +29,7 @@ flowchart LR
   A --> K["kali-surface<br/>DNS, TLS, WHOIS/RDAP, puertos ligeros"]
   A --> S["spiderfoot<br/>OSINT pasivo de dominio"]
   A --> T["tor-proxy<br/>SOCKS para indices autorizados"]
-  A -. "opcional, proposal-only" .-> C["OpenClaw Gateway<br/>asistente IA controlado"]
+  A -. "opcional, proposal-only" .-> C["OpenClaw Gateway<br/>asistencia controlada"]
   O --> Internet["Fuentes publicas"]
   K --> Internet
   S --> Internet
@@ -47,8 +57,8 @@ flowchart TD
   Findings --> Model
   Model --> Dash["Dashboards<br/>riesgo, fraude, SOCMINT, OSINT, frameworks, escenarios"]
   Model --> Reports["Informes HTML<br/>directivo y tecnico"]
-  Model --> AI["Paquete IA<br/>prompt, contexto, guardrails, payloads"]
-  AI -. "sin ejecucion automatica" .-> OpenClaw["OpenClaw proposal gateway"]
+  Model --> Assist["Paquete asistido<br/>contexto, guardrails, payloads"]
+  Assist -. "sin ejecucion automatica" .-> OpenClaw["OpenClaw proposal gateway"]
 ```
 
 ## Persistence and Recovery
@@ -75,11 +85,11 @@ flowchart LR
 - `api` valida alcance autorizado y orquesta fuentes.
 - `osint-tools`, `kali-surface`, `spiderfoot` y `tor-proxy` están en redes internas sin UI pública.
 - `tor-proxy` no publica SOCKS al host y opera sin privilegios, con filesystem de solo lectura y límites de recursos.
-- Proveedores IA reciben paquetes controlados y modo `proposal_only`; no ejecutan shell, navegador ni cambios sin aprobación.
+- Proveedores opcionales reciben paquetes controlados y modo `proposal_only`; no ejecutan shell, navegador ni cambios sin aprobación.
 
 ## OpenClaw Use With Least Privilege
 
-- Best use: assistant inside the platform for explaining runs, drafting executive/technical actions, preparing scheduled scan plans, and reviewing report quality.
+- Best use: controlled assistant inside the platform for explaining runs, drafting executive/technical actions, preparing scheduled scan plans, and reviewing report quality.
 - Docker default: `OPENCLAW_ENABLED=true` with a dedicated internal gateway; the deterministic pipeline remains independent.
 - Runtime controls: generated token, no public exposure, no shared personal workspace, read-only filesystem and no unrestricted tools or plugins.
 - CyberDecisionEngine payloads include an explicit `proposal_only` policy so OpenClaw returns analysis and plans, not direct operations.

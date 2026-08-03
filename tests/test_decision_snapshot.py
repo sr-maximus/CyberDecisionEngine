@@ -5,7 +5,8 @@ from cyberdeck.decision_intelligence import build_decision_snapshot
 from cyberdeck.reporting.html_report import prepare_context_for_report, render_report
 from cyberdeck.schemas import OrganizationProfile, RunContext, SourceStatus
 from cyberdeck.semantics import CLAIM_EVIDENCE_MODEL_VERSION
-from cyberdeck_api.jobs import summarize_context
+from cyberdeck_api.jobs import _hydrate_source_lifecycle, summarize_context
+from cyberdeck_api.models import DomainAnalysisRequest, RunRecord
 
 
 RUN_ID = "syntheticregression"
@@ -23,11 +24,23 @@ def test_regression_snapshot_is_the_shared_decision_record(tmp_path, regression_
     assert snapshot["metrics"]["queried_sources"]["value"] == 3
     assert snapshot["metrics"]["productive_sources"]["value"] == 1
     assert snapshot["metrics"]["total_sources"]["value"] == 3
+    assert snapshot["metrics"]["eligible_sources"]["value"] == 3
+    assert snapshot["metrics"]["successful_sources"]["value"] == 3
     assert snapshot["metrics"]["registered_sources"]["value"] == 3
+    assert snapshot["metrics"]["empty_sources"]["value"] == 2
+    assert snapshot["metrics"]["failed_sources"]["value"] == 0
+    assert snapshot["source_health"]["registered"] == 3
+    assert snapshot["source_health"]["eligible"] == 3
+    assert snapshot["source_health"]["queried"] == 3
+    assert snapshot["source_health"]["successful"] == 3
+    assert snapshot["source_health"]["productive"] == 1
     assert all(status.name.lower() != "opencti" for status in prepared.source_statuses)
     assert len(prepared.connector_coverage["connectors"]) == 3
     assert snapshot["metrics"]["validated_findings"]["value"] == 2
-    assert snapshot["scenario_funnel"]["reference_templates"] == 1500
+    library = json.loads(
+        open("data/scenarios/cyber_scenario_library.json", encoding="utf-8").read()
+    )
+    assert snapshot["scenario_funnel"]["reference_templates"] == library["scenario_count"]
     assert snapshot["scenario_funnel"]["executable"] == 0
     assert snapshot["scenario_funnel"]["supported"] == 2
     assert snapshot["metrics"]["pending_decisions"]["value"] == 2
@@ -211,3 +224,39 @@ def test_organization_without_domains_keeps_an_organization_scope_subtitle():
     assert snapshot.report_context.subject_name == "Example Holdings"
     assert snapshot.report_context.report_subtitle.startswith("Alcance de organización declarado")
     assert "0 dominios" not in snapshot.report_context.report_subtitle
+
+
+def test_historical_run_hydrates_source_lifecycle_from_persisted_coverage(regression_context):
+    context = prepare_context_for_report(regression_context.model_copy(deep=True), run_id="legacy-run")
+    summary = summarize_context(["example.com"], context)
+    lifecycle = summary.metrics["source_coverage"]["source_lifecycle"]
+    expected = {
+        "registered_sources": lifecycle["registered"],
+        "eligible_sources": lifecycle["eligible"],
+        "queried_sources": lifecycle["attempted"],
+        "successful_sources": lifecycle["succeeded"],
+        "productive_sources": lifecycle["productive"],
+        "empty_sources": lifecycle["empty"],
+        "degraded_sources": lifecycle["degraded"],
+        "failed_sources": lifecycle["failed"],
+        "skipped_sources": lifecycle["skipped"],
+    }
+    for field_name in expected:
+        setattr(summary.kpis, field_name, 0)
+        summary.decision_snapshot["metrics"].pop(field_name, None)
+    run = RunRecord(
+        id="legacy-run",
+        status="completed",
+        request=DomainAnalysisRequest(domains=["example.com"], authorized_scope=True),
+        domains=["example.com"],
+        summary=summary,
+    )
+
+    assert _hydrate_source_lifecycle(run) is True
+    for field_name, value in expected.items():
+        assert getattr(run.summary.kpis, field_name) == value
+        assert run.summary.decision_snapshot["metrics"][field_name]["value"] == value
+    assert run.summary.decision_snapshot["source_health"]["registered"] == expected["registered_sources"]
+    assert run.summary.decision_snapshot["source_health"]["queried"] == expected["queried_sources"]
+    assert run.summary.decision_snapshot["source_health"]["productive"] == expected["productive_sources"]
+    assert len(run.summary.decision_snapshot["snapshot_hash"]) == 64

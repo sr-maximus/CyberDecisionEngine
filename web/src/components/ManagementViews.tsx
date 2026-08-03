@@ -1,4 +1,4 @@
-import { Activity, AlertCircle, BellRing, CalendarClock, CheckCircle2, ChevronDown, FileWarning, LifeBuoy, Pause, PlayCircle, RefreshCw, ScrollText, Send, ShieldCheck, XCircle } from "lucide-react";
+import { Activity, AlertCircle, BellRing, CalendarClock, CheckCircle2, ChevronDown, FileWarning, LifeBuoy, Pause, PlayCircle, RefreshCw, RotateCcw, ScrollText, Send, ShieldCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createMonitoringProfile, createSupportTicket, getMonitoringOverview, updateMonitoringAlert, updateMonitoringProfile, updateSupportTicket } from "../api";
 import type { DomainAnalysisRequest, MonitoringCadence, MonitoringOverview, RunRecord } from "../types";
@@ -175,8 +175,17 @@ const monitoringCopy = {
     cadence: "Frecuencia",
     duration: "Tiempo maximo por ciclo",
     create: "Activar monitoreo",
+    createScheduled: "Crear seguimiento",
     refresh: "Sincronizar estado",
     setup: "Configurar nuevo seguimiento",
+    executionMode: "Tipo de ejecución",
+    newMode: "Nueva",
+    newModeHelp: "Crea un seguimiento con la frecuencia seleccionada.",
+    resumeMode: "Reanudar",
+    resumeModeHelp: "Continúa un perfil pausado sin duplicar su historial.",
+    continuousMode: "Continuo 24/7",
+    continuousModeHelp: "Mantiene ciclos persistentes, deduplica y alerta hasta que lo pauses.",
+    resumeInstruction: "Selecciona un perfil pausado en la lista para reanudarlo.",
     noScope: "Ingresa marca/grupo o dominio autorizado antes de activar monitoreo.",
     profiles: "Perfiles activos",
     alerts: "Alertas nuevas",
@@ -224,8 +233,17 @@ const monitoringCopy = {
     cadence: "Cadence",
     duration: "Max time per cycle",
     create: "Enable monitoring",
+    createScheduled: "Create monitoring",
     refresh: "Sync status",
     setup: "Configure new monitoring",
+    executionMode: "Execution type",
+    newMode: "New",
+    newModeHelp: "Creates monitoring with the selected cadence.",
+    resumeMode: "Resume",
+    resumeModeHelp: "Continues a paused profile without duplicating its history.",
+    continuousMode: "Continuous 24/7",
+    continuousModeHelp: "Runs persistent deduplicated cycles and alerts until paused.",
+    resumeInstruction: "Select a paused profile from the list to resume it.",
     noScope: "Enter an authorized brand/group or domain before enabling monitoring.",
     profiles: "Active profiles",
     alerts: "New alerts",
@@ -273,6 +291,7 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
   const copy = monitoringCopy[props.language];
   const [overview, setOverview] = useState<MonitoringOverview | null>(null);
   const [cadence, setCadence] = useState<MonitoringCadence>("24h");
+  const [executionMode, setExecutionMode] = useState<"new" | "resume" | "continuous">("new");
   const [duration, setDuration] = useState(30);
   const [profileName, setProfileName] = useState("");
   const [supportSubject, setSupportSubject] = useState("");
@@ -331,9 +350,9 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
       await createMonitoringProfile({
         name: profileName.trim() || props.organizationName.trim() || props.domains.join(", "),
         request: buildRequest(),
-        cadence,
+        cadence: effectiveCadence,
         collection_duration_minutes: duration,
-        enabled: cadence !== "manual",
+        enabled: effectiveCadence !== "manual",
         created_by: "web"
       });
       setProfileName("");
@@ -400,6 +419,22 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
   const logs = overview?.logs ?? [];
   const tickets = overview?.support_tickets ?? [];
   const openAlerts = alerts.filter((alert) => alert.status === "open").length;
+  const effectiveCadence: MonitoringCadence = executionMode === "continuous" ? "continuous" : cadence;
+
+  function selectExecutionMode(mode: "new" | "resume" | "continuous") {
+    setExecutionMode(mode);
+    setMessage(null);
+    if (mode === "continuous") {
+      setCadence("continuous");
+      setSetupOpen(true);
+    } else if (mode === "resume") {
+      setActiveSection("profiles");
+      setSetupOpen(false);
+    } else {
+      setCadence((current) => current === "continuous" ? "24h" : current);
+      setSetupOpen(true);
+    }
+  }
 
   return (
     <section className="panel monitoring-panel">
@@ -410,7 +445,46 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
         </div>
         <BellRing size={20} />
       </div>
-      <details className="monitoring-setup" open={setupOpen} onToggle={(event) => setSetupOpen(event.currentTarget.open)}>
+      <div className="monitoring-mode-selector" aria-label={copy.executionMode}>
+        <button
+          className={executionMode === "new" ? "active" : ""}
+          type="button"
+          aria-pressed={executionMode === "new"}
+          onClick={() => selectExecutionMode("new")}
+        >
+          <PlayCircle size={17} />
+          <span><strong>{copy.newMode}</strong><small>{copy.newModeHelp}</small></span>
+        </button>
+        <button
+          className={executionMode === "resume" ? "active" : ""}
+          type="button"
+          aria-pressed={executionMode === "resume"}
+          onClick={() => selectExecutionMode("resume")}
+        >
+          <RotateCcw size={17} />
+          <span><strong>{copy.resumeMode}</strong><small>{copy.resumeModeHelp}</small></span>
+        </button>
+        <button
+          className={executionMode === "continuous" ? "active" : ""}
+          type="button"
+          aria-pressed={executionMode === "continuous"}
+          onClick={() => selectExecutionMode("continuous")}
+        >
+          <Activity size={17} />
+          <span><strong>{copy.continuousMode}</strong><small>{copy.continuousModeHelp}</small></span>
+        </button>
+      </div>
+      {executionMode === "resume" ? (
+        <div className="monitoring-resume-hint">
+          <RotateCcw size={17} />
+          <span>{copy.resumeInstruction}</span>
+        </div>
+      ) : null}
+      <details
+        className="monitoring-setup"
+        open={executionMode !== "resume" && setupOpen}
+        onToggle={(event) => setSetupOpen(event.currentTarget.open)}
+      >
         <summary>
           <span><Activity size={17} /> {copy.setup}</span>
           <ChevronDown size={17} />
@@ -422,7 +496,11 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
           </label>
           <label className="field-control">
             <span>{copy.cadence}</span>
-            <select value={cadence} onChange={(event) => setCadence(event.target.value as MonitoringCadence)}>
+            <select
+              value={effectiveCadence}
+              disabled={executionMode === "continuous"}
+              onChange={(event) => setCadence(event.target.value as MonitoringCadence)}
+            >
               {(["1h", "6h", "24h", "7d", "continuous", "manual"] as MonitoringCadence[]).map((item) => (
                 <option key={item} value={item}>{copy.cadences[item]}</option>
               ))}
@@ -438,7 +516,7 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
           </label>
           <button className="primary-button" type="button" disabled={loading || !hasScope} onClick={createProfile} title={copy.create}>
             <PlayCircle size={17} />
-            <span>{copy.create}</span>
+            <span>{executionMode === "continuous" ? copy.create : copy.createScheduled}</span>
           </button>
         </div>
       </details>

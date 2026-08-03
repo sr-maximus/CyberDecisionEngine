@@ -2,9 +2,13 @@ from pathlib import Path
 
 from cyberdeck.decision_intelligence import build_decision_snapshot
 from cyberdeck.reporting.html_report import (
+    _display_vulnerability_intelligence,
     _format_strategic_percent,
+    _framework_summary,
     _radar_svg,
     _risk_digest,
+    _search_groups,
+    _work_plan,
     prepare_context_for_report,
     render_report,
 )
@@ -16,10 +20,18 @@ def test_report_generation(tmp_path):
         name="Demo Bank",
         sector="Financial and insurance activities",
         country="CO",
-        author="Edwin Penuela",
+        author="Edwin Javier Peñuela Camacho",
         authorized_scope=True,
         primary_domains=["demo-bank.com"],
         comparison_domains=["benchmark-bank.com"],
+        financial_risk_inputs={
+            "asset_value": 1_000_000,
+            "exposure_factor": 0.25,
+            "annual_rate_of_occurrence": 0.4,
+            "control_risk_reduction": 0.5,
+            "control_cost": 40_000,
+            "currency": "USD",
+        },
         control_maturity={
             "iso27001_score": 0.6,
             "nist_csf_score": 0.65,
@@ -133,13 +145,21 @@ def test_report_generation(tmp_path):
     assert '<html lang="es">' in html
     assert "Arquitectura de decisión" in html
     assert "Alcance y base de comparación" in html
+    assert "Alcance sectorial declarado" in html
     assert "demo-bank.com" in html
     assert "benchmark-bank.com" in html
-    assert "Catálogo accionable de recomendaciones" in html
-    assert "Plan de trabajo de mitigación y revisión de escenarios" in html
+    assert "Opciones de decisión sustentadas por escenarios" in html
+    assert "Plan de trabajo de mitigación y revisión de escenarios" not in html
+    assert "Sin plan de acción sustentado" in html
+    assert "Fuentes y estado de conectores" not in html
+    assert "<h3>Referencias</h3>" not in html
+    assert "Cobertura operativa de conectores y continuidad de recolección" not in html
     assert "Cobertura de módulos de inteligencia" in html
     assert "Metodología y lectura de porcentajes" in html
     assert "Inteligencia de vulnerabilidades" in html
+    assert "Riesgo cuantitativo por escenarios organizacionales" not in html
+    assert "ALE antes de controles" not in html
+    assert "ROSI" not in html
     assert "Escenarios multi-framework activados" in html
     assert "Fecha del informe" in html
     assert "2026-02-03" in html
@@ -150,7 +170,11 @@ def test_report_generation(tmp_path):
     assert "Colombia" in html
 
     context.organization.language = "en"
-    context.metrics["risk_methodology"]["purpose"] = "La estructura de riesgo convierte senales tecnicas y de fraude en probabilidad contextual, impacto de negocio, efectividad de controles, riesgo inherente, riesgo residual y matriz 4x4."
+    context.metrics["risk_methodology"]["purpose"] = (
+        "La estructura de riesgo convierte evidencia trazable en una estimacion contextual "
+        "de plausibilidad, impacto de negocio, riesgo inherente, riesgo residual y matriz 4x4; "
+        "no confirma incidentes."
+    )
     context.metrics["forecast"]["7"]["language"] = "Probabilidad relativa estimada; no implica certeza de ataque."
     english_out = render_report(context, str(tmp_path / "report-en.html"))
     english_html = Path(english_out).read_text(encoding="utf-8")
@@ -160,8 +184,9 @@ def test_report_generation(tmp_path):
     assert "Executive Summary" in english_html
     assert "Decision Architecture" in english_html
     assert "Scope and Comparison Basis" in english_html
-    assert "Actionable Recommendation Catalog" in english_html
-    assert "Mitigation and Scenario Review Work Plan" in english_html
+    assert "Scenario-Supported Decision Options" in english_html
+    assert "Mitigation and Scenario Review Work Plan" not in english_html
+    assert "No supported action plan" in english_html
     assert "Intelligence Module Coverage" in english_html
     assert "Methodology and Reading of Percentages" in english_html
     assert "Vulnerability intelligence" in english_html
@@ -178,14 +203,115 @@ def test_report_generation(tmp_path):
     assert "2026-02-03 14:45" not in technical_html
     assert "Financial and insurance activities" in english_html
     assert "Scope, Data and Definitions" in technical_html
+    assert "Declared sector scope" in technical_html
+    assert "technical-audit-table" in technical_html
     assert "Methodology and Assumptions" in technical_html
     assert "Vulnerability Intelligence and Patch Focus" in technical_html
+    assert "Organization-wide quantitative scenario risk" not in technical_html
+    assert "ALE · before controls" not in technical_html
+    assert "Declared financial inputs" not in technical_html
+    assert "SLE / ALE / ROSI" not in technical_html
     assert "https://urlscan.io/result/019ed40b-2269-7628-9d53-4f8400647c66/" not in technical_html
     assert "https://urlscan.io/screenshots/019ed40b-2269-7628-9d53-4f8400647c66.png" not in technical_html
     assert "Narrative intelligence, disinformation and reputational risk" in technical_html
     assert "Evidence-Activated Multi-Framework Scenarios" in technical_html
     assert "Resumen Ejecutivo" not in english_html
     assert "Employee Virtual Risk" not in english_html
+
+
+def test_work_plan_requires_an_evidence_backed_scenario() -> None:
+    payload = {
+        "organization": {"name": "Example", "language": "es"},
+        "report_scope": {"primary_domains": ["example.com"]},
+        "scope_events": [
+            {
+                "id": "event-1",
+                "canonical_id": "event-1",
+                "title": "Registro contextual",
+                "evidence_status": "direct",
+                "evidence_url": "https://example.com/context",
+            }
+        ],
+        "risk_findings": [],
+        "scenario_library": {"matches": []},
+        "source_statuses": [
+            {"name": "Busqueda publica", "status": "partial", "records": 1}
+        ],
+    }
+
+    plan = _work_plan(payload, "es")
+
+    assert plan["status"] == "not_supported"
+    assert plan["items"] == []
+    assert "No se publica un plan de mitigación" in plan["summary"]
+    assert "conectores" not in plan["summary"].casefold()
+
+
+def test_supported_scenario_links_actions_to_evidence_backed_compliance_mappings() -> None:
+    payload = {
+        "organization": {"name": "Example", "language": "es"},
+        "report_scope": {"primary_domains": ["example.com"]},
+        "scope_events": [
+            {
+                "id": "event-1",
+                "canonical_id": "event-1",
+                "title": "Señal directa",
+                "evidence_status": "direct",
+                "evidence_url": "https://example.com/evidence",
+            }
+        ],
+        "risk_findings": [],
+        "scenario_library": {
+            "matches": [
+                {
+                    "id": "ATTACK-T1566",
+                    "title": "Phishing",
+                    "primary_framework": "attack",
+                    "evidence_ids": ["event-1"],
+                    "evidence_count": 1,
+                    "confidence": 72,
+                    "recommendation": "Validar controles de correo y respuesta.",
+                    "decision": "Priorizar revisión del canal afectado.",
+                    "question": "¿La señal justifica elevar la vigilancia del canal?",
+                    "criteria": "Cerrar cuando la evidencia y el control estén verificados.",
+                    "reasons_label": "La señal directa coincide con el escenario.",
+                }
+            ]
+        },
+        "framework_summary": {
+            "mappings": [
+                {
+                    "framework": "NIST CSF",
+                    "axis": "Detect",
+                    "controls": ["DE.CM"],
+                    "evidence": [{"evidence_id": "event-1"}],
+                },
+                {
+                    "framework": "ISO 27001",
+                    "axis": "Detección",
+                    "controls": ["A.8.16"],
+                    "evidence": [{"evidence_id": "event-1"}],
+                },
+                {
+                    "framework": "COBIT 2019",
+                    "axis": "Monitoreo",
+                    "controls": ["DSS05"],
+                    "evidence": [{"evidence_id": "event-1"}],
+                },
+            ]
+        },
+    }
+
+    plan = _work_plan(payload, "es")
+
+    assert plan["status"] == "supported"
+    assert plan["items"][0]["evidence_ids"] == ["event-1"]
+    frameworks = {
+        mapping["framework"]
+        for mapping in plan["items"][0]["control_mappings"]
+    }
+    assert frameworks == {"NIST CSF", "ISO 27001", "COBIT 2019"}
+    assert plan["items"][0]["control_mappings"][0]["evidence_count"] == 1
 
 
 def test_strategic_coverage_percent_preserves_small_nonzero_values():
@@ -214,6 +340,119 @@ def test_risk_digest_does_not_turn_missing_heat_data_into_zero() -> None:
 
     assert digest["top_heat"] == "sin datos"
     assert digest["top_heat_score"] is None
+
+
+def test_search_results_explain_observation_date_and_hide_internal_category() -> None:
+    groups = _search_groups(
+        [
+            {
+                "source": "OSINT: Common Crawl CDX CC-MAIN-2026-25",
+                "category": "osint_public_index",
+                "evidence_type": "web_page",
+                "title": "URL publica indexada para example.com: https://example.com/careers/",
+                "domain": "example.com",
+                "observed_at": "2026-06-17T04:18:32+00:00",
+                "age_days": 35,
+                "tags": ["common_crawl", "example.com", "osint", "public_url"],
+                "evidence_url": "https://example.com/careers/",
+            }
+        ],
+        "es",
+    )
+
+    row = groups["internet"]["rows"][0]
+    assert row["category_label"] == "Índice web público"
+    assert row["title"] == "Página pública indexada en example.com"
+    assert row["observed_date"] == "17 jun 2026"
+    assert row["recency_label"] == "Observado hace 35 días"
+    assert row["age_days"] == 35
+
+
+def test_framework_summary_deduplicates_evidence_across_frameworks_by_axis() -> None:
+    evidence = {
+        "evidence_id": "evidence-1",
+        "title": "Observed technology",
+        "url": "https://example.com/evidence",
+        "evidence_status": "validated",
+        "relationship": "direct",
+        "domain": "example.com",
+    }
+    payload = {
+        "metrics": {
+            "framework_mapping": {
+                "status": "evidence_backed",
+                "record_count": 1,
+                "cell_count": 2,
+                "mappings": [
+                    {
+                        "framework": "NIST CSF",
+                        "axis": "vulnerability",
+                        "controls": ["Identify", "Protect"],
+                        "record_count": 2,
+                        "validated_count": 2,
+                        "direct_count": 2,
+                        "evidence_ids": ["evidence-1", "evidence-2"],
+                        "validated_evidence_ids": ["evidence-1", "evidence-2"],
+                        "direct_relationship_evidence_ids": [
+                            "evidence-1",
+                            "evidence-2",
+                        ],
+                        "evidence": [evidence],
+                    },
+                    {
+                        "framework": "ISO 27001",
+                        "axis": "vulnerability",
+                        "controls": ["Technological controls"],
+                        "record_count": 2,
+                        "validated_count": 2,
+                        "direct_count": 2,
+                        "evidence_ids": ["evidence-1", "evidence-3"],
+                        "validated_evidence_ids": ["evidence-1", "evidence-3"],
+                        "direct_relationship_evidence_ids": [
+                            "evidence-1",
+                            "evidence-3",
+                        ],
+                        "evidence": [evidence],
+                    },
+                ],
+            }
+        }
+    }
+
+    summary = _framework_summary(payload, "es")
+
+    assert summary["related_frameworks"] == ["ISO 27001", "NIST CSF"]
+    assert len(summary["affected_axes"]) == 1
+    axis = summary["affected_axes"][0]
+    assert axis["axis"] == "Vulnerabilidades y exposición"
+    assert axis["record_count"] == 3
+    assert axis["validated_count"] == 3
+    assert axis["direct_count"] == 3
+    assert axis["frameworks"] == ["ISO 27001", "NIST CSF"]
+
+
+def test_vulnerability_display_explains_unversioned_technology() -> None:
+    displayed = _display_vulnerability_intelligence(
+        {
+            "rows": [
+                {
+                    "type": "potential",
+                    "label": "apache",
+                    "asset": "example.com",
+                    "status": "Tecnología observada sin versión exacta",
+                    "decision": "Confirmar versión o SBOM antes de asociar una CVE.",
+                    "what_it_demonstrates": "Tecnología observada pasivamente en un activo del alcance.",
+                    "what_it_does_not_demonstrate": "No demuestra versión afectada, vulnerabilidad aplicable ni compromiso.",
+                }
+            ]
+        },
+        "es",
+    )
+
+    row = displayed["rows"][0]
+    assert row["type_label"] == "Tecnología por validar"
+    assert "sin versión exacta" in row["status"]
+    assert "No demuestra versión afectada" in row["what_it_does_not_demonstrate"]
 
 
 def test_report_templates_guard_optional_context():

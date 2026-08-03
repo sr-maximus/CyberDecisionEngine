@@ -10,6 +10,7 @@ SCENARIO = {
         "d3fend": {"id": "D3-PH", "name": "Phishing Detection"},
         "atlas": {"id": "AML.TA0004", "name": "Initial Access"},
         "disarm": {"id": "T2001.001", "name": "Account Asset", "tactic": "Observed Asset"},
+        "f3": {"id": "F1032", "name": "Impersonate Business"},
     },
 }
 
@@ -27,6 +28,7 @@ def _signal(**overrides):
         "attack_mapping_status": "potentially_relevant_technique",
         "disarm_signal": False,
         "atlas_signal": False,
+        "f3_signal": False,
         "framework_ids": set(),
     }
     signal.update(overrides)
@@ -90,3 +92,14 @@ def test_atlas_scenario_requires_exact_id_and_high_confidence():
 def test_d3fend_mapping_alone_does_not_activate_a_scenario():
     evidence = _signal(framework_ids={"D3-PH"})
     assert _score_report_scenario(SCENARIO, [evidence], ["example.com"], "", "es") is None
+
+
+def test_f3_scenario_requires_exact_current_run_mapping():
+    generic = _signal(framework_ids={"F1032"})
+    assert _score_report_scenario(SCENARIO, [generic], ["example.com"], "", "es") is None
+
+    supported = _signal(f3_signal=True, framework_ids={"F1032"})
+    match = _score_report_scenario(SCENARIO, [supported], ["example.com"], "", "es")
+    assert match is not None
+    assert match["primary_framework"] == "f3"
+    assert match["evidence_ids"] == ["evd-1"]

@@ -94,8 +94,9 @@ relacion causal aprobada y confianza de dimension de al menos 60. El
 multiplicador queda limitado a `0.90 - 1.10`. El registro de mapeos parte vacio
 para no inventar causalidad.
 
-## Uso de IA
+## Asistencia analítica opcional
 
-La IA puede proponer extracciones o explicaciones, pero el motor implementado
-no depende de una IA para calcular. La resolucion definitiva, deduplicacion,
-ponderacion, umbrales, score y confianza son deterministas y reproducibles.
+Una capa asistida puede proponer extracciones o explicaciones, pero el motor
+implementado no depende de modelos generativos para calcular. La resolucion
+definitiva, deduplicacion, ponderacion, umbrales, score y confianza son
+deterministas y reproducibles.

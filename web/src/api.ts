@@ -1,6 +1,9 @@
 import type {
   AIAnalysisPackage,
   AIAnalysisRequest,
+  AIChatRequest,
+  AIExecutionRequest,
+  AIExecutionResult,
   AIOrchestrationConfig,
   AttackSurfaceResponse,
   DisinformationFrameworkResponse,
@@ -69,6 +72,19 @@ export function rerunAnalysis(runId: string): Promise<RunRecord> {
 
 export function generateRunReport(runId: string): Promise<RunRecord> {
   return apiFetch<RunRecord>(`/api/runs/${runId}/report`, { method: "POST" });
+}
+
+export function reviewRunEvidence(
+  runId: string,
+  evidenceId: string,
+  status: "pending" | "validated" | "false_positive",
+  reviewer = "authorized_user",
+  reason = ""
+): Promise<RunRecord> {
+  return apiFetch<RunRecord>(`/api/runs/${encodeURIComponent(runId)}/evidence/${encodeURIComponent(evidenceId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, reviewer, reason })
+  });
 }
 
 export function getMonitoringOverview(): Promise<MonitoringOverview> {
@@ -172,6 +188,20 @@ export function getAIOrchestrationConfig(): Promise<AIOrchestrationConfig> {
 
 export function createAIAnalysisPackage(request: AIAnalysisRequest): Promise<AIAnalysisPackage> {
   return apiFetch<AIAnalysisPackage>("/api/ai/package", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+export function executeAIAnalysis(request: AIExecutionRequest): Promise<AIExecutionResult> {
+  return apiFetch<AIExecutionResult>("/api/ai/analyze", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+export function chatWithAI(request: AIChatRequest): Promise<AIExecutionResult> {
+  return apiFetch<AIExecutionResult>("/api/ai/chat", {
     method: "POST",
     body: JSON.stringify(request)
   });

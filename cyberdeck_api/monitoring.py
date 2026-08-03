@@ -38,6 +38,8 @@ INTERVAL_MINUTES = {
 }
 
 CONTEXT_ONLY_TAGS = {"validation_required", "reputation_checker", "dns_inventory_only"}
+ASSURED_EVIDENCE_STATES = {"direct", "validated", "confirmed"}
+RELATED_SCOPE_STATES = {"direct", "related", "validated", "confirmed"}
 URL_RE = re.compile(r"https?://[^\s)>\"]+", re.IGNORECASE)
 
 
@@ -329,7 +331,10 @@ def _alerts_from_run(profile_id: str, run: RunRecord) -> list[MonitoringAlert]:
         evidence_text = " ".join(str(item) for item in finding.get("evidence") or [])
         url = _first_url(evidence_text)
         residual = float(finding.get("residual_risk") or 0)
-        if residual < 18 and not url:
+        evidence_status = str(finding.get("evidence_status") or "").lower()
+        if evidence_status not in ASSURED_EVIDENCE_STATES:
+            continue
+        if residual < 18 or (not url and residual < 45):
             continue
         fingerprint = _fingerprint("finding", title, url, str(finding.get("category") or "risk"))
         alerts.append(
@@ -342,7 +347,7 @@ def _alerts_from_run(profile_id: str, run: RunRecord) -> list[MonitoringAlert]:
                 title=title,
                 category=str(finding.get("category") or "risk"),
                 evidence_url=url,
-                validation=str(finding.get("matrix_label") or "validated finding"),
+                validation=f"{evidence_status} | {finding.get('matrix_label') or 'risk assessed'}",
             )
         )
     for event in run.summary.events:
@@ -352,7 +357,13 @@ def _alerts_from_run(profile_id: str, run: RunRecord) -> list[MonitoringAlert]:
         title = str(event.get("title") or "Threat signal")
         url = str(event.get("evidence_url") or "") or None
         severity = float(event.get("severity") or 0.0)
-        if severity < 0.55 and not url:
+        evidence_status = str(event.get("evidence_status") or "").lower()
+        scope_relationship = str(event.get("relationship_to_scope") or "").lower()
+        if evidence_status not in ASSURED_EVIDENCE_STATES:
+            continue
+        if scope_relationship not in RELATED_SCOPE_STATES and evidence_status not in {"validated", "confirmed"}:
+            continue
+        if severity < 0.55 or not url:
             continue
         category = str(event.get("category") or "event")
         fingerprint = _fingerprint("event", title, url, category, str(event.get("technique") or ""))
@@ -366,7 +377,33 @@ def _alerts_from_run(profile_id: str, run: RunRecord) -> list[MonitoringAlert]:
                 title=title,
                 category=category,
                 evidence_url=url,
-                validation="validated evidence" if url else "signal without direct URL",
+                validation=f"{evidence_status} | scope:{scope_relationship or 'validated'}",
+            )
+        )
+    metrics = run.summary.metrics if isinstance(run.summary.metrics, dict) else {}
+    pivot = metrics.get("pivot_intelligence") if isinstance(metrics.get("pivot_intelligence"), dict) else {}
+    for entity in list(pivot.get("entities") or []):
+        if not isinstance(entity, dict) or not entity.get("decision_relevant") or not entity.get("corroborated"):
+            continue
+        urls = [str(item) for item in entity.get("evidence_urls") or [] if str(item).startswith(("http://", "https://"))]
+        if not urls:
+            continue
+        entity_type = str(entity.get("entity_type") or "entity")
+        value = str(entity.get("value") or "").strip()
+        if not value:
+            continue
+        fingerprint = _fingerprint("pivot", entity_type, value, urls[0])
+        alerts.append(
+            MonitoringAlert(
+                id=uuid4().hex[:12],
+                profile_id=profile_id,
+                run_id=run.id,
+                fingerprint=fingerprint,
+                severity="medium",
+                title=f"Entidad correlacionada: {value}",
+                category=f"pivot_{entity_type}",
+                evidence_url=urls[0],
+                validation=f"corroborated | {int(entity.get('source_count') or 0)} independent sources",
             )
         )
     return alerts

@@ -7,7 +7,10 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 
 DEFAULT_HEADERS = {
-    "User-Agent": "CyberDecisionEngine/0.1 defensive-intelligence"
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+    "Accept": "application/json, application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5",
+    "Accept-Language": "en-US,en;q=0.8,es;q=0.7",
+    "X-Client-Name": "CyberDecisionEngine-defensive-intelligence",
 }
 
 

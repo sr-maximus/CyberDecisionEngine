@@ -73,7 +73,7 @@ const copy = {
     mismatch: "New password and confirmation do not match.",
     locked: "Account locked after failed attempts. Wait {minutes} min or request admin unlock.",
     invalidWithAttempts: "Invalid credentials. Failed attempts: {attempts}/5.",
-    model: "Model designed by Edwin Penuela",
+    model: "Model designed by Edwin Javier Peñuela Camacho",
     posture: "Defensive, passive, authorized and traceable use.",
     roles: "Admin / Analyst / Executive",
     governance: "Local permissions, users and API connector governance.",

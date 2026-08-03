@@ -1,18 +1,9 @@
 from cyberdeck.collectors.kali_surface import _events_from_payload as kali_events_from_payload
 from cyberdeck.collectors.osint_tools import _events_from_payload as osint_events_from_payload
 from cyberdeck.collectors.spiderfoot import _events_from_payload as spiderfoot_events_from_payload
-from cyberdeck.cli import _collector_timeout_budget
 from cyberdeck.cli import _build_general_findings
 from cyberdeck.enrichment.evidence_pipeline import process_evidence_records
 from cyberdeck.schemas import EvidenceStatus, OrganizationProfile
-
-
-class _FakeCollector:
-    def __init__(self, name, timeout_seconds=80, collection_timeout_seconds=180, domains=None):
-        self.name = name
-        self.timeout_seconds = timeout_seconds
-        self.collection_timeout_seconds = collection_timeout_seconds
-        self.domains = domains or []
 
 
 def test_osint_tools_payload_to_events():
@@ -181,8 +172,10 @@ def test_spiderfoot_payload_to_events_uses_real_records_only():
     assert all(event.demo is False for event in events)
 
 
-def test_visible_source_names_keep_special_timeout_budgets():
-    assert _collector_timeout_budget(_FakeCollector("Busqueda publica")) >= 200
-    assert _collector_timeout_budget(_FakeCollector("Correlacion OSINT")) >= 100
-    assert _collector_timeout_budget(_FakeCollector("Superficie externa")) >= 90
-    assert _collector_timeout_budget(_FakeCollector("Inventario pasivo", domains=["a.com", "b.com", "c.com"])) >= 180
+def test_spiderfoot_events_are_typed_as_technology_infrastructure():
+    events = spiderfoot_events_from_payload(
+        {"domains": [{"domain": "example.com", "records": [{"type": "Internet Name", "data": "example.com", "module": "sfp_dnsresolve", "source": "example.com"}]}]},
+        10,
+    )
+
+    assert events[0].evidence_type.value == "technology_infrastructure"

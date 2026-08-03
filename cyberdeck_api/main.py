@@ -19,7 +19,15 @@ from fastapi.staticfiles import StaticFiles
 from cyberdeck.settings import PROJECT_ROOT
 from cyberdeck.methodology import load_methodology_registry
 from cyberdeck_api.attack_surface import build_attack_surface
-from cyberdeck_api.ai_orchestration import ai_orchestration_config, build_ai_analysis_package, openclaw_runtime_status
+from cyberdeck_api.ai_orchestration import (
+    CHAT_PROMPT_VERSION,
+    ai_orchestration_config,
+    build_ai_analysis_package,
+    execute_openclaw_analysis,
+    execute_ollama_chat,
+    ollama_runtime_status,
+    openclaw_runtime_status,
+)
 from cyberdeck_api.disinformation import load_disinformation_framework
 from cyberdeck_api.domain_scope import normalize_domains
 from cyberdeck_api.employee_risk import run_employee_risk_module
@@ -36,8 +44,12 @@ from cyberdeck_api.licensing import (
 from cyberdeck_api.models import (
     AIAnalysisPackage,
     AIAnalysisRequest,
+    AIChatRequest,
+    AIExecutionRequest,
+    AIExecutionResult,
     DomainAnalysisRequest,
     EmployeeRiskRunResponse,
+    EvidenceReviewRequest,
     HealthResponse,
     MitreGroup,
     MonitoringAlert,
@@ -354,7 +366,9 @@ async def scenario_library() -> dict:
 async def ai_config() -> dict:
     config = ai_orchestration_config()
     runtime = await openclaw_runtime_status()
+    chat_runtime = await ollama_runtime_status("OLLAMA_CHAT_MODEL")
     config["openclaw_gateway"].update(runtime)
+    config["ollama_chat"].update(chat_runtime)
     for provider in config["provider_catalog"]:
         if provider.get("key") == "openclaw_gateway":
             provider["enabled"] = runtime.get("ready", False)
@@ -369,6 +383,74 @@ async def ai_package(request: AIAnalysisRequest) -> AIAnalysisPackage:
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found.")
     return build_ai_analysis_package(run, request)
+
+
+@app.post("/api/ai/analyze", response_model=AIExecutionResult)
+async def ai_analyze(request: AIExecutionRequest) -> AIExecutionResult:
+    run = await store.get_run(request.run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    return await execute_openclaw_analysis(run, request)
+
+
+@app.post("/api/ai/chat", response_model=AIExecutionResult)
+async def ai_chat(request: AIChatRequest) -> AIExecutionResult:
+    run = await store.get_run(request.run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    if _requests_report_generation(request.message):
+        try:
+            run = await store.generate_report(request.run_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if run is None or run.report is None:
+            raise HTTPException(status_code=409, detail="Report generation did not produce an output.")
+        executive_url = run.report.url
+        technical_url = run.report.technical_url
+        answer = (
+            "Los informes ejecutivo y técnico fueron generados desde la corrida seleccionada y están listos para revisión."
+            if request.language == "es"
+            else "The executive and technical reports were generated from the selected run and are ready for review."
+        )
+        return AIExecutionResult(
+            id=f"ai-report-{run.id}",
+            run_id=run.id,
+            status="completed",
+            provider="CyberDecisionEngine · generación determinista",
+            model="report-engine",
+            prompt_version=CHAT_PROMPT_VERSION,
+            analysis={
+                "answer": answer,
+                "facts": [],
+                "inferences": [],
+                "decision_options": [],
+                "technical_checks": [],
+                "dashboard_targets": [{"module": "overview", "reason": "report status and run summary"}],
+                "report_guidance": {
+                    "executive": executive_url,
+                    "technical": technical_url,
+                },
+                "evidence_refs": [],
+                "limitations": [],
+                "follow_up_questions": [],
+            },
+            evidence_validation={
+                "requested_count": 0,
+                "validated_count": 0,
+                "validated_refs": [],
+                "unknown_refs": [],
+                "all_refs_valid": True,
+            },
+            usage={"mode": "deterministic_report_generation"},
+        )
+    return await execute_ollama_chat(run, request)
+
+
+def _requests_report_generation(message: str) -> bool:
+    normalized = message.casefold()
+    action = any(token in normalized for token in ("genera", "generar", "crear", "create", "generate"))
+    artifact = any(token in normalized for token in ("informe", "reporte", "report"))
+    return action and artifact
 
 
 @app.get("/api/licensing/overview", response_model=LicensingOverview)
@@ -489,6 +571,27 @@ async def rerun(run_id: str) -> RunRecord:
 async def generate_run_report(run_id: str) -> RunRecord:
     try:
         run = await store.generate_report(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    return run
+
+
+@app.patch("/api/runs/{run_id}/evidence/{evidence_id}", response_model=RunRecord)
+async def review_run_evidence(
+    run_id: str,
+    evidence_id: str,
+    request: EvidenceReviewRequest,
+) -> RunRecord:
+    try:
+        run = await store.review_evidence(
+            run_id,
+            evidence_id,
+            request.status,
+            request.reviewer,
+            request.reason,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if run is None:

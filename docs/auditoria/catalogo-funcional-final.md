@@ -21,7 +21,7 @@
 | Visión general | `overview` | terminado | no | conservar como superficie canónica de alcance, ejecución y lectura resumida | Overview | `App.renderView`; configuración, progreso y resultados sin marca predefinida |
 | Tablero estratégico | `dashboards` | terminado | no | conservar como análisis principal | StrategicDashboard | snapshot común y evidencia global |
 | Escenarios de decisión | `scenarios` | terminado | no | conservar; mostrar solo activaciones aplicables | ScenarioDecisionView | pruebas de esquema y escenarios |
-| IA estratégica | `ai` | pendiente de configuración | no | conservar con degradación sin IA | AIAssistantView | proveedor intercambiable; OpenClaw opcional |
+| Asistente estratégico | `ai` | pendiente de configuración | no | conservar con degradación determinista | AIAssistantView | proveedor opcional; OpenClaw opcional |
 | Superficie de ataque | `attackSurface` | terminado | no | conservar | AttackSurfaceView | datos del run; no recollecta al navegar |
 | Marca y fraude | `brand` | terminado | no | conservar | BrandRiskView | evidencia filtrada por módulo |
 | Riesgo virtual de empleados | `employeeRisk` | terminado | no | mantener aislado | EmployeeRiskView | formulario individual/lote e informe propio |
@@ -82,7 +82,7 @@ filtrado por su semántica. Un estado sin datos no dibuja nodos ni inventa valor
 |---|---|---|
 | OpenClaw | gateway habilitado, política válida y modelo verificable | gateway activo; sin credencial, el modelo queda `configured_unverified` y el pipeline determinista continúa |
 | OpenCTI | `OPENCTI_MODE` diferente de `disabled` y configuración válida | backend interno completo |
-| Proveedores de IA | clave/modelo configurado | análisis determinista y editor disponibles |
+| Proveedores opcionales | clave/modelo configurado | análisis determinista y editor disponibles |
 | Fuentes con API | credencial válida | estado `unconfigured` o `skipped`; no entra en elegibles |
 | Captura visual | asset local con hash y dimensiones | “captura no disponible” con causa |
 | PESTEL/Porter | evidencia corporativa, regulatoria, sectorial y de noticias con cobertura suficiente | muestra aspectos y cobertura disponible; la presión agregada permanece `insufficient_evidence` si no es publicable |

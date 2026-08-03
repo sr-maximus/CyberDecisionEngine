@@ -10,6 +10,7 @@ const esDictionary: Record<string, string> = {
   "Adversary behavior": "Comportamiento adversario",
   "Defensive countermeasures": "Contramedidas defensivas",
   "AI system risk": "Riesgo de sistemas de IA",
+  "Fraud behavior": "Comportamiento de fraude",
   Governance: "Gobierno",
   Govern: "Gobernar",
   Identify: "Identificar",
@@ -48,6 +49,12 @@ const esDictionary: Record<string, string> = {
   Agent: "Agente",
   Prompt: "Prompt",
   "Supply chain": "Cadena de suministro",
+  Reconnaissance: "Reconocimiento",
+  "Resource development": "Desarrollo de recursos",
+  Stealth: "Ocultamiento",
+  "Defense impairment": "Deterioro de defensas",
+  Positioning: "Posicionamiento",
+  Monetization: "Monetización",
   Evaluate: "Evaluar",
   Align: "Alinear",
   Build: "Construir",
@@ -130,6 +137,14 @@ const esDictionary: Record<string, string> = {
   "ATLAS sections": "secciones ATLAS",
   "automation mentions": "menciones de automatización",
   "supply-chain records": "registros de cadena de suministro",
+  "Fraud actor behavior": "Comportamiento del actor de fraude",
+  "identity and transaction abuse": "abuso de identidad y transacciones",
+  "impersonation infrastructure": "infraestructura de suplantación",
+  "monetization path": "ruta de monetización",
+  "explicit F3 mappings": "mapeos F3 explícitos",
+  "assured current-run records": "registros verificados de la corrida actual",
+  "fraud and brand evidence": "evidencia de fraude y marca",
+  "identity abuse signals": "señales de abuso de identidad",
   "Decision rights": "Derechos de decisión",
   "risk ownership": "responsabilidad de riesgo",
   "performance monitoring": "monitoreo de desempeño",
@@ -183,6 +198,8 @@ const esDictionary: Record<string, string> = {
     "Traduce técnicas ATT&CK observadas en acciones defensivas y familias de herramientas.",
   "Review AI and automation risk only when explicit AI/model/agent/prompt signals are present.":
     "Revisa riesgo de IA y automatización solo cuando existen señales explícitas de IA, modelo, agente o prompt.",
+  "Map assured fraud-related evidence to official F3 tactics and techniques without treating a behavioral match as a confirmed fraud incident.":
+    "Relaciona evidencia verificada de fraude con tácticas y técnicas oficiales de F3, sin presentar una coincidencia de comportamiento como un incidente de fraude confirmado.",
   "Support board-level governance decisions by connecting intelligence signals to ownership and assurance.":
     "Apoya decisiones de gobierno directivo conectando señales de inteligencia con responsables y aseguramiento."
 };

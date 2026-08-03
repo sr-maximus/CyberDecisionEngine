@@ -1,4 +1,20 @@
+FROM golang:1.25-bookworm AS cariddi-builder
+
+ARG CARIDDI_REPOSITORY=https://github.com/edoardottt/cariddi.git
+ARG CARIDDI_COMMIT=de52cc0bc40accdda235b9d6796cd95a7e937a5d
+
+RUN git clone "${CARIDDI_REPOSITORY}" /src/cariddi \
+    && cd /src/cariddi \
+    && git checkout "${CARIDDI_COMMIT}" \
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/cariddi ./cmd/cariddi
+
 FROM kalilinux/kali-rolling
+
+ARG CARIDDI_COMMIT=de52cc0bc40accdda235b9d6796cd95a7e937a5d
+
+LABEL org.opencontainers.image.source="https://github.com/edoardottt/cariddi" \
+      org.opencontainers.image.revision="${CARIDDI_COMMIT}" \
+      org.opencontainers.image.licenses="GPL-3.0"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -12,6 +28,7 @@ RUN apt-get update \
         curl \
         dnsrecon \
         dnsutils \
+        exploitdb \
         httpx-toolkit \
         jq \
         nuclei \
@@ -38,6 +55,7 @@ RUN useradd --create-home --home-dir /home/surface --shell /usr/sbin/nologin sur
     && chown -R surface:surface /app /work /home/surface
 
 WORKDIR /app
+COPY --from=cariddi-builder /out/cariddi /usr/local/bin/cariddi
 COPY --chown=surface:surface app /app/app
 
 USER surface

@@ -9,6 +9,7 @@ from typing import Iterable, List, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from cyberdeck.schemas import EvidenceStatus, RecordKind, ThreatEvent
+from cyberdeck.enrichment.vulnerability_correlation import correlate_vulnerabilities
 
 
 STATUS_RANK = {
@@ -69,7 +70,7 @@ def process_evidence_records(
         duplicates += 1
         unique[key] = _merge_records(existing, event)
 
-    records = list(unique.values())
+    records = correlate_vulnerabilities(list(unique.values()))
     status_counts = {status.value: 0 for status in EvidenceStatus}
     kind_counts = {kind.value: 0 for kind in RecordKind}
     for event in records:

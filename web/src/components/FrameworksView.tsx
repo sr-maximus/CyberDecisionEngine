@@ -10,81 +10,107 @@ import { FrameworkMapping } from "./DecisionCharts";
 
 const labels = {
   es: {
-    frameworks: "Frameworks",
-    criticalHigh: "Crítico / Alto",
-    coverageAvg: "Cobertura prom.",
-    decisionScope: "Alcance decisión",
-    enterprise: "empresa",
-    title: "Mapeo de controles por framework",
-    subtitle: "NIST CSF, ISO 27001, PCI DSS, SOC 2, GDPR, CIS, MITRE ATT&CK, D3FEND, ATLAS y COBIT",
-    exposure: "Ranking de exposición",
-    exposureSubtitle: "Prioridad de decisión por framework",
-    alignment: "Alineación con amenazas",
-    alignmentSubtitle: "Familias de control ligadas a señales activas",
-    matrixTitle: "Matriz avanzada de controles",
-    matrixSubtitle: "Cruce tipo matriz para revisar qué dominios, controles y aspectos se relacionan entre frameworks",
-    matrixDetail: "Detalle del cruce",
-    mappingIntensity: "Intensidad de mapeo",
-    intensityTitle: "Cómo leer la intensidad",
+    frameworks: "Marcos de referencia",
+    criticalHigh: "Validada / directa",
+    coverageAvg: "Cruces con evidencia",
+    decisionScope: "Lectura",
+    enterprise: "organizacional",
+    title: "Correspondencia entre marcos y evidencia",
+    subtitle: "Lectura comparada de controles, exposición y aspectos afectados en los marcos disponibles",
+    exposure: "Intensidad de registros por marco",
+    exposureSubtitle: "Registros únicos relacionados con cada marco en la corrida actual",
+    alignment: "Señales por ámbito de control",
+    alignmentSubtitle: "Concentración de registros en las áreas que requieren revisión",
+    matrixTitle: "Matriz de relación entre evidencia, controles y riesgos",
+    matrixSubtitle: "Seleccione un cruce para revisar qué se relaciona, qué lo sustenta y qué decisión puede apoyar",
+    matrixDetail: "Análisis del cruce seleccionado",
+    mappingIntensity: "registros relacionados",
+    intensityTitle: "Cómo leer la celda",
     intensityHelp:
-      "No mide cumplimiento ni madurez. Es una señal de relación calculada con dominios, aspectos afectados, evidencia activa y exposición del framework.",
+      "El número es un conteo de registros únicos de esta corrida. No mide cumplimiento, madurez, eficacia de control ni probabilidad.",
     referenceBase: "Base oficial",
     referenceDate: "Fecha de referencia",
     verifiedAt: `Verificado con fuentes oficiales el ${FRAMEWORK_REFERENCES_VERIFIED_AT}`,
     affectedSpecifics: "Qué afecta",
     mappedEvidence: "Evidencia relacionada",
+    validatedEvidence: "Validada / directa / por revisar",
     decisionReading: "Lectura de decisión",
     noDirectMap: "Sin relación directa en los datos actuales",
     matrixAxes: {
-      governance: "Gobierno",
-      identity: "Identidad",
+      governance: "Gobierno y riesgo",
+      identity: "Identidad y acceso",
       protect: "Protección",
-      detect: "Detección",
-      response: "Respuesta",
+      detect: "Detección y monitoreo",
+      response: "Respuesta y recuperación",
       privacy: "Datos y privacidad",
-      vulnerability: "Vulnerabilidad",
+      vulnerability: "Gestión de vulnerabilidades",
       fraud: "Fraude y marca",
       ai: "Abuso de IA",
       adversary: "Comportamiento adversario"
+    },
+    matrixAxisHelp: {
+      governance: "Dirección, contexto y propiedad",
+      identity: "Cuentas, acceso y privilegios",
+      protect: "Salvaguardas y endurecimiento",
+      detect: "Visibilidad, registros y alertas",
+      response: "Contención, continuidad y recuperación",
+      privacy: "Datos personales y confidencialidad",
+      vulnerability: "CVE, parches y exposición",
+      fraud: "Suplantación, phishing y confianza",
+      ai: "Modelos, agentes y prompts",
+      adversary: "Tácticas, técnicas y comportamiento"
     }
   },
   en: {
-    frameworks: "Frameworks",
-    criticalHigh: "Critical / High",
-    coverageAvg: "Coverage avg",
-    decisionScope: "Decision scope",
-    enterprise: "enterprise",
-    title: "Framework control mapping",
-    subtitle: "NIST CSF, ISO 27001, PCI DSS, SOC 2, GDPR, CIS, MITRE ATT&CK, D3FEND, ATLAS and COBIT",
-    exposure: "Exposure ranking",
-    exposureSubtitle: "Decision priority by framework",
-    alignment: "Threat alignment",
-    alignmentSubtitle: "Control families linked to active signals",
-    matrixTitle: "Advanced control matrix",
-    matrixSubtitle: "Matrix-style crosswalk to review which domains, controls and aspects relate across frameworks",
-    matrixDetail: "Crosswalk detail",
-    mappingIntensity: "Mapping intensity",
-    intensityTitle: "How to read intensity",
+    frameworks: "Reference frameworks",
+    criticalHigh: "Validated / direct",
+    coverageAvg: "Evidence crosswalks",
+    decisionScope: "Reading",
+    enterprise: "organizational",
+    title: "Framework-to-evidence correspondence",
+    subtitle: "Comparative reading of controls, exposure and affected aspects across available frameworks",
+    exposure: "Record intensity by framework",
+    exposureSubtitle: "Unique records related to each framework in the current run",
+    alignment: "Signals by control domain",
+    alignmentSubtitle: "Record concentration across areas requiring review",
+    matrixTitle: "Evidence, control and risk relationship matrix",
+    matrixSubtitle: "Select a crosswalk to inspect the relationship, its support and the decision it may inform",
+    matrixDetail: "Selected crosswalk analysis",
+    mappingIntensity: "related records",
+    intensityTitle: "How to read the cell",
     intensityHelp:
-      "It is not compliance or maturity. It is a relationship signal calculated from domains, affected aspects, active evidence and framework exposure.",
+      "The number is a unique current-run record count. It does not measure compliance, maturity, control effectiveness or probability.",
     referenceBase: "Official base",
     referenceDate: "Reference date",
     verifiedAt: `Verified against official sources on ${FRAMEWORK_REFERENCES_VERIFIED_AT}`,
     affectedSpecifics: "Affected specifics",
     mappedEvidence: "Related evidence",
+    validatedEvidence: "Validated / direct / under review",
     decisionReading: "Decision reading",
     noDirectMap: "No direct relation in current data",
     matrixAxes: {
-      governance: "Governance",
-      identity: "Identity",
+      governance: "Governance and risk",
+      identity: "Identity and access",
       protect: "Protection",
-      detect: "Detection",
-      response: "Response",
+      detect: "Detection and monitoring",
+      response: "Response and recovery",
       privacy: "Data and privacy",
-      vulnerability: "Vulnerability",
+      vulnerability: "Vulnerability management",
       fraud: "Fraud and brand",
       ai: "AI abuse",
       adversary: "Adversary behavior"
+    },
+    matrixAxisHelp: {
+      governance: "Direction, context and ownership",
+      identity: "Accounts, access and privileges",
+      protect: "Safeguards and hardening",
+      detect: "Visibility, logging and alerts",
+      response: "Containment, continuity and recovery",
+      privacy: "Personal data and confidentiality",
+      vulnerability: "CVEs, patching and exposure",
+      fraud: "Impersonation, phishing and trust",
+      ai: "Models, agents and prompts",
+      adversary: "Tactics, techniques and behavior"
     }
   }
 };
@@ -100,9 +126,12 @@ interface MatrixCell {
   id: string;
   framework: FrameworkMappingItem;
   axis: MatrixAxis;
-  score: number;
+  recordCount: number;
+  validatedCount: number;
+  directCount: number;
+  relatedCount: number;
   controls: string[];
-  evidence: string[];
+  evidence: FrameworkMappingItem["axisMappings"][number]["evidence"];
   tone: "none" | "low" | "medium" | "high";
 }
 
@@ -122,17 +151,17 @@ const matrixAxes: MatrixAxis[] = [
 export function FrameworksView({ run, language }: { run?: RunRecord; language: LanguageMode }) {
   const copy = labels[language];
   const model = buildDashboardModel(run, defaultDashboardFilters);
-  const critical = model.frameworkMappings.filter((item) => item.tone === "critical").length;
-  const high = model.frameworkMappings.filter((item) => item.tone === "high").length;
-  const avgCoverage = Math.round(model.frameworkMappings.reduce((sum, item) => sum + item.coverage, 0) / Math.max(1, model.frameworkMappings.length));
+  const validated = model.frameworkMappings.reduce((sum, item) => sum + item.validatedCount, 0);
+  const direct = model.frameworkMappings.reduce((sum, item) => sum + item.directCount, 0);
+  const mappedCells = model.frameworkMappings.reduce((sum, item) => sum + item.axisMappings.length, 0);
   const exposureRank = model.frameworkMappings.map((item) => ({ name: item.name, value: item.exposure, tone: item.tone }));
 
   return (
     <div className="view-stack">
       <section className="dashboard-kpis">
         <Metric icon={<GitBranch size={18} />} label={copy.frameworks} value={String(model.frameworkMappings.length)} />
-        <Metric icon={<ShieldAlert size={18} />} label={copy.criticalHigh} value={`${critical}/${high}`} />
-        <Metric icon={<ShieldCheck size={18} />} label={copy.coverageAvg} value={`${avgCoverage}%`} />
+        <Metric icon={<ShieldAlert size={18} />} label={copy.criticalHigh} value={`${validated}/${direct}`} />
+        <Metric icon={<ShieldCheck size={18} />} label={copy.coverageAvg} value={String(mappedCells)} />
         <Metric icon={<Target size={18} />} label={copy.decisionScope} value={copy.enterprise} />
       </section>
 
@@ -188,16 +217,19 @@ function FrameworkControlMatrix({ items, language }: { items: FrameworkMappingIt
   const cells = useMemo(() => buildMatrixCells(items), [items]);
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const selectedCell = useMemo(() => {
-    return cells.find((cell) => cell.id === selectedCellId) ?? cells.find((cell) => cell.score > 0) ?? cells[0];
+    return cells.find((cell) => cell.id === selectedCellId) ?? cells.find((cell) => cell.recordCount > 0) ?? cells[0];
   }, [cells, selectedCellId]);
 
   return (
     <div className="framework-control-matrix">
       <div className="framework-matrix-scroll" role="region" aria-label={copy.matrixTitle}>
-        <div className="framework-matrix-grid" style={{ gridTemplateColumns: `174px repeat(${matrixAxes.length}, minmax(112px, 1fr))` }}>
+        <div className="framework-matrix-grid" style={{ gridTemplateColumns: `184px repeat(${matrixAxes.length}, minmax(138px, 1fr))` }}>
           <div className="framework-matrix-corner">{copy.frameworks}</div>
           {matrixAxes.map((axis) => (
-            <div className="framework-matrix-column" key={axis.id}>{copy.matrixAxes[axis.id]}</div>
+            <div className="framework-matrix-column" key={axis.id}>
+              <strong>{copy.matrixAxes[axis.id]}</strong>
+              <span>{copy.matrixAxisHelp[axis.id]}</span>
+            </div>
           ))}
           {items.map((item) => (
             <div className="framework-matrix-row" key={item.name}>
@@ -215,9 +247,9 @@ function FrameworkControlMatrix({ items, language }: { items: FrameworkMappingIt
                     className={`framework-matrix-cell ${cell.tone} ${selectedCell?.id === cell.id ? "selected" : ""}`}
                     key={cell.id}
                     onClick={() => setSelectedCellId(cell.id)}
-                    aria-label={`${item.name} ${copy.matrixAxes[axis.id]} ${cell.score}%`}
+                    aria-label={`${item.name} ${copy.matrixAxes[axis.id]} ${cell.recordCount} ${copy.mappingIntensity}`}
                   >
-                    <span>{cell.score > 0 ? `${cell.score}%` : "·"}</span>
+                    <span>{cell.recordCount > 0 ? cell.recordCount : "·"}</span>
                     <em>{controlPreview || copy.noDirectMap}</em>
                   </button>
                 );
@@ -237,7 +269,7 @@ function FrameworkControlMatrix({ items, language }: { items: FrameworkMappingIt
             </p>
           </div>
           <div className="framework-matrix-score">
-            <strong>{selectedCell.score}%</strong>
+            <strong>{selectedCell.recordCount}</strong>
             <span>{copy.mappingIntensity}</span>
           </div>
           <div className="framework-matrix-detail-block framework-matrix-help">
@@ -268,15 +300,19 @@ function FrameworkControlMatrix({ items, language }: { items: FrameworkMappingIt
           </div>
           <div className="framework-matrix-detail-block">
             <strong>{copy.mappedEvidence}</strong>
-            <ul>
-              {(selectedCell.evidence.length ? localizeFrameworkList(selectedCell.evidence, language) : [copy.noDirectMap]).map((value) => (
-                <li key={value}>{value}</li>
-              ))}
+            <p>{copy.validatedEvidence}: {selectedCell.validatedCount} / {selectedCell.directCount} / {selectedCell.relatedCount}</p>
+            <ul className="framework-evidence-links">
+              {selectedCell.evidence.length ? selectedCell.evidence.map((value) => (
+                <li key={value.evidenceId}>
+                  {value.url ? <a href={value.url} target="_blank" rel="noreferrer">{value.title}</a> : value.title}
+                  <small>{value.domain || value.source} · {value.status} · {value.relationship}</small>
+                </li>
+              )) : <li>{copy.noDirectMap}</li>}
             </ul>
           </div>
           <div className="framework-matrix-detail-block">
             <strong>{copy.decisionReading}</strong>
-            <p>{selectedCell.score > 0 ? localizeFrameworkText(selectedCell.framework.analysisUse, language) : copy.noDirectMap}</p>
+            <p>{selectedCell.recordCount > 0 ? localizeFrameworkText(selectedCell.framework.analysisUse, language) : copy.noDirectMap}</p>
           </div>
         </aside>
       ) : null}
@@ -289,33 +325,22 @@ function buildMatrixCells(items: FrameworkMappingItem[]): MatrixCell[] {
 }
 
 function buildMatrixCell(item: FrameworkMappingItem, axis: MatrixAxis): MatrixCell {
-  const pools = {
-    controls: uniqueText([...item.domains, ...item.affectedAspects, ...item.considerations]),
-    evidence: uniqueText(item.evidenceFocus)
-  };
-  const corpus = normalizeText([
-    item.name,
-    item.family,
-    item.analysisUse,
-    item.decision,
-    item.sourceLabel,
-    ...pools.controls,
-    ...pools.evidence
-  ].join(" "));
-  const keywordHits = axis.keywords.filter((keyword) => corpus.includes(keyword)).length;
-  const controls = pools.controls.filter((value) => axis.keywords.some((keyword) => normalizeText(value).includes(keyword))).slice(0, 6);
-  const evidence = pools.evidence.filter((value) => axis.keywords.some((keyword) => normalizeText(value).includes(keyword))).slice(0, 5);
-  const baseScore = keywordHits * 18 + controls.length * 12 + evidence.length * 10;
-  const exposureWeight = Math.round(item.exposure * 0.18);
-  const score = keywordHits || controls.length || evidence.length ? Math.min(100, Math.max(12, baseScore + exposureWeight)) : 0;
+  const mapping = item.axisMappings.find((value) => value.axis === axis.id);
+  const recordCount = mapping?.recordCount ?? 0;
+  const validatedCount = mapping?.validatedCount ?? 0;
+  const directCount = mapping?.directCount ?? 0;
+  const relatedCount = mapping?.relatedCount ?? 0;
   return {
     id: `${item.name}-${axis.id}`,
     framework: item,
     axis,
-    score,
-    controls,
-    evidence,
-    tone: score >= 72 ? "high" : score >= 42 ? "medium" : score > 0 ? "low" : "none"
+    recordCount,
+    validatedCount,
+    directCount,
+    relatedCount,
+    controls: mapping?.controls ?? [],
+    evidence: mapping?.evidence ?? [],
+    tone: validatedCount > 0 ? "high" : directCount > 0 ? "medium" : recordCount > 0 ? "low" : "none"
   };
 }
 

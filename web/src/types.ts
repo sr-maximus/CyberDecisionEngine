@@ -14,6 +14,7 @@ export type ViewKey =
   | "employeeRisk"
   | "disinformation"
   | "socmint"
+  | "relationshipGraph"
   | "osint"
   | "darkweb"
   | "frameworks"
@@ -43,6 +44,7 @@ export interface DomainAnalysisRequest {
   declared_competitors?: string[];
   countries_of_operation?: string[];
   entity_aliases?: Array<Record<string, unknown>>;
+  scenario_risk_inputs?: Record<string, unknown>;
   language?: LanguageMode;
   mode: AnalysisMode;
   analysis_window: AnalysisWindow;
@@ -205,9 +207,15 @@ export interface KpiSummary {
   avg_residual_risk: number | null;
   healthy_sources: number;
   total_sources: number;
+  eligible_sources?: number;
   queried_sources?: number;
+  successful_sources?: number;
   productive_sources?: number;
   registered_sources?: number;
+  empty_sources?: number;
+  degraded_sources?: number;
+  failed_sources?: number;
+  skipped_sources?: number;
 }
 
 export interface DomainSignal {
@@ -268,6 +276,7 @@ export interface ThreatEvent {
   id: string;
   title: string;
   category: string;
+  evidence_type?: "document" | "web_page" | "news" | "social_media" | "technology_infrastructure" | "official_record" | "authorized_dark_web" | "other";
   source: string;
   observed_at: string;
   actor?: string | null;
@@ -574,11 +583,15 @@ export interface AIProviderDescriptor {
 
 export interface AIOrchestrationConfig {
   prompt_version: string;
+  chat_prompt_version?: string;
   provider_catalog: AIProviderDescriptor[];
   token_policy: Record<string, unknown>;
   approval_required: boolean;
   automation_default: string;
   openclaw_gateway?: Record<string, unknown>;
+  ollama_chat?: Record<string, unknown>;
+  agent_architecture?: Record<string, unknown>;
+  assistant_capabilities?: string[];
 }
 
 export interface AIAnalysisRequest {
@@ -620,6 +633,71 @@ export interface AIAnalysisPackage {
   output_schema: Record<string, unknown>;
   provider_payloads: AIProviderPayload[];
   approval_question: string;
+}
+
+export interface AIExecutionRequest {
+  run_id: string;
+  approved: true;
+  language: LanguageMode;
+  system_prompt: string;
+  user_prompt: string;
+  output_schema: Record<string, unknown>;
+  output_token_budget: number;
+}
+
+export type AIChatScope =
+  | "overview"
+  | "evidence"
+  | "risk"
+  | "scenarios"
+  | "frameworks"
+  | "osint"
+  | "socmint"
+  | "darkweb"
+  | "attack_surface"
+  | "brand_fraud"
+  | "disinformation"
+  | "geography"
+  | "vulnerabilities";
+
+export interface AIChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AIChatRequest {
+  run_id: string;
+  message: string;
+  language: LanguageMode;
+  audience: "executive" | "technical" | "board" | "incident" | "fraud";
+  scopes: AIChatScope[];
+  history: AIChatTurn[];
+  output_token_budget: number;
+  analysis_mode?: "interactive" | "deep";
+}
+
+export interface AIExecutionResult {
+  id: string;
+  run_id: string;
+  status: "completed" | "completed_with_limitations" | "failed";
+  provider: string;
+  model: string;
+  prompt_version: string;
+  generated_at: string;
+  analysis: Record<string, unknown>;
+  raw_text?: string | null;
+  evidence_validation: Record<string, unknown>;
+  agent_trace: Array<{
+    agent_id: string;
+    label: string;
+    status: string;
+    execution_mode: string;
+    scopes: string[];
+    evidence_refs: string[];
+    limitations: string[];
+  }>;
+  usage: Record<string, unknown>;
+  limitations: string[];
 }
 
 export interface DashboardFilters {
@@ -746,6 +824,7 @@ export interface DisinformationScenario {
     disarm: { id: string; name: string; tactic: string };
     d3fend: { id: string; name: string };
     atlas: { id: string; name: string };
+    f3?: { id: string; name: string; tactics?: string[]; isAttack?: boolean };
   };
   scores: {
     likelihood: number;
@@ -793,6 +872,7 @@ export interface ScenarioLibraryResponse {
     d3fend_controls: number;
     atlas_tactics: number;
     disarm_techniques: number;
+    f3_techniques: number;
   };
   scenarios: DisinformationScenario[];
 }

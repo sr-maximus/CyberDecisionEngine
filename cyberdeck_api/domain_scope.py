@@ -64,6 +64,7 @@ def build_domain_queries(
         '"{domain}" phishing',
         '"{domain}" fraude',
         '"{domain}" scam OR estafa OR suplantacion',
+        '"{domain}" "oferta laboral falsa" OR "empleo falso" OR "fake job" OR "recruitment scam"',
         '"{domain}" facebook OR instagram OR linkedin OR tiktok OR "x.com"',
         '"{domain}" leak OR filtracion OR credenciales',
         '"{domain}" dark web OR "breach forum" OR ".onion"',
@@ -78,6 +79,9 @@ def build_domain_queries(
         '"{domain}" password OR token OR credential OR secret',
         '"{domain}" support OR ayuda OR login OR verificacion',
         '"{domain}" "dominio falso" OR "soporte falso" OR "login falso"',
+        'site:{domain} contacto OR contact OR directorio OR equipo OR leadership',
+        'site:{domain} "@{domain}"',
+        'site:{domain} filetype:pdf email OR telefono OR phone OR contacto',
     ]
     brand_priority_templates = [
         '"{term}"',
@@ -90,6 +94,12 @@ def build_domain_queries(
         '"{term}" estafa',
         '"{term}" queja OR reclamo OR denuncia',
         '"{term}" fraude OR phishing OR suplantacion',
+        '"{term}" "oferta laboral falsa" OR "empleo falso" OR "vacante falsa" OR "fake job" OR "recruitment scam"',
+        '"{term}" ciberataque OR ransomware OR vulnerabilidad OR campaña',
+        'site:linkedin.com/company "{term}"',
+        'site:linkedin.com/in "{term}"',
+        '"{term}" equipo OR directivos OR leadership OR empleados',
+        '"{term}" correo OR email OR telefono OR phone OR contacto',
     ]
     strategic_evidence_templates = [
         '"{term}" regulator OR regulacion OR regulation OR gobierno',
@@ -111,6 +121,8 @@ def build_domain_queries(
         '"{term}" site:linkedin.com OR site:instagram.com OR site:facebook.com OR site:x.com OR site:tiktok.com OR site:youtube.com',
         '"{term}" youtube',
         '"{term}" hashtag OR "#"',
+        '"{term}" site:linkedin.com/in',
+        '"{term}" directorio OR equipo OR leadership OR management',
     ]
     person_priority_templates = [
         '"{term}"',
@@ -146,11 +158,6 @@ def build_domain_queries(
         if str(value).strip()
     )
     subject_terms = _unique_ordered([*_scoped_brand_terms(domain_list, subject_name, subject_aliases), *declared_context_terms])
-    if subject_type != "person":
-        strategic_terms = _unique_ordered([subject_name.strip()] if subject_name and subject_name.strip() else subject_terms[:1])
-        for template in strategic_evidence_templates:
-            queries.extend(template.format(term=term) for term in strategic_terms)
-        queries.extend(_strategic_market_queries(strategic_terms, domain_list, country, sector, strategic_context))
     for template in domain_priority_templates:
         queries.extend(template.format(domain=domain) for domain in domain_list)
     priority_templates = person_priority_templates if subject_type == "person" else brand_priority_templates
@@ -161,6 +168,11 @@ def build_domain_queries(
         queries.extend(template.format(domain=domain) for domain in domain_list)
     for template in deep_templates:
         queries.extend(template.format(term=term) for term in subject_terms)
+    if subject_type != "person":
+        strategic_terms = _unique_ordered([subject_name.strip()] if subject_name and subject_name.strip() else subject_terms[:1])
+        for template in strategic_evidence_templates:
+            queries.extend(template.format(term=term) for term in strategic_terms)
+        queries.extend(_strategic_market_queries(strategic_terms, domain_list, country, sector, strategic_context))
     has_colombia_scope = _is_colombia(country)
     if has_colombia_scope and subject_type != "person":
         regional_terms = _unique_ordered([*domain_list, *subject_terms])
@@ -195,7 +207,8 @@ def build_source_config(
     search_domains = [*domains, *competitor_domains]
     brand_terms = _scoped_brand_terms(search_domains, organization_name, subject_aliases)
     budget_seconds = _scan_budget_seconds(scan_time_budget_minutes)
-    budget_multiplier = _budget_multiplier(budget_seconds)
+    wait_until_complete = int(scan_time_budget_minutes or 0) <= 0
+    budget_multiplier = 2.0 if wait_until_complete else _budget_multiplier(budget_seconds)
     web_search = config.setdefault("web_search", {})
     web_search["enabled"] = True
     web_search["queries"] = build_domain_queries(
@@ -217,21 +230,29 @@ def build_source_config(
     adaptive_collection_timeout = (115 if is_deep else 65) + query_volume * (14 if is_deep else 8)
     if budget_seconds:
         adaptive_collection_timeout = max(adaptive_collection_timeout, min(900.0, budget_seconds * 0.38))
-    web_search["collection_timeout_seconds"] = min(900.0 if budget_seconds else 420.0 if is_deep else 210.0, max(requested_collection_timeout, adaptive_collection_timeout))
+    web_search["collection_timeout_seconds"] = (
+        0
+        if wait_until_complete
+        else min(900.0 if budget_seconds else 420.0 if is_deep else 210.0, max(requested_collection_timeout, adaptive_collection_timeout))
+    )
     provider_budget = min(42 if budget_seconds else 28 if is_deep else 16, max(8, int((len(search_domains) * 4 + len(brand_terms) * 2) * budget_multiplier)))
     current_limits = web_search.get("provider_query_limits", {})
-    web_search["provider_query_limits"] = {
-        "duckduckgo_lite": min(max(int(current_limits.get("duckduckgo_lite", 0) or 0), provider_budget), provider_budget),
-        "google_news_rss": min(max(int(current_limits.get("google_news_rss", 0) or 0), provider_budget), provider_budget),
-        "gdelt": min(max(int(current_limits.get("gdelt", 0) or 0), provider_budget), provider_budget),
-        "hacker_news": min(max(int(current_limits.get("hacker_news", 0) or 0), provider_budget), provider_budget),
-        "google_cse": min(max(int(current_limits.get("google_cse", 0) or 0), provider_budget), provider_budget),
-        "brave": min(max(int(current_limits.get("brave", 0) or 0), provider_budget), provider_budget),
-    }
+    web_search["provider_query_limits"] = (
+        {provider: 0 for provider in ("duckduckgo_lite", "google_news_rss", "gdelt", "hacker_news", "google_cse", "brave")}
+        if wait_until_complete
+        else {
+            "duckduckgo_lite": min(max(int(current_limits.get("duckduckgo_lite", 0) or 0), provider_budget), provider_budget),
+            "google_news_rss": min(max(int(current_limits.get("google_news_rss", 0) or 0), provider_budget), provider_budget),
+            "gdelt": min(max(int(current_limits.get("gdelt", 0) or 0), provider_budget), provider_budget),
+            "hacker_news": min(max(int(current_limits.get("hacker_news", 0) or 0), provider_budget), provider_budget),
+            "google_cse": min(max(int(current_limits.get("google_cse", 0) or 0), provider_budget), provider_budget),
+            "brave": min(max(int(current_limits.get("brave", 0) or 0), provider_budget), provider_budget),
+        }
+    )
     query_budget = int((45 if is_deep else 24) * budget_multiplier)
     record_budget = int((420 if is_deep else 220) * budget_multiplier)
-    web_search["max_queries"] = min(len(web_search["queries"]), min(query_budget, max(12, len(search_domains) * 7 + len(brand_terms) * 3)))
-    web_search["max_records"] = min(record_budget, max(60, len(search_domains) * 24 + len(brand_terms) * 10))
+    web_search["max_queries"] = 0 if wait_until_complete else min(len(web_search["queries"]), min(query_budget, max(12, len(search_domains) * 7 + len(brand_terms) * 3)))
+    web_search["max_records"] = 0 if wait_until_complete else min(record_budget, max(60, len(search_domains) * 24 + len(brand_terms) * 10))
     if budget_seconds:
         web_search["max_queries"] = min(len(web_search["queries"]), max(web_search["max_queries"], min(120, len(search_domains) * 10 + len(brand_terms) * 5)))
         web_search["max_records"] = min(1200, max(web_search["max_records"], len(search_domains) * 40 + len(brand_terms) * 18))
@@ -256,7 +277,11 @@ def build_source_config(
     kali_surface = config.setdefault("kali_surface", {})
     kali_surface["enabled"] = True
     kali_surface["domains"] = domains
-    kali_surface["mode"] = kali_surface.get("mode", "light")
+    configured_surface_mode = str(kali_surface.get("mode", "")).lower()
+    kali_surface["mode"] = "passive" if configured_surface_mode == "passive" else "deep" if is_deep else "light"
+    kali_surface["web_crawl"] = kali_surface["mode"] != "passive"
+    kali_surface["crawl_depth"] = 2 if kali_surface["mode"] == "deep" else 1
+    kali_surface["crawl_concurrency"] = 6 if kali_surface["mode"] == "deep" else 4
     kali_surface["max_hosts"] = min(48 if budget_seconds else 24, max(12, int(len(domains) * 5 * budget_multiplier)))
     kali_surface["max_records"] = min(4200 if budget_seconds else 2500, max(60, int(len(domains) * 60 * budget_multiplier)))
     kali_timeout = 34 if is_deep else 22
@@ -267,17 +292,15 @@ def build_source_config(
     spiderfoot = config.setdefault("spiderfoot", {})
     spiderfoot["enabled"] = True
     spiderfoot["domains"] = domains
-    spiderfoot["max_records"] = min(3000 if budget_seconds else 1200 if is_deep else 500, max(80, int(len(domains) * 60 * budget_multiplier)))
+    spiderfoot["max_records"] = min(3000 if budget_seconds or wait_until_complete else 1200 if is_deep else 500, max(80, int(len(domains) * 60 * budget_multiplier)))
     spiderfoot["depth"] = spiderfoot.get("depth", "deep")
-    spider_timeout = 50 if is_deep else 28
-    if budget_seconds:
-        spider_waves = max(1, (len(domains) + 1) // 2)
-        spider_timeout = max(spider_timeout, int(min(600, max(45, (budget_seconds * 0.92 - 25) / spider_waves))))
-    spiderfoot["timeout_seconds"] = min(600 if budget_seconds else 180 if is_deep else 90, max(int(spiderfoot.get("timeout_seconds", 28 if is_deep else 20)), spider_timeout))
+    spiderfoot["timeout_seconds"] = 0
+    spiderfoot["completion_policy"] = "wait_until_configured_modules_finish"
     spiderfoot["max_threads"] = int(spiderfoot.get("max_threads", 4))
     spiderfoot["include_raw"] = False
 
     socmint = config.setdefault("socmint_public", {})
+    socmint["enabled"] = True
     socmint["keywords"] = _socmint_terms(search_domains, brand_terms, subject_type)
     socmint["max_queries"] = min(len(socmint["keywords"]), min(700 if budget_seconds else 500, max(3, int((len(search_domains) * 4 + len(brand_terms) * 3) * budget_multiplier))))
     socmint["max_records"] = min(2200 if budget_seconds else 1500, max(25, int((len(search_domains) * 16 + len(brand_terms) * 10) * budget_multiplier)))
@@ -307,7 +330,9 @@ def build_source_config(
     config["scan_budget"] = {
         "minutes": scan_time_budget_minutes,
         "seconds": budget_seconds,
-        "mode": "user_defined" if budget_seconds else "auto",
+        "mode": "user_defined" if budget_seconds else "until_complete",
+        "record_cap": None if wait_until_complete else "connector_specific",
+        "resume_policy": "resume_persistent_profile_and_deduplicate_across_cycles",
     }
     return config
 
@@ -344,15 +369,22 @@ def _strategic_market_queries(
     if sector:
         queries.extend([
             f'"{primary}" "{sector}" ciberseguridad OR riesgo digital',
-            f'"{sector}" regulacion OR geopolitica OR economia digital OR continuidad',
-            f'"{sector}" competencia OR nuevos entrantes OR proveedores OR sustitutos',
+            f'"{sector}" regulacion de ciberseguridad OR soberania de datos OR politica digital',
+            f'"{sector}" economia digital OR inversion tecnologica OR costos de ciberseguridad',
+            f'"{sector}" confianza digital OR desinformacion OR talento de ciberseguridad',
+            f'"{sector}" nube OR inteligencia artificial OR cadena de suministro de software OR continuidad digital',
+            f'"{sector}" competencia digital OR nuevos entrantes OR proveedores tecnologicos OR sustitutos',
         ])
     for location in geography:
-        queries.append(f'"{primary}" "{location}" regulacion OR economia OR ciberseguridad OR continuidad')
+        queries.extend([
+            f'"{primary}" "{location}" regulacion OR economia OR ciberseguridad OR continuidad',
+            f'"{location}" politica de ciberseguridad OR regulacion digital OR soberania de datos',
+            f'"{location}" infraestructura digital OR nube OR inteligencia artificial OR interrupcion tecnologica',
+        ])
     for competitor in competitors:
-        queries.append(f'"{primary}" "{competitor}" competencia OR mercado OR tecnologia OR ciberseguridad')
+        queries.append(f'"{primary}" "{competitor}" competencia digital OR mercado OR tecnologia OR ciberseguridad')
     for supplier in suppliers:
-        queries.append(f'"{primary}" "{supplier}" proveedor OR interrupcion OR dependencia OR ciberseguridad')
+        queries.append(f'"{primary}" "{supplier}" proveedor tecnologico OR interrupcion OR dependencia OR cadena de suministro de software OR ciberseguridad')
     for product in products:
         queries.append(f'"{primary}" "{product}" mercado OR clientes OR sustituto OR riesgo digital')
     return _unique_ordered(queries)
@@ -494,6 +526,8 @@ def build_organization_profile(request: DomainAnalysisRequest, domains: List[str
             "crown_jewels": domains,
             "technologies": [],
             "risk_appetite": {},
+            "financial_risk_inputs": request.financial_risk_inputs,
+            "scenario_risk_inputs": request.scenario_risk_inputs,
             # Internal maturity cannot be inferred from public domain evidence.
             "control_maturity": {},
             "fraud_maturity": {},
