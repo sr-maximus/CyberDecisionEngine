@@ -6,6 +6,18 @@ from statistics import quantiles
 from typing import Dict, Iterable, Mapping, Sequence, Union
 
 
+PCIDER_MODEL_VERSION = "1.0.0"
+PCIDER_CONTROL_REDUCTION_CAP = 0.85
+PCIDER_CONTROL_WEIGHTS = {
+    "iso": 0.25,
+    "nist": 0.25,
+    "soc2": 0.15,
+    "d3fend": 0.15,
+    "attack_detection": 0.10,
+    "ir": 0.10,
+}
+
+
 def clip(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
     return max(minimum, min(maximum, float(value)))
 
@@ -39,7 +51,27 @@ def threat_activity_score(events: Iterable[Mapping[str, float]]) -> float:
     return clip(1 - math.exp(-0.35 * total), 0.0, 1.0)
 
 
-def contextual_likelihood(A: float, E: float, V: float, P: float, K: float, T: float, S: float, G: float, C: float, D: float, R: float) -> float:
+def contextual_likelihood(
+    A: float,
+    E: float,
+    V: float,
+    P: float,
+    K: float,
+    T: float,
+    S: float,
+    G: float,
+    C: float | None = None,
+    D: float | None = None,
+    R: float | None = None,
+    *,
+    data_sufficiency: float = 1.0,
+    base_rate: float = 0.10,
+) -> float:
+    """P-CIDER contextual likelihood.
+
+    C, D and R are retained only for legacy callers. Controls are deliberately
+    excluded from inherent likelihood and applied once through residual risk.
+    """
     p_safe = clip(P, 0.001, 0.999)
     logit = math.log(p_safe / (1 - p_safe))
     z = (
@@ -52,11 +84,10 @@ def contextual_likelihood(A: float, E: float, V: float, P: float, K: float, T: f
         + 0.70 * clip(T)
         + 0.55 * clip(S)
         + 0.35 * clip(G)
-        - 0.80 * clip(C)
-        - 0.60 * clip(D)
-        - 0.45 * clip(R)
     )
-    return clip(1 / (1 + math.exp(-z)), 0.0, 1.0)
+    raw = clip(1 / (1 + math.exp(-z)), 0.0, 1.0)
+    ds = clip(data_sufficiency)
+    return clip(ds * raw + (1 - ds) * clip(base_rate), 0.0, 1.0)
 
 
 def business_impact(financial: float, operational: float, confidentiality: float, integrity: float, availability: float, legal: float, reputational: float) -> float:
@@ -74,16 +105,18 @@ def business_impact(financial: float, operational: float, confidentiality: float
 
 
 def control_effectiveness(iso: float, nist: float, soc2: float, d3fend: float, attack_detection: float, ir: float) -> float:
-    return clip(
-        0.25 * iso
-        + 0.25 * nist
-        + 0.15 * soc2
-        + 0.15 * d3fend
-        + 0.10 * attack_detection
-        + 0.10 * ir,
-        0.0,
-        1.0,
-    )
+    values = {
+        "iso": iso,
+        "nist": nist,
+        "soc2": soc2,
+        "d3fend": d3fend,
+        "attack_detection": attack_detection,
+        "ir": ir,
+    }
+    residual_failure = 1.0
+    for key, weight in PCIDER_CONTROL_WEIGHTS.items():
+        residual_failure *= (1 - clip(values[key])) ** weight
+    return min(PCIDER_CONTROL_REDUCTION_CAP, clip(1 - residual_failure, 0.0, 1.0))
 
 
 def inherent_risk(likelihood: float, impact: float) -> float:
@@ -91,7 +124,7 @@ def inherent_risk(likelihood: float, impact: float) -> float:
 
 
 def residual_risk(inherent: float, CE: float) -> float:
-    return max(0.0, inherent) * (1 - min(0.85, clip(CE)))
+    return max(0.0, inherent) * (1 - min(PCIDER_CONTROL_REDUCTION_CAP, clip(CE)))
 
 
 def _index(value: float) -> int:
@@ -178,24 +211,56 @@ def forecast_lambda(lambda_previous: float, baseline: float, kev_signal: float, 
     )
 
 
-def monte_carlo_risk(likelihood: float, impact: float, control_effectiveness: float, n: int = 10000) -> dict[str, float]:
-    rng = random.Random(42)
+def _beta_params(mean: float, confidence: float) -> tuple[float, float]:
+    strength = 2.0 + 48.0 * clip(confidence)
+    value = clip(mean)
+    return 1 + strength * value, 1 + strength * (1 - value)
+
+
+def monte_carlo_risk(
+    likelihood: float,
+    impact: float,
+    control_effectiveness: float,
+    n: int = 10000,
+    *,
+    likelihood_confidence: float = 0.65,
+    impact_confidence: float = 0.55,
+    control_confidence: float = 0.45,
+    seed: int = 42,
+) -> dict[str, float | int | str]:
+    rng = random.Random(seed)
     samples = []
     sample_count = max(100, int(n))
+    l_alpha, l_beta = _beta_params(likelihood, likelihood_confidence)
+    i_alpha, i_beta = _beta_params(impact, impact_confidence)
+    ce_alpha, ce_beta = _beta_params(control_effectiveness, control_confidence)
     for _ in range(sample_count):
-        l_sample = rng.betavariate(1 + 10 * clip(likelihood), 1 + 10 * (1 - clip(likelihood)))
-        i_sample = rng.betavariate(1 + 10 * clip(impact), 1 + 10 * (1 - clip(impact)))
-        ce_sample = rng.betavariate(
-            1 + 10 * clip(control_effectiveness),
-            1 + 10 * (1 - clip(control_effectiveness)),
+        l_sample = rng.betavariate(l_alpha, l_beta)
+        i_sample = rng.betavariate(i_alpha, i_beta)
+        ce_sample = rng.betavariate(ce_alpha, ce_beta)
+        samples.append(
+            100
+            * l_sample
+            * i_sample
+            * (1 - min(PCIDER_CONTROL_REDUCTION_CAP, ce_sample))
         )
-        samples.append(100 * l_sample * i_sample * (1 - min(0.85, ce_sample)))
     samples.sort()
     q = quantiles(samples, n=10)
+    inherent_mean = 100 * clip(likelihood) * clip(impact)
+    residual_mean = inherent_mean * (
+        1 - min(PCIDER_CONTROL_REDUCTION_CAP, clip(control_effectiveness))
+    )
     return {
         "p10": round(q[0], 2),
         "p50": round(samples[len(samples) // 2], 2),
         "p90": round(q[8], 2),
+        "inherent_mean": round(inherent_mean, 2),
+        "residual_mean": round(residual_mean, 2),
+        "decision_risk": round(residual_mean, 2),
+        "iterations": sample_count,
+        "seed": seed,
+        "control_reduction_cap": PCIDER_CONTROL_REDUCTION_CAP,
+        "model_version": PCIDER_MODEL_VERSION,
     }
 
 

@@ -53,7 +53,13 @@ def test_attack_catalog_uses_current_stix_tactics_and_relationships():
 def test_scenario_library_is_preventive_and_has_no_synthetic_probability():
     payload = json.loads(Path("data/scenarios/cyber_scenario_library.json").read_text(encoding="utf-8"))
 
-    assert payload["scenario_count"] == 1500
+    expected = sum(
+        count
+        for name, count in payload["catalog_counts"].items()
+        if name != "MITRE D3FEND controls"
+    )
+    assert payload["scenario_count"] == expected
+    assert payload["scenario_count"] == len(payload["scenarios"])
     assert payload["math_model"]["formula"] == "scenario_support = assured_current_run_evidence_only"
     assert all(item["status"] == "preventive_template" for item in payload["scenarios"])
     assert all(item["scores"]["likelihood"] == 0 for item in payload["scenarios"])
@@ -65,7 +71,8 @@ def test_scenario_api_does_not_present_reference_templates_as_executable():
 
     load_scenario_library.cache_clear()
     result = load_scenario_library()
-    assert result["reference_template_count"] == 1500
+    library = json.loads(Path("data/scenarios/cyber_scenario_library.json").read_text(encoding="utf-8"))
+    assert result["reference_template_count"] == library["scenario_count"]
     assert result["scenario_count"] == 0
     assert result["executable_scenario_count"] == 0
     assert result["tested_scenario_count"] == 0

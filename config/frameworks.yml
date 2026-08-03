@@ -10,6 +10,12 @@ frameworks:
   mitre_atlas:
     enabled: true
     website: https://atlas.mitre.org/
+  mitre_f3:
+    enabled: true
+    version: "1.1"
+    data_json: https://raw.githubusercontent.com/center-for-threat-informed-defense/fight-fraud-framework/main/public/f3-v1.1.json
+    website: https://ctid.mitre.org/fraud
+    repository: https://github.com/center-for-threat-informed-defense/fight-fraud-framework
   nist_csf_2:
     enabled: true
     reference: https://csrc.nist.gov/pubs/cswp/29/the-nist-cybersecurity-framework-csf-20/final

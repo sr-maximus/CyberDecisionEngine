@@ -6,7 +6,7 @@ Antes de activar una definición futura se exigirá:
 
 1. Firma canónica de objetivo, dominio, tipos de evidencia, indicadores, exclusiones y marcos.
 2. Comparación exacta de firma.
-3. Revisión semántica asistida, nunca decidida únicamente por IA.
+3. Revisión semántica asistida y revisión humana; nunca decisión automática.
 4. Pruebas de duplicado y aislamiento organizacional.
 5. Revisión humana del owner del escenario.
 

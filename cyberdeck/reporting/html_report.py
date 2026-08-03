@@ -13,16 +13,24 @@ from urllib.parse import urlparse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from cyberdeck.analysis.cyber_radar import build_cyber_risk_radar
-from cyberdeck.analysis.forecasting import build_forecast
 from cyberdeck.analysis.fraud import fraud_pressure_index
 from cyberdeck.analysis.mitre_mapping import build_atlas_profile, build_d3fend_profile, build_mitre_profile
 from cyberdeck.analysis.narratives import build_narrative_intelligence
+from cyberdeck.analysis.public_entities import build_public_entity_intelligence
+from cyberdeck.analysis.pivot_intelligence import build_pivot_intelligence
+from cyberdeck.analysis.prospective_risk import build_prospective_attack_risk
+from cyberdeck.analysis.sector_intelligence import build_sector_intelligence
 from cyberdeck.analysis.strategic_news import build_strategic_intelligence, export_strategic_scores
+from cyberdeck.analysis.framework_evidence import build_framework_evidence_mapping
+from cyberdeck.analysis.geographic_intelligence import build_geographic_intelligence
+from cyberdeck.analysis.threat_news import build_threat_news
 from cyberdeck.analysis.source_intel import build_actor_profile, build_pattern_profile, build_source_coverage
 from cyberdeck.analysis.strategy import build_strategic_action_plan
 from cyberdeck.analysis.trend_detection import summarize_trends
 from cyberdeck.analysis.vulnerability import build_vulnerability_intelligence
+from cyberdeck.analysis.layered_scenario_risk import calculate_layered_scenario_risk
 from cyberdeck.enrichment.evidence_pipeline import process_evidence_records
+from cyberdeck.enrichment.vulnerability_correlation import correlate_vulnerabilities
 from cyberdeck.decision_intelligence import build_decision_snapshot
 from cyberdeck.knowledge.migrations import remove_legacy_optional_collector
 from cyberdeck.methodology import load_methodology_registry
@@ -137,7 +145,10 @@ def render_report(context: RunContext, output_path: str, *, prepared: bool = Fal
     payload["technical_report_name"] = f"{out.stem}-technical{out.suffix}"
     payload["risk_findings"] = _display_risk_findings(payload.get("risk_findings", []), report_lang)
     payload["metrics"] = _display_metrics_sources(payload.get("metrics", {}), report_lang)
-    payload["metrics"]["vulnerability_intelligence"] = _display_vulnerability_intelligence(payload["metrics"].get("vulnerability_intelligence", {}))
+    payload["metrics"]["vulnerability_intelligence"] = _display_vulnerability_intelligence(
+        payload["metrics"].get("vulnerability_intelligence", {}),
+        report_lang,
+    )
     payload["references"] = context.references or REFERENCES
     payload["css"] = css
     payload["report_display"] = _report_display(payload, report_lang)
@@ -148,11 +159,14 @@ def render_report(context: RunContext, output_path: str, *, prepared: bool = Fal
     payload["report_scope"] = _report_scope(payload, report_lang)
     payload["scope_events"] = _scope_filtered_events(payload, report_lang)
     payload["evidence_rows"] = _evidence_rows(payload["scope_events"], report_lang)
+    payload["executive_evidence_rows"] = _executive_evidence_sample(payload["evidence_rows"])
+    payload["evidence_type_summary"] = _evidence_type_summary(payload["evidence_rows"], report_lang)
     payload["search_groups"] = _search_groups(payload["scope_events"], report_lang)
     payload["risk_digest"] = _risk_digest(payload, report_lang)
     payload["domain_comparison_rows"] = _domain_comparison_rows(payload, report_lang)
     payload["decision_layers"] = _decision_layers(payload, report_lang)
     payload["framework_summary"] = _framework_summary(payload, report_lang)
+    payload["f3_summary"] = _f3_summary(payload, report_lang)
     payload["scenario_cards"] = _scenario_cards(payload, report_lang)
     payload["scenario_library"] = _scenario_library_digest(payload, report_lang)
     payload["domain_reading_rows"] = _domain_reading_rows(payload, report_lang)
@@ -316,7 +330,13 @@ def _remove_legacy_assumed_profile_data(context: RunContext) -> None:
 
 
 def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> None:
-    events = context.raw_events
+    events = correlate_vulnerabilities(
+        [
+            event
+            for event in context.raw_events
+            if event.evidence_status not in {EvidenceStatus.FALSE_POSITIVE, EvidenceStatus.DISCARDED}
+        ]
+    )
     findings = context.risk_findings
     assured = [
         event
@@ -324,19 +344,6 @@ def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> No
         if event.evidence_status in {EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
     ]
     fraud_pressure = fraud_pressure_index(assured)
-    applicable = {"cve_applicable", "cve_confirmed", "kev_exposed", "exploitation_observed"}
-    kev_signal = 1.0 if any(event.vulnerability_status in applicable and "kev" in {tag.lower() for tag in event.tags} for event in assured) else 0.0
-    darkweb_signal = min(
-        1.0,
-        sum(1 for event in assured if event.category.startswith("darkweb") or "darkweb" in {tag.lower() for tag in event.tags}) / 10,
-    )
-    declared_sector = (context.organization.sector or "").strip().lower()
-    sector_targeting_observed = any(
-        "sector_targeting" in {tag.lower() for tag in event.tags}
-        or "sector_campaign" in {tag.lower() for tag in event.tags}
-        or (declared_sector and f"sector:{declared_sector}" in {tag.lower() for tag in event.tags})
-        for event in assured
-    )
     evidence_assurance = len(assured) / max(1, len(events))
     source_health = float(coverage.get("source_health_score", 0.0) or 0.0)
     max_residual = max((finding.residual_risk for finding in findings), default=0.0)
@@ -359,6 +366,13 @@ def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> No
         if key in context.organization.control_maturity
     }
     strategic_news = build_strategic_intelligence(events, context.organization, created_at=context.generated_at)
+    prospective_attack_risk = build_prospective_attack_risk(
+        assured,
+        findings,
+        sector=context.organization.sector,
+        controls=context.organization.control_maturity,
+        source_coverage=coverage,
+    )
     context.metrics.update(
         {
             "posture_index": round(external_posture, 2),
@@ -379,18 +393,21 @@ def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> No
             "d3fend": build_d3fend_profile(events),
             "atlas": build_atlas_profile(events),
             "vulnerability_intelligence": build_vulnerability_intelligence(events, findings),
+            "layered_scenario_risk": calculate_layered_scenario_risk(context.organization.scenario_risk_inputs),
             "risk_heat_radar": build_cyber_risk_radar(events, findings),
             "strategy": build_strategic_action_plan(findings, events, context.organization, coverage),
             "strategic_news": strategic_news,
+            "threat_news": build_threat_news(events),
+            "framework_mapping": build_framework_evidence_mapping(events, findings, context.organization),
+            "geographic_intelligence": build_geographic_intelligence(events, context.organization),
+            "sector_intelligence": build_sector_intelligence(events, context.organization),
+            "public_entity_intelligence": build_public_entity_intelligence(events, context.organization),
+            "pivot_intelligence": build_pivot_intelligence(events),
             "pestel": strategic_news["pestel"],
             "porter": strategic_news["porter"],
             "narrative_intelligence": build_narrative_intelligence(events, context.organization),
-            "forecast": build_forecast(
-                kev_signal=kev_signal,
-                sector_signal=0.2 if sector_targeting_observed else 0.0,
-                socmint_signal=fraud_pressure,
-                darkweb_signal=darkweb_signal,
-            ),
+            "prospective_attack_risk": prospective_attack_risk,
+            "forecast": prospective_attack_risk["horizons"],
             "risk_methodology": {
                 "purpose": "El modelo separa evidencia, plausibilidad contextual, impacto, controles declarados, riesgo inherente y riesgo residual; no confirma incidentes ni estima probabilidad calibrada de ataque.",
                 "likelihood": "La plausibilidad contextual es un puntaje acotado basado en evidencia directa o validada. Las limitaciones y fuentes ausentes no incrementan el riesgo.",
@@ -618,7 +635,11 @@ def _display_risk_findings(findings: list[Dict[str, Any]], language: str) -> lis
 
 def _work_plan(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
     scoped_events = payload.get("scope_events") or _scope_filtered_events(payload, language)
-    events = [event for event in scoped_events if str(event.get("evidence_status", "raw")) in {"direct", "validated", "confirmed"}]
+    events = [
+        event
+        for event in scoped_events
+        if str(event.get("evidence_status", "raw")) in {"direct", "validated", "confirmed"}
+    ]
     findings = sorted(
         [
             item
@@ -629,63 +650,162 @@ def _work_plan(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
         reverse=True,
     )
     scenario_matches = payload.get("scenario_library", {}).get("matches", []) or []
-    source_statuses = payload.get("source_statuses", []) or []
-    source_gaps = [status for status in source_statuses if not _status_is_healthy(status)]
-    primary_domains = (payload.get("report_scope") or _report_scope(payload, language)).get("primary_domains", [])
-    scope_label = ", ".join(primary_domains[:5]) or str(payload.get("organization", {}).get("name") or ("overall scope" if language == "en" else "alcance general"))
-    catalog = _work_plan_catalog(language)
+    event_by_id: dict[str, Dict[str, Any]] = {}
+    for event in events:
+        for value in (event.get("canonical_id"), event.get("id")):
+            if value:
+                event_by_id[str(value)] = event
+
     items: list[Dict[str, Any]] = []
-    for config in catalog:
-        matched_events = _work_plan_matching_events(events, config["keywords"])
-        matched_findings = _work_plan_matching_findings(findings, config["keywords"])
-        matched_scenarios = _work_plan_matching_scenarios(scenario_matches, config["keywords"])
-        should_include = bool(matched_events or matched_findings or matched_scenarios or config.get("always"))
-        if config["key"] == "sources" and source_gaps:
-            should_include = True
-        if not should_include:
+    for match in scenario_matches:
+        evidence_ids = [str(value) for value in match.get("evidence_ids", []) if value]
+        matched_events = [event_by_id[value] for value in evidence_ids if value in event_by_id]
+        evidence_count = int(match.get("evidence_count", 0) or 0)
+        if not match.get("id") or evidence_count <= 0:
             continue
-        score = _work_plan_priority_score(matched_findings, matched_events, matched_scenarios, config, source_gaps)
+        actions = _unique_text_values([match.get("recommendation"), match.get("decision")])
+        if not actions:
+            continue
+        confidence = float(match.get("confidence", 0) or 0)
+        score = min(25.0, confidence / 5.0 + min(evidence_count, 5))
+        owners = _scenario_action_owners(match, language)
+        control_mappings = _scenario_control_mappings(payload, match, language)
+        basis = (
+            f"Escenario {match.get('id')} · {evidence_count} evidencias relacionadas · confianza {confidence:.0f}%."
+            if language == "es"
+            else f"Scenario {match.get('id')} · {evidence_count} related evidence records · {confidence:.0f}% confidence."
+        )
         item = {
-            "id": config["id"],
-            "title": config["title"],
-            "timeframe": _work_plan_timeframe(score, config["key"], language),
+            "id": match.get("id"),
+            "title": match.get("title"),
+            "timeframe": _work_plan_timeframe(score, str(match.get("primary_framework") or ""), language),
             "priority": _work_plan_priority_label(score, language),
             "tone": _work_plan_tone(score),
-            "owners": config["owners"],
-            "provider": _work_plan_provider(config["key"], bool(matched_events or matched_findings or matched_scenarios), bool(source_gaps), language),
-            "objective": config["objective"].format(scope=scope_label),
-            "actions": config["actions"],
-            "validation": config["validation"],
-            "basis": _work_plan_basis(len(matched_findings), len(matched_events), len(matched_scenarios), language),
+            "owners": owners,
+            "objective": match.get("question"),
+            "actions": actions,
+            "validation": match.get("criteria"),
+            "argument": match.get("reasons_label"),
+            "basis": basis,
             "evidence_urls": _work_plan_evidence_urls(matched_events),
-            "scenarios": [match.get("id", "") for match in matched_scenarios[:4] if match.get("id")],
+            "evidence_ids": evidence_ids,
+            "scenarios": [match.get("id")],
+            "control_mappings": control_mappings,
         }
         items.append(item)
-    if not items:
-        items.append(_work_plan_empty_item(scope_label, language))
+
     items = sorted(items, key=lambda item: _work_plan_sort_key(item, language))[:8]
-    specialized_required = sum(1 for item in items if item["provider"] and item["provider"] != _work_plan_internal_provider_label(language))
-    summary = (
-        f"Plan derivado de {len(findings)} hallazgos validados, {len(events)} evidencias aseguradas, {len(scenario_matches)} escenarios soportados y {len(source_statuses)} fuentes. Los responsables son roles/equipos, no personas; las fechas son ventanas de ejecución sugeridas para mitigar riesgo y revisar escenarios."
-        if language == "es"
-        else f"Plan derived from {len(findings)} validated findings, {len(events)} assured evidence records, {len(scenario_matches)} evidence-supported scenarios and {len(source_statuses)} sources. Owners are roles/teams, not named individuals; dates are suggested execution windows for mitigation and scenario review."
-    )
-    openclaw_note = (
-        "Cada frente puede convertirse en tareas, dependencias, consultas adicionales y criterios de aceptación; la ejecución de cambios, contacto con terceros o acciones sobre fuentes queda sujeta a aprobación del administrador y alcance autorizado."
-        if language == "es"
-        else "Each workstream can be turned into tasks, dependencies, follow-up queries and acceptance criteria; changes, third-party contact or source actions remain subject to admin approval and authorized scope."
-    )
-    vendor_note = (
-        f"{specialized_required} frentes sugieren capacidad especializada adicional cuando el equipo interno no tenga cobertura suficiente."
-        if language == "es"
-        else f"{specialized_required} workstreams suggest additional specialized capability when the internal team does not have enough coverage."
-    )
+    has_supported_plan = bool(items)
+    if language == "es":
+        summary = (
+            f"Plan sustentado en {len(items)} escenarios respaldados por evidencia, "
+            f"{len(findings)} hallazgos validados y {len(events)} evidencias directas o validadas."
+            if has_supported_plan
+            else (
+                "No se publica un plan de mitigación: esta corrida no contiene escenarios respaldados "
+                "por evidencia suficientes para justificar acciones."
+            )
+        )
+        decision_gate = (
+            "Cada acción debe conservar el escenario, el argumento, la evidencia y el criterio de cierre que la sustentan."
+            if has_supported_plan
+            else (
+                "Los registros recolectados permanecen como contexto. El plan se habilita únicamente cuando "
+                "la validación activa un escenario del marco analítico."
+            )
+        )
+    else:
+        summary = (
+            f"Plan supported by {len(items)} evidence-backed scenarios, "
+            f"{len(findings)} validated findings and {len(events)} direct or validated evidence records."
+            if has_supported_plan
+            else (
+                "No mitigation plan is published: this run does not contain evidence-backed scenarios "
+                "sufficient to justify actions."
+            )
+        )
+        decision_gate = (
+            "Every action must retain its supporting scenario, rationale, evidence and closure criterion."
+            if has_supported_plan
+            else (
+                "Collected records remain context. A plan is enabled only when validation activates "
+                "a scenario from the analytical framework."
+            )
+        )
     return {
+        "status": "supported" if has_supported_plan else "not_supported",
         "summary": summary,
-        "openclaw_note": openclaw_note,
-        "vendor_note": vendor_note,
+        "decision_gate": decision_gate,
         "items": items,
     }
+
+
+def _unique_text_values(values: list[Any]) -> list[str]:
+    unique: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in unique:
+            unique.append(text)
+    return unique
+
+
+def _scenario_action_owners(match: Dict[str, Any], language: str) -> list[str]:
+    framework = str(match.get("primary_framework") or "").lower()
+    if language == "en":
+        return {
+            "f3": ["Fraud", "Digital channels", "Cybersecurity", "Legal"],
+            "disarm": ["Communications", "Reputation risk", "Cyber intelligence", "Legal"],
+            "atlas": ["AI security", "Application security", "Technology risk"],
+            "attack": ["Cybersecurity", "SOC / CTI", "Asset owner"],
+        }.get(framework, ["Cybersecurity", "Risk owner"])
+    return {
+        "f3": ["Fraude", "Canales digitales", "Ciberseguridad", "Legal"],
+        "disarm": ["Comunicaciones", "Riesgo reputacional", "Ciberinteligencia", "Legal"],
+        "atlas": ["Seguridad de IA", "Seguridad de aplicaciones", "Riesgo tecnológico"],
+        "attack": ["Ciberseguridad", "SOC / CTI", "Dueño del activo"],
+    }.get(framework, ["Ciberseguridad", "Dueño del riesgo"])
+
+
+def _scenario_control_mappings(
+    payload: Dict[str, Any],
+    match: Dict[str, Any],
+    language: str,
+) -> list[Dict[str, Any]]:
+    evidence_ids = {str(value) for value in match.get("evidence_ids", []) if value}
+    if not evidence_ids:
+        return []
+    framework_summary = payload.get("framework_summary") or _framework_summary(payload, language)
+    decision_frameworks = {
+        "NIST CSF",
+        "ISO 27001",
+        "PCI DSS",
+        "SOC 2",
+        "GDPR",
+        "CIS Controls",
+        "COBIT 2019",
+    }
+    mappings: list[Dict[str, Any]] = []
+    for row in framework_summary.get("mappings", []) or []:
+        if row.get("framework") not in decision_frameworks:
+            continue
+        row_evidence_ids = {
+            str(item.get("evidence_id"))
+            for item in row.get("evidence", []) or []
+            if item.get("evidence_id")
+        }
+        linked_count = len(evidence_ids.intersection(row_evidence_ids))
+        if linked_count <= 0:
+            continue
+        mappings.append(
+            {
+                "framework": row.get("framework"),
+                "aspect": row.get("axis"),
+                "controls": list(row.get("controls") or []),
+                "evidence_count": linked_count,
+            }
+        )
+    mappings.sort(key=lambda item: (-item["evidence_count"], str(item["framework"]), str(item["aspect"])))
+    return mappings[:8]
 
 
 def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
@@ -1238,13 +1358,36 @@ def _display_metrics_sources(metrics: Dict[str, Any], language: str) -> Dict[str
     return output
 
 
-def _display_vulnerability_intelligence(value: Dict[str, Any]) -> Dict[str, Any]:
+def _display_vulnerability_intelligence(value: Dict[str, Any], language: str = "es") -> Dict[str, Any]:
     output = dict(value or {})
     rows = []
     for row in output.get("rows", []) or []:
         row_data = dict(row or {})
         row_data["evidence_url"] = _public_evidence_url(str(row_data.get("evidence_url") or ""))
         row_data["preview_url"] = _event_preview_url(row) if isinstance(row, dict) else ""
+        row_type = str(row_data.get("type") or "potential")
+        type_labels = {
+            "confirmed": ("Aplicabilidad sustentada", "Supported applicability"),
+            "candidate": ("Coincidencia por validar", "Match to validate"),
+            "potential": ("Tecnología por validar", "Technology to validate"),
+        }
+        row_data["type_label"] = type_labels.get(row_type, type_labels["potential"])[
+            1 if language == "en" else 0
+        ]
+        if language == "en":
+            row_data["status"] = REPORT_TRANSLATIONS_EN.get(str(row_data.get("status") or ""), row_data.get("status") or "")
+            row_data["decision"] = REPORT_TRANSLATIONS_EN.get(
+                str(row_data.get("decision") or ""),
+                row_data.get("decision") or "",
+            )
+            row_data["what_it_demonstrates"] = REPORT_TRANSLATIONS_EN.get(
+                str(row_data.get("what_it_demonstrates") or ""),
+                row_data.get("what_it_demonstrates") or "",
+            )
+            row_data["what_it_does_not_demonstrate"] = REPORT_TRANSLATIONS_EN.get(
+                str(row_data.get("what_it_does_not_demonstrate") or ""),
+                row_data.get("what_it_does_not_demonstrate") or "",
+            )
         rows.append(row_data)
     output["rows"] = rows
     return output
@@ -1271,6 +1414,19 @@ REPORT_PREFIX_TRANSLATIONS_EN = {
 
 
 REPORT_TRANSLATIONS_EN = {
+    "Tecnología observada sin versión exacta": "Technology observed without an exact version",
+    "Confirmar versión o SBOM antes de asociar una CVE.": "Confirm the version or SBOM before associating a CVE.",
+    "Tecnología observada pasivamente en un activo del alcance.": "Technology was passively observed on an in-scope asset.",
+    "No demuestra versión afectada, vulnerabilidad aplicable ni compromiso.": "It does not demonstrate an affected version, an applicable vulnerability, or compromise.",
+    "Producto coincidente; versión pendiente de confirmación": "Product match; version pending confirmation",
+    "Confirmar producto, versión, activo y exposición antes de priorizar parche.": "Confirm product, version, asset, and exposure before prioritizing a patch.",
+    "Existe coincidencia de producto entre el activo observado y la configuración publicada por NVD.": "A product match exists between the observed asset and the configuration published by NVD.",
+    "No demuestra aplicabilidad hasta confirmar la versión; tampoco demuestra explotación ni compromiso.": "It does not demonstrate applicability until the version is confirmed, nor exploitation or compromise.",
+    "KEV aplicable": "Applicable KEV",
+    "CVE aplicable": "Applicable CVE",
+    "Priorizar validación de exposición, vector CVSS y ventana de parche.": "Prioritize validation of exposure, CVSS vector, and patch window.",
+    "La tecnología y versión observadas coinciden con una configuración afectada publicada por NVD.": "The observed technology and version match an affected configuration published by NVD.",
+    "No demuestra explotación ni compromiso.": "It does not demonstrate exploitation or compromise.",
     "PESTEL explica por que el riesgo cyber cambia por fuerzas externas, no solo por vulnerabilidades. Para la marca, grupo o conglomerado analizado, la lectura debe cubrir unidades de negocio, canales digitales, terceros, clientes, regulacion, continuidad y exposiciones sectoriales declaradas en la solicitud.": "PESTEL explains why cyber risk changes because of external forces, not only vulnerabilities. For the analyzed brand, group or conglomerate, the reading should cover business units, digital channels, third parties, customers, regulation, continuity and sector exposures declared in the request.",
     "Politico": "Political",
     "Economico/Fraude": "Economic/Fraud",
@@ -1339,7 +1495,7 @@ REPORT_TRANSLATIONS_EN = {
     "Reducir exposicion de datos, trazabilidad legal y respuesta regulatoria.": "Reduce data exposure, legal traceability and regulatory response.",
     "Gobernar prompts, agentes, herramientas, logs y decisiones automatizadas.": "Govern prompts, agents, tools, logs and automated decisions.",
     "Probabilidad relativa estimada; no implica certeza de ataque.": "Estimated relative probability; it does not imply certainty of attack.",
-    "La estructura de riesgo convierte senales tecnicas y de fraude en probabilidad contextual, impacto de negocio, efectividad de controles, riesgo inherente, riesgo residual y matriz 4x4.": "The risk structure converts technical and fraud signals into contextual likelihood, business impact, control effectiveness, inherent risk, residual risk and a 4x4 matrix.",
+    "La estructura de riesgo convierte evidencia trazable en una estimacion contextual de plausibilidad, impacto de negocio, riesgo inherente, riesgo residual y matriz 4x4; no confirma incidentes.": "The risk structure converts traceable evidence into contextual plausibility, business impact, inherent risk, residual risk and a 4x4 matrix; it does not confirm incidents.",
     "L usa funcion logistica con activo, exposicion, CVSS, EPSS, KEV, actividad de amenaza, targeting sectorial, presion geopolitica/regulatoria y resta madurez de controles, deteccion y resiliencia.": "L uses a logistic function with asset, exposure, CVSS, EPSS, KEV, threat activity, sector targeting, geopolitical/regulatory pressure and subtracts control, detection and resilience maturity.",
     "El modelo separa evidencia, plausibilidad contextual, impacto, controles declarados, riesgo inherente y riesgo residual; no confirma incidentes ni estima probabilidad calibrada de ataque.": "The model separates evidence, contextual plausibility, impact, declared controls, inherent risk and residual risk; it does not confirm incidents or estimate calibrated attack probability.",
     "La plausibilidad contextual es un puntaje acotado basado en evidencia directa o validada. Las limitaciones y fuentes ausentes no incrementan el riesgo.": "Contextual plausibility is a bounded score based on direct or validated evidence. Limitations and unavailable sources do not increase risk.",
@@ -1657,6 +1813,11 @@ FRAMEWORK_ASPECTS = [
         "aspect_es": "TTP observadas, detecciones, contramedidas, cobertura y pruebas de control.",
         "aspect_en": "Observed TTPs, detections, countermeasures, coverage and control testing.",
     },
+    {
+        "framework": "MITRE F3 v1.1",
+        "aspect_es": "Conductas de fraude, abuso de identidad y pagos, suplantación, posicionamiento y monetización sustentadas por evidencia.",
+        "aspect_en": "Evidence-backed fraud behavior, identity and payment abuse, impersonation, positioning and monetization.",
+    },
 ]
 
 
@@ -1731,7 +1892,16 @@ def _domain_comparison_rows(payload: Dict[str, Any], language: str) -> list[Dict
                     "domain": domain,
                     "events": len(matches),
                     "sources": ", ".join(sorted({_display_source_name(event.get("source", ""), language) for event in matches if event.get("source")})[:4]) or ("sin evidencia directa" if language == "es" else "no direct evidence"),
-                    "categories": ", ".join(sorted({event.get("category", "") for event in matches if event.get("category")})[:5]) or ("sin categoría" if language == "es" else "no category"),
+                    "categories": ", ".join(
+                        sorted(
+                            {
+                                _search_category_label(event.get("category"), language)
+                                for event in matches
+                                if event.get("category")
+                            }
+                        )[:5]
+                    )
+                    or ("sin categoría" if language == "es" else "no category"),
                 }
             )
     return rows
@@ -1869,9 +2039,177 @@ def _framework_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]
                 "aspect": item["aspect_en"] if language == "en" else item["aspect_es"],
             }
         )
+    axis_labels = {
+        "governance": ("Gobierno", "Governance"),
+        "identity": ("Identidad y acceso", "Identity and access"),
+        "protect": ("Protección", "Protection"),
+        "detect": ("Detección", "Detection"),
+        "response": ("Respuesta y recuperación", "Response and recovery"),
+        "privacy": ("Datos y privacidad", "Data and privacy"),
+        "vulnerability": ("Vulnerabilidades y exposición", "Vulnerabilities and exposure"),
+        "fraud": ("Fraude, suplantación y marca", "Fraud, impersonation and brand"),
+        "ai": ("Riesgo de IA", "AI risk"),
+        "adversary": ("Comportamiento adversario", "Adversary behavior"),
+    }
+    evidence_mapping = payload.get("metrics", {}).get("framework_mapping", {}) or {}
+    mappings = []
+    for row in evidence_mapping.get("mappings", []) or []:
+        axis = str(row.get("axis") or "unmapped")
+        evidence_rows = []
+        for evidence in row.get("evidence", []) or []:
+            evidence_rows.append(
+                {
+                    "evidence_id": evidence.get("evidence_id"),
+                    "title": evidence.get("title") or evidence.get("url") or "Evidence",
+                    "url": evidence.get("url"),
+                    "status": evidence.get("evidence_status") or "raw",
+                    "relationship": evidence.get("relationship") or "unassessed",
+                    "domain": evidence.get("domain") or "",
+                    "source": evidence.get("source") or "",
+                }
+            )
+        mappings.append(
+            {
+                "framework": row.get("framework") or "Framework",
+                "axis": axis_labels.get(axis, (axis, axis))[1 if language == "en" else 0],
+                "record_count": int(row.get("record_count") or len(evidence_rows)),
+                "validated_count": int(row.get("validated_count") or 0),
+                "direct_count": int(row.get("direct_count") or 0),
+                "related_count": int(row.get("related_count") or 0),
+                "finding_count": int(row.get("finding_count") or 0),
+                "controls": list(row.get("controls") or []),
+                "domains": list(row.get("domains") or []),
+                "evidence_ids": [
+                    str(value)
+                    for value in row.get("evidence_ids", [])
+                    if value
+                ],
+                "validated_evidence_ids": [
+                    str(value)
+                    for value in row.get("validated_evidence_ids", [])
+                    if value
+                ],
+                "direct_relationship_evidence_ids": [
+                    str(value)
+                    for value in row.get("direct_relationship_evidence_ids", [])
+                    if value
+                ],
+                "evidence": evidence_rows,
+            }
+        )
+    affected_axes: list[Dict[str, Any]] = []
+    axes: dict[str, Dict[str, Any]] = {}
+    for mapping in mappings:
+        axis = str(mapping.get("axis") or "")
+        group = axes.setdefault(
+            axis,
+            {
+                "axis": axis,
+                "frameworks": set(),
+                "controls": {},
+                "evidence": {},
+                "evidence_ids": set(),
+                "validated_evidence_ids": set(),
+                "direct_relationship_evidence_ids": set(),
+                "fallback_record_count": 0,
+                "fallback_validated_count": 0,
+                "fallback_direct_count": 0,
+            },
+        )
+        framework = str(mapping.get("framework") or "")
+        if framework:
+            group["frameworks"].add(framework)
+            group["controls"][framework] = list(mapping.get("controls") or [])
+        group["evidence_ids"].update(mapping.get("evidence_ids") or [])
+        group["validated_evidence_ids"].update(
+            mapping.get("validated_evidence_ids") or []
+        )
+        group["direct_relationship_evidence_ids"].update(
+            mapping.get("direct_relationship_evidence_ids") or []
+        )
+        group["fallback_record_count"] = max(
+            group["fallback_record_count"],
+            int(mapping.get("record_count") or 0),
+        )
+        group["fallback_validated_count"] = max(
+            group["fallback_validated_count"],
+            int(mapping.get("validated_count") or 0),
+        )
+        group["fallback_direct_count"] = max(
+            group["fallback_direct_count"],
+            int(mapping.get("direct_count") or 0),
+        )
+        for evidence in mapping.get("evidence", []) or []:
+            evidence_id = str(evidence.get("evidence_id") or evidence.get("url") or "")
+            if evidence_id:
+                group["evidence"][evidence_id] = evidence
+    for axis, group in sorted(axes.items()):
+        evidence_rows = list(group["evidence"].values())
+        record_count = (
+            len(group["evidence_ids"])
+            if group["evidence_ids"]
+            else max(len(evidence_rows), group["fallback_record_count"])
+        )
+        validated_count = (
+            len(group["validated_evidence_ids"])
+            if group["evidence_ids"]
+            else max(
+                sum(
+                    1
+                    for evidence in evidence_rows
+                    if str(evidence.get("status") or "").lower()
+                    in {"validated", "confirmed"}
+                ),
+                group["fallback_validated_count"],
+            )
+        )
+        direct_count = (
+            len(group["direct_relationship_evidence_ids"])
+            if group["evidence_ids"]
+            else max(
+                sum(
+                    1
+                    for evidence in evidence_rows
+                    if str(evidence.get("relationship") or "").lower() == "direct"
+                ),
+                group["fallback_direct_count"],
+            )
+        )
+        affected_axes.append(
+            {
+                "axis": axis,
+                "frameworks": sorted(group["frameworks"]),
+                "control_lines": [
+                    {
+                        "framework": framework,
+                        "controls": controls,
+                    }
+                    for framework, controls in sorted(group["controls"].items())
+                ],
+                "record_count": record_count,
+                "validated_count": validated_count,
+                "direct_count": direct_count,
+                "evidence": evidence_rows[:3],
+            }
+        )
+    related_frameworks = sorted(
+        {
+            str(mapping.get("framework"))
+            for mapping in mappings
+            if mapping.get("framework")
+        }
+    )
     return {
         "scores": scores,
         "aspects": aspects,
+        "mappings": mappings,
+        "affected_axes": affected_axes,
+        "related_frameworks": related_frameworks,
+        "mapping_status": evidence_mapping.get("status") or "no_data",
+        "mapped_records": int(evidence_mapping.get("record_count") or 0),
+        "validated_records": int(evidence_mapping.get("validated_count") or 0),
+        "mapped_cells": int(evidence_mapping.get("cell_count") or len(mappings)),
+        "mapping_limitations": list(evidence_mapping.get("limitations") or []),
         "gap_summary": (
             (
                 "Priorice las coberturas declaradas más bajas y vincule cada acción a evidencia, responsable y fecha de cierre."
@@ -1883,6 +2221,59 @@ def _framework_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]
                 "No se declararon controles internos; el mapeo es preventivo y no representa cumplimiento ni madurez."
                 if language == "es"
                 else "No internal controls were declared; mapping is preventive and does not represent compliance or maturity."
+            )
+        ),
+    }
+
+
+def _f3_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
+    profile = payload.get("metrics", {}).get("f3", {}) or {}
+    technique_rows = []
+    for technique in profile.get("techniques", []) or []:
+        evidence_rows = [
+            {
+                "evidence_id": evidence.get("evidence_id") or "",
+                "title": evidence.get("title") or "",
+                "url": evidence.get("url") or "",
+                "status": evidence.get("status") or "raw",
+            }
+            for evidence in technique.get("evidence", []) or []
+        ]
+        technique_rows.append(
+            {
+                "id": technique.get("id") or "",
+                "name": technique.get("official_name") or "",
+                "tactics": list(technique.get("tactics") or []),
+                "record_count": int(technique.get("record_count") or len(evidence_rows)),
+                "validated_count": int(technique.get("validated_count") or 0),
+                "mapping_status": technique.get("mapping_status") or "evidence_supported_candidate",
+                "evidence": evidence_rows,
+            }
+        )
+    active_tactics = [
+        tactic
+        for tactic in profile.get("tactics", []) or []
+        if int(tactic.get("record_count") or 0) > 0
+    ]
+    return {
+        "framework": profile.get("framework") or "MITRE Fight Fraud Framework",
+        "version": profile.get("framework_version") or "1.1",
+        "source_url": profile.get("source_url") or "https://ctid.mitre.org/fraud",
+        "status": profile.get("status") or "no_data",
+        "mapped_record_count": int(profile.get("mapped_record_count") or 0),
+        "mapped_technique_count": int(profile.get("mapped_technique_count") or len(technique_rows)),
+        "active_tactics": active_tactics,
+        "techniques": technique_rows,
+        "limitations": list(profile.get("limitations") or []),
+        "interpretation": (
+            (
+                "La corrida contiene registros asegurados compatibles con técnicas F3. "
+                "El mapeo orienta validación y controles; no confirma fraude ni incidente."
+            )
+            if language == "es"
+            else (
+                "The run contains assured records compatible with F3 techniques. "
+                "The mapping guides validation and controls; it does not confirm fraud or an incident."
             )
         ),
     }
@@ -2229,7 +2620,7 @@ def _intelligence_modules(payload: Dict[str, Any], language: str) -> list[Dict[s
             card("Attack Surface", surface_count, "signals", "Use WHOIS/DNS/TLS/email-control evidence to prioritize verifiable closure.", "Domain evidence is kept separate from benchmark domains.", "active" if surface_count else "quiet"),
             card("Brand and Fraud", f"{metrics.get('fraud_pressure', 0):.2f}", "pressure", "Connect phishing, impersonation, complaints and transaction monitoring.", f"{brand_fraud_count} brand/fraud-related signals.", "active" if brand_fraud_count or metrics.get("fraud_pressure", 0) else "quiet"),
             card("Framework Mapping", framework_count, "frameworks", "Map actions to NIST, ISO, SOC 2, PCI, GDPR, ATT&CK and D3FEND evidence.", "Only declared coverage can become an auditable remediation item; this is not a compliance assessment.", "reference"),
-            card("Supported possibilities", scenario_library["active_count"], "current run", "Use supported possibilities as decision options, not as confirmed incidents.", f"{scenario_library['reference_template_count']} preventive reference templates are kept separate.", "active" if scenario_library["active_count"] else "reference"),
+            card("Supported possibilities", scenario_library["active_count"], "current run", "Use supported possibilities as decision options, not as confirmed incidents.", "Only evidence-supported scenarios from the current run are presented.", "active" if scenario_library["active_count"] else "reference"),
         ]
     return [
         card("OSINT", osint_records, "registros", "Usar URLs, noticias, advisories e índices públicos como primera capa de evidencia.", "Recolección abierta, pasiva y trazable.", "active" if osint_records else "quiet"),
@@ -2239,7 +2630,7 @@ def _intelligence_modules(payload: Dict[str, Any], language: str) -> list[Dict[s
         card("Superficie de ataque", surface_count, "señales", "Usar WHOIS/DNS/TLS/correo para priorizar cierres verificables.", "La evidencia propia se separa de dominios benchmark.", "active" if surface_count else "quiet"),
         card("Marca y fraude", f"{metrics.get('fraud_pressure', 0):.2f}", "presión", "Conectar phishing, suplantación, reclamos y monitoreo transaccional.", f"{brand_fraud_count} señales asociadas a marca/fraude.", "active" if brand_fraud_count or metrics.get("fraud_pressure", 0) else "quiet"),
         card("Mapeo de frameworks", framework_count, "marcos", "Mapear acciones a NIST, ISO, SOC 2, PCI, GDPR, ATT&CK y D3FEND.", "Solo la cobertura declarada puede pasar a remediación auditable; no es una evaluación de cumplimiento.", "reference"),
-        card("Posibilidades soportadas", scenario_library["active_count"], "corrida actual", "Usar posibilidades soportadas como opciones de decisión, no como incidentes confirmados.", f"{scenario_library['reference_template_count']} plantillas preventivas permanecen separadas.", "active" if scenario_library["active_count"] else "reference"),
+        card("Posibilidades soportadas", scenario_library["active_count"], "corrida actual", "Usar posibilidades soportadas como opciones de decisión, no como incidentes confirmados.", "Solo se presentan escenarios de la corrida actual respaldados por evidencia.", "active" if scenario_library["active_count"] else "reference"),
     ]
 
 
@@ -2282,7 +2673,6 @@ def _model_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
 
 
 def _recommendation_catalog(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
-    text = _payload_signal_text(payload)
     areas = {
         "strategic": {"label": "Estratégica" if language == "es" else "Strategic", "items": []},
         "risk": {"label": "Riesgos" if language == "es" else "Risk", "items": []},
@@ -2290,30 +2680,44 @@ def _recommendation_catalog(payload: Dict[str, Any], language: str) -> Dict[str,
         "technical": {"label": "Técnica" if language == "es" else "Technical", "items": []},
         "prediction": {"label": "Índice de presión de señales" if language == "es" else "Signal pressure index", "items": []},
     }
-    seen = set()
-    for finding in payload.get("top_findings", [])[:5]:
-        for recommendation in finding.get("recommendations", [])[:2]:
-            key = ("finding", finding.get("title"), recommendation)
-            if key in seen:
-                continue
-            areas["risk"]["items"].append(
-                {
-                    "title": finding.get("title"),
-                    "action": recommendation,
-                    "owner": finding.get("owner") or "CISO",
-                    "basis": "Hallazgo priorizado con evidencia recolectada." if language == "es" else "Prioritized finding with collected evidence.",
-                    "priority": _priority_from_score(float(finding.get("residual_risk", 0) or 0), language),
-                }
-            )
-            seen.add(key)
-    ranked = []
-    for index, item in enumerate(RECOMMENDATION_LIBRARY):
-        matches = [trigger for trigger in item["triggers"] if trigger in text]
-        ranked.append((len(matches), -index, matches, item))
-    for score, _order, matches, item in sorted(ranked, reverse=True):
-        if score <= 0:
+    area_by_framework = {
+        "attack": "technical",
+        "d3fend": "technical",
+        "atlas": "risk",
+        "disarm": "strategic",
+        "f3": "risk",
+    }
+    seen: set[tuple[str, str]] = set()
+    for match in (payload.get("scenario_library", {}).get("matches", []) or [])[:12]:
+        scenario_id = str(match.get("id") or "").strip()
+        action = str(match.get("recommendation") or match.get("decision") or "").strip()
+        evidence_count = int(match.get("evidence_count", 0) or 0)
+        if not scenario_id or not action or evidence_count <= 0:
             continue
-        _append_library_recommendation(areas, item, matches, language, seen)
+        key = (scenario_id, action)
+        if key in seen:
+            continue
+        framework = str(match.get("primary_framework") or "").lower()
+        area_key = area_by_framework.get(framework, "strategic")
+        confidence = float(match.get("confidence", 0) or 0)
+        score = min(25.0, confidence / 5.0 + min(evidence_count, 5))
+        basis = (
+            f"Sustentada por {scenario_id}, {evidence_count} evidencias relacionadas y confianza {confidence:.0f}%."
+            if language == "es"
+            else f"Supported by {scenario_id}, {evidence_count} related evidence records and {confidence:.0f}% confidence."
+        )
+        areas[area_key]["items"].append(
+            {
+                "title": match.get("title") or scenario_id,
+                "action": action,
+                "owner": " · ".join(_scenario_action_owners(match, language)),
+                "basis": basis,
+                "priority": _work_plan_priority_label(score, language),
+                "tone": _work_plan_tone(score),
+                "scenario_id": scenario_id,
+            }
+        )
+        seen.add(key)
     for area in areas.values():
         area["items"] = area["items"][:6]
     return areas
@@ -2396,6 +2800,8 @@ def _build_report_scenario_matches(scenarios: list[Dict[str, Any]], payload: Dic
             (frameworks.get("attack", {}) or {}).get("id"),
             (frameworks.get("disarm", {}) or {}).get("id"),
             (frameworks.get("d3fend", {}) or {}).get("id"),
+            (frameworks.get("atlas", {}) or {}).get("id"),
+            (frameworks.get("f3", {}) or {}).get("id"),
         )
         if key in seen:
             continue
@@ -2417,6 +2823,12 @@ def _scenario_evidence_signals(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
             continue
         text = _event_text(event)
         tags = {str(tag).lower() for tag in event.get("tags", []) or []}
+        validation = event.get("technical_validation", {}) or {}
+        f3_ids = {
+            str(item.get("id", "")).upper()
+            for item in validation.get("f3_mappings", []) or []
+            if isinstance(item, dict) and item.get("id")
+        }
         signals.append(
             {
                 "id": event.get("canonical_id") or event.get("id"),
@@ -2438,7 +2850,8 @@ def _scenario_evidence_signals(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
                     tags.intersection({"atlas_signal", "ai_asset", "ai_model", "ai_agent", "prompt_injection", "model_supply_chain"})
                     or event.get("category") in {"ai_security", "ai_model_exposure"}
                 ),
-                "framework_ids": _scenario_framework_ids(text, tags),
+                "f3_signal": bool(f3_ids),
+                "framework_ids": _scenario_framework_ids(text, tags).union(f3_ids),
                 "tags": tags,
             }
         )
@@ -2456,6 +2869,7 @@ def _score_report_scenario(
     attack = frameworks.get("attack", {}) or {}
     disarm = frameworks.get("disarm", {}) or {}
     atlas = frameworks.get("atlas", {}) or {}
+    f3 = frameworks.get("f3", {}) or {}
     reasons = set()
     matched_domains = set()
     attack_matches = [
@@ -2479,10 +2893,21 @@ def _score_report_scenario(
         and signal.get("atlas_signal")
         and str(atlas.get("id")).upper() in signal.get("framework_ids", set())
     ]
+    f3_matches = [
+        signal
+        for signal in evidence
+        if f3.get("id")
+        and signal.get("f3_signal")
+        and str(f3.get("id")).upper() in signal.get("framework_ids", set())
+    ]
 
     primary_framework = ""
     matched = []
-    if attack_matches:
+    if f3_matches:
+        primary_framework = "f3"
+        matched = f3_matches
+        reasons.add(f"F3 {f3.get('id')}")
+    elif attack_matches:
         primary_framework = "attack"
         matched = attack_matches
         reasons.add(f"ATT&CK {attack.get('id')}")
@@ -2515,7 +2940,13 @@ def _score_report_scenario(
     mean_confidence = sum(float(signal.get("confidence_score", 0)) for signal in matched) / evidence_count
     score = evidence_count * 5 + mean_confidence * 100
     confidence = min(95, round(mean_confidence * 100))
-    fallback = f"ATT&CK {attack.get('id')}" if attack.get("id") else str(disarm.get("tactic", "DISARM"))
+    fallback = (
+        f"F3 {f3.get('id')}"
+        if f3.get("id")
+        else f"ATT&CK {attack.get('id')}"
+        if attack.get("id")
+        else str(disarm.get("tactic", "DISARM"))
+    )
     return {
         "scenario": scenario,
         "score": score,
@@ -2532,11 +2963,16 @@ def _score_report_scenario(
 def _scenario_framework_ids(text: str, tags: set[str]) -> set[str]:
     identifiers: set[str] = set()
     for tag in tags:
-        match = re.match(r"^(?:atlas|disarm|framework_id):\s*(AML\.TA\d{4}|T\d{4}(?:\.\d{3})?)$", tag, re.IGNORECASE)
+        match = re.match(
+            r"^(?:atlas|disarm|f3|framework_id):\s*(AML\.TA\d{4}|T\d{4}(?:\.\d{3})?|F\d{4}(?:\.\d{3})?|FA\d{4})$",
+            tag,
+            re.IGNORECASE,
+        )
         if match:
             identifiers.add(match.group(1).upper())
     identifiers.update(match.group(0).upper() for match in re.finditer(r"\bAML\.TA\d{4}\b", text, re.IGNORECASE))
     identifiers.update(match.group(1).upper() for match in re.finditer(r"\bDISARM\s*[:#-]?\s*(T\d{4}(?:\.\d{3})?)\b", text, re.IGNORECASE))
+    identifiers.update(match.group(1).upper() for match in re.finditer(r"\bF3\s*[:#-]?\s*(F\d{4}(?:\.\d{3})?|FA\d{4}|T\d{4}(?:\.\d{3})?)\b", text, re.IGNORECASE))
     return identifiers
 
 
@@ -2564,12 +3000,14 @@ def _scenario_match_view(match: Dict[str, Any], language: str) -> Dict[str, Any]
             "d3fend": _framework_label(frameworks.get("d3fend", {}) or {}),
             "atlas": _framework_label(frameworks.get("atlas", {}) or {}),
             "disarm": _framework_label(frameworks.get("disarm", {}) or {}),
+            "f3": _framework_label(frameworks.get("f3", {}) or {}),
         },
         "criteria": lens["criteria"],
         "question": lens["question"],
         "decision": lens["decision"],
         "recommendation": recommendation,
         "support": _format_scenario_risk(float(match.get("confidence", 0) or 0), language),
+        "evidence_ids": [str(value) for value in match.get("evidence_ids", []) if value],
         "scenario": scenario,
     }
 
@@ -2586,8 +3024,8 @@ def _scenario_evidence_label(evidence_count: int, reasons: list[str], language: 
 
 
 def _framework_coverage_from_matches(matches: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
-    sets = {"attack": set(), "d3fend": set(), "atlas": set(), "disarm": set()}
-    labels = {"attack": "ATT&CK", "d3fend": "D3FEND", "atlas": "ATLAS", "disarm": "DISARM"}
+    sets = {"attack": set(), "d3fend": set(), "atlas": set(), "disarm": set(), "f3": set()}
+    labels = {"attack": "ATT&CK", "d3fend": "D3FEND", "atlas": "ATLAS", "disarm": "DISARM", "f3": "F3"}
     for match in matches:
         frameworks = match.get("scenario", {}).get("frameworks", {}) or {}
         for key in sets:
@@ -2630,6 +3068,7 @@ def _scenario_family(match: Dict[str, Any]) -> str:
     disarm = frameworks.get("disarm", {}) or {}
     d3fend = frameworks.get("d3fend", {}) or {}
     atlas = frameworks.get("atlas", {}) or {}
+    f3 = frameworks.get("f3", {}) or {}
     text = _normalize(
         " ".join(
             [
@@ -2642,6 +3081,7 @@ def _scenario_family(match: Dict[str, Any]) -> str:
                 str(disarm.get("tactic", "")),
                 str(d3fend.get("name", "")),
                 str(atlas.get("name", "")),
+                str(f3.get("name", "")),
                 " ".join(match.get("reasons", []) or []),
             ]
         )
@@ -2670,6 +3110,7 @@ def _scenario_decision_lens(match: Dict[str, Any], language: str) -> Dict[str, s
     control = _framework_label(frameworks.get("d3fend", {}) or {})
     atlas = _framework_label(frameworks.get("atlas", {}) or {})
     disarm = _framework_label(frameworks.get("disarm", {}) or {})
+    f3 = _framework_label(frameworks.get("f3", {}) or {})
     support = _format_scenario_risk(float(match.get("confidence", 0) or 0), language)
     if language == "en":
         catalog = {
@@ -2685,8 +3126,8 @@ def _scenario_decision_lens(match: Dict[str, Any], language: str) -> Dict[str, s
             },
             "fraud": {
                 "criteria": "CISM/CISA/COBIT/CIPM: fraud accountability, evidence quality, customer impact, third parties and escalation controls.",
-                "question": f"For {primary_domain}, can {attack} plus {disarm} enable impersonation, payment abuse or trust degradation?",
-                "decision": f"Evaluate a fraud-control scenario tied to {disarm}: channel validation, takedown/legal coordination and transaction monitoring thresholds.",
+                "question": f"For {primary_domain}, can {f3} with {attack} plus {disarm} enable impersonation, payment abuse or trust degradation?",
+                "decision": f"Evaluate the F3 fraud behavior {f3}: channel validation, identity/payment controls, takedown/legal coordination and transaction monitoring thresholds.",
             },
             "influence": {
                 "criteria": "Threat Intelligence/CISM/CyBOK: intelligence requirement, source confidence, narrative reach, reputation and risk communication.",
@@ -2723,8 +3164,8 @@ def _scenario_decision_lens(match: Dict[str, Any], language: str) -> Dict[str, s
         },
         "fraud": {
             "criteria": "CISM/CISA/COBIT/CIPM: responsabilidad antifraude, calidad de evidencia, impacto a clientes, terceros y controles de escalamiento.",
-            "question": f"Para {primary_domain}, ¿{attack} más {disarm} puede habilitar suplantación, abuso de pagos o deterioro de confianza?",
-            "decision": f"Evaluar escenario antifraude asociado a {disarm}: validación de canales, coordinación legal/takedown y umbrales de monitoreo transaccional.",
+            "question": f"Para {primary_domain}, ¿{f3} junto con {attack} y {disarm} puede habilitar suplantación, abuso de pagos o deterioro de confianza?",
+            "decision": f"Evaluar la conducta antifraude F3 {f3}: validación de canales, controles de identidad/pago, coordinación legal/takedown y umbrales de monitoreo transaccional.",
         },
         "influence": {
             "criteria": "Threat Intelligence/CISM/CyBOK: requerimiento de inteligencia, confianza de fuente, alcance narrativo, reputación y comunicación de riesgo.",
@@ -2998,21 +3439,45 @@ def _scope_filtered_events(payload: Dict[str, Any], language: str) -> list[Dict[
 def _scope_terms_for_payload(payload: Dict[str, Any], language: str) -> list[str]:
     scope = payload.get("report_scope") or _report_scope(payload, language)
     terms: list[str] = []
+
+    def add_term(value: Any, *, minimum: int = 4) -> None:
+        cleaned = str(value or "").strip().lower()
+        if len(cleaned) < minimum:
+            return
+        terms.append(cleaned)
+        compact = cleaned.replace(" ", "")
+        if len(compact) >= 4:
+            terms.append(compact)
+
     for domain in scope.get("primary_domains", []) or []:
         cleaned = str(domain).strip().lower()
         if not cleaned:
             continue
         terms.append(cleaned)
         label = cleaned.split(".", 1)[0].replace("-", " ").replace("_", " ").strip()
-        compact = label.replace(" ", "")
-        if len(label) >= 4:
-            terms.append(label)
-        if len(compact) >= 4:
-            terms.append(compact)
-    org_name = str((payload.get("organization", {}) or {}).get("name", "") or "").strip().lower()
+        add_term(label)
+    organization = payload.get("organization", {}) or {}
+    org_name = str(organization.get("name", "") or "").strip().lower()
     if org_name and not org_name.startswith("domain intelligence:") and len(org_name) >= 4:
-        terms.append(org_name)
-        terms.append(org_name.replace(" ", ""))
+        add_term(org_name)
+        legal_suffixes = {"ag", "corp", "corporation", "inc", "incorporated", "ltd", "limited", "llc", "plc", "sa", "sas"}
+        without_suffix = " ".join(part for part in org_name.replace(",", " ").split() if part not in legal_suffixes)
+        if without_suffix != org_name:
+            add_term(without_suffix)
+    for field in (
+        "legal_name",
+        "brands",
+        "subsidiaries",
+        "parent_organizations",
+        "entity_aliases",
+        "subject_aliases",
+        "strategic_assets",
+    ):
+        values = organization.get(field, []) or []
+        if isinstance(values, str):
+            values = [values]
+        for value in values:
+            add_term(value, minimum=3)
     deduped: list[str] = []
     seen = set()
     for term in terms:
@@ -3165,7 +3630,52 @@ def _evidence_rows(events: list[Dict[str, Any]], language: str) -> list[Dict[str
     return [_search_row(row, language) | {
         "technique": row.get("technique") or "",
         "cve": row.get("cve") or "",
-    } for row in rows[:180]]
+    } for row in rows]
+
+
+def _evidence_type_summary(rows: list[Dict[str, Any]], language: str) -> list[Dict[str, Any]]:
+    counts: Dict[str, int] = {}
+    for row in rows:
+        key = str(row.get("evidence_type") or "other")
+        counts[key] = counts.get(key, 0) + 1
+    labels = {
+        "document": ("Documentos y archivos", "Documents and files"),
+        "web_page": ("Páginas web", "Web pages"),
+        "news": ("Noticias y comunicados", "News and releases"),
+        "social_media": ("Redes sociales", "Social media"),
+        "technology_infrastructure": ("Tecnología e infraestructura", "Technology and infrastructure"),
+        "official_record": ("Registros oficiales", "Official records"),
+        "authorized_dark_web": ("Dark web autorizada", "Authorized dark web"),
+        "other": ("Otros registros", "Other records"),
+    }
+    label_index = 1 if language == "en" else 0
+    return [
+        {"key": key, "label": labels.get(key, labels["other"])[label_index], "count": count}
+        for key, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+
+def _executive_evidence_sample(rows: list[Dict[str, Any]], limit: int = 40) -> list[Dict[str, Any]]:
+    buckets: Dict[str, list[Dict[str, Any]]] = {}
+    for row in rows:
+        buckets.setdefault(str(row.get("evidence_type") or "other"), []).append(row)
+    keys = sorted(buckets)
+    offsets = {key: 0 for key in keys}
+    sample: list[Dict[str, Any]] = []
+    while len(sample) < min(limit, len(rows)):
+        advanced = False
+        for key in keys:
+            offset = offsets[key]
+            if offset >= len(buckets[key]):
+                continue
+            sample.append(buckets[key][offset])
+            offsets[key] += 1
+            advanced = True
+            if len(sample) >= limit:
+                break
+        if not advanced:
+            break
+    return sample
 
 
 def _search_groups(events: list[Dict[str, Any]], language: str = "es") -> Dict[str, Any]:
@@ -3184,7 +3694,14 @@ def _search_groups(events: list[Dict[str, Any]], language: str = "es") -> Dict[s
         elif "internet_search" in tags or "osint_public" in tags or "common_crawl" in tags or "Internet Search" in source or "OSINT" in source or "Common Crawl" in source:
             groups["internet"]["rows"].append(_search_row(event, language))
     for group in groups.values():
-        group["rows"] = sorted(group["rows"], key=lambda item: (item["age_days"], item["source"], item["title"]))[:16]
+        group["rows"] = sorted(
+            group["rows"],
+            key=lambda item: (
+                item["age_days"] if item["age_days"] is not None else 10**9,
+                item["source"],
+                item["title"],
+            ),
+        )[:16]
         group["count"] = len(group["rows"])
     groups["total"] = sum(group["count"] for group in groups.values())
     return groups
@@ -3194,19 +3711,118 @@ def _search_row(event: Dict[str, Any], language: str = "es") -> Dict[str, Any]:
     tags = event.get("tags") or []
     raw_url = str(event.get("evidence_url") or "").strip()
     review_url = _public_evidence_url(raw_url)
+    age_value = event.get("age_days")
+    try:
+        age_days = max(0, int(age_value)) if age_value is not None else None
+    except (TypeError, ValueError):
+        age_days = None
+    observed_at = (
+        event.get("observed_at")
+        or event.get("published_at")
+        or event.get("collected_at")
+        or event.get("timestamp")
+    )
     return {
         "source": _display_source_name(event.get("source", ""), language),
         "category": event.get("category") or "",
-        "title": _clean_evidence_text(event.get("title") or "", language),
+        "category_label": _search_category_label(event.get("category"), language),
+        "evidence_type": event.get("evidence_type") or "other",
+        "evidence_type_label": _evidence_type_label(event.get("evidence_type"), language),
+        "title": _search_result_title(event, review_url, language),
         "actor": event.get("actor") or "",
-        "age_days": event.get("age_days") or 0,
+        "age_days": age_days,
+        "observed_date": _observation_date_label(observed_at, language),
+        "recency_label": _recency_label(age_days, language),
         "tags": _clean_tag_list(tags, language),
         "evidence_url": review_url,
+        "evidence_url_label": _host_from_url(review_url) or ("fuente" if language == "es" else "source"),
         "raw_evidence_url": raw_url,
         "preview_url": _event_preview_url(event),
         "relationship": _evidence_relationship(event, language),
         "validation": _evidence_validation(event, raw_url, review_url, language),
     }
+
+
+def _search_category_label(value: Any, language: str) -> str:
+    labels = {
+        "osint_public_index": ("Índice web público", "Public web index"),
+        "social_signal": ("Mención social pública", "Public social mention"),
+        "brand_reputation": ("Marca y reputación", "Brand and reputation"),
+        "fake_recruitment": ("Suplantación en ofertas de empleo", "Recruitment impersonation"),
+        "phishing": ("Suplantación y phishing", "Impersonation and phishing"),
+        "attack_surface": ("Superficie externa", "External surface"),
+        "attack_surface_web": ("Servicio web observado", "Observed web service"),
+        "attack_surface_dns": ("Registro DNS observado", "Observed DNS record"),
+        "exploit_context": ("Contexto público de explotación", "Public exploit context"),
+        "darkweb": ("Índice autorizado de dark web", "Authorized dark web index"),
+    }
+    raw = str(value or "").strip()
+    if raw in labels:
+        return labels[raw][1 if language == "en" else 0]
+    if not raw:
+        return "Sin clasificar" if language == "es" else "Unclassified"
+    return raw.replace("_", " ").strip().capitalize()
+
+
+def _search_result_title(event: Dict[str, Any], evidence_url: str, language: str) -> str:
+    title = _clean_evidence_text(event.get("title") or "", language)
+    normalized = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode("ascii").lower()
+    if normalized.startswith("url publica indexada para"):
+        host = str(event.get("domain") or "").strip()
+        if not host and evidence_url:
+            host = (urlparse(evidence_url).hostname or "").removeprefix("www.")
+        if host:
+            return (
+                f"Public page indexed on {host}"
+                if language == "en"
+                else f"Página pública indexada en {host}"
+            )
+    return title
+
+
+def _observation_date_label(value: Any, language: str) -> str:
+    if not value:
+        return "Not reported" if language == "en" else "No informada"
+    parsed: datetime | None = value if isinstance(value, datetime) else None
+    if parsed is None:
+        try:
+            parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return "Not reported" if language == "en" else "No informada"
+    if language == "en":
+        months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        return f"{months[parsed.month - 1]} {parsed.day}, {parsed.year}"
+    months = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+    return f"{parsed.day} {months[parsed.month - 1]} {parsed.year}"
+
+
+def _recency_label(age_days: int | None, language: str) -> str:
+    if age_days is None:
+        return "Recency unavailable" if language == "en" else "Recencia no disponible"
+    if age_days == 0:
+        return "Observed today" if language == "en" else "Observado hoy"
+    if age_days == 1:
+        return "Observed 1 day ago" if language == "en" else "Observado hace 1 día"
+    return (
+        f"Observed {age_days} days ago"
+        if language == "en"
+        else f"Observado hace {age_days} días"
+    )
+
+
+def _evidence_type_label(value: Any, language: str) -> str:
+    labels = {
+        "document": ("Documentos y archivos", "Documents and files"),
+        "web_page": ("Páginas web", "Web pages"),
+        "news": ("Noticias y comunicados", "News and releases"),
+        "social_media": ("Redes sociales", "Social media"),
+        "technology_infrastructure": ("Tecnología e infraestructura", "Technology and infrastructure"),
+        "official_record": ("Registros oficiales", "Official records"),
+        "authorized_dark_web": ("Dark web autorizada", "Authorized dark web"),
+        "other": ("Otros registros", "Other records"),
+    }
+    pair = labels.get(str(value or "other"), labels["other"])
+    return pair[1 if language == "en" else 0]
 
 
 def _public_evidence_url(url: str) -> str:

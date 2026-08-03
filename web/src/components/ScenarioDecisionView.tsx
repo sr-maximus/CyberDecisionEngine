@@ -5,7 +5,7 @@ import { getScenarioLibrary } from "../api";
 import type { DisinformationScenario, LanguageMode, RunRecord, ScenarioLibraryResponse, ThreatEvent } from "../types";
 import { BarRanking } from "./ChartPrimitives";
 
-type FrameworkKey = "attack" | "d3fend" | "atlas" | "disarm";
+type FrameworkKey = "attack" | "d3fend" | "atlas" | "disarm" | "f3";
 type ScenarioFamily = "exploit" | "identity" | "fraud" | "influence" | "ai" | "continuity" | "general";
 type DecisionLens = { criteria: string; question: string; decision: string };
 
@@ -27,6 +27,7 @@ interface EvidenceSignal {
   sourceRefs: string[];
   disarmSignal: boolean;
   atlasSignal: boolean;
+  f3Signal: boolean;
   frameworkIds: Set<string>;
 }
 
@@ -84,7 +85,8 @@ const labels = {
     attack: "ATT&CK",
     d3fend: "D3FEND",
     atlas: "ATLAS",
-    disarm: "DISARM"
+    disarm: "DISARM",
+    f3: "F3"
   },
   en: {
     title: "Actionable decision scenarios",
@@ -121,7 +123,8 @@ const labels = {
     attack: "ATT&CK",
     d3fend: "D3FEND",
     atlas: "ATLAS",
-    disarm: "DISARM"
+    disarm: "DISARM",
+    f3: "F3"
   }
 };
 
@@ -356,7 +359,7 @@ export function ScenarioDecisionView({ run, language }: { run?: RunRecord; langu
         </div>
         <div className="privacy-note scenario-note">
           <GitBranch size={18} />
-          <span>{library?.reference_template_count ?? 0} {language === "en" ? "preventive reference templates" : "plantillas preventivas de referencia"} · ATT&CK + D3FEND + ATLAS + DISARM</span>
+          <span>{library?.reference_template_count ?? 0} {language === "en" ? "framework-derived analytical scenarios" : "escenarios analíticos derivados de marcos"} · ATT&CK + ATLAS + DISARM + F3 · D3FEND {language === "en" ? "as defensive crosswalk" : "como cruce defensivo"}</span>
         </div>
       </section>
 
@@ -476,10 +479,11 @@ export function ScenarioDecisionView({ run, language }: { run?: RunRecord; langu
                       </div>
                     </div>
                     <div className="framework-chip-row">
-                      <span>ATT&CK {selectedMatch.scenario.frameworks.attack.id}</span>
-                      <span>D3FEND {selectedMatch.scenario.frameworks.d3fend.id}</span>
-                      <span>ATLAS {selectedMatch.scenario.frameworks.atlas.id}</span>
-                      <span>DISARM {selectedMatch.scenario.frameworks.disarm.id}</span>
+                      {selectedMatch.scenario.frameworks.attack.id ? <span>ATT&CK {selectedMatch.scenario.frameworks.attack.id}</span> : null}
+                      {selectedMatch.scenario.frameworks.d3fend.id ? <span>D3FEND {selectedMatch.scenario.frameworks.d3fend.id}</span> : null}
+                      {selectedMatch.scenario.frameworks.atlas.id ? <span>ATLAS {selectedMatch.scenario.frameworks.atlas.id}</span> : null}
+                      {selectedMatch.scenario.frameworks.disarm.id ? <span>DISARM {selectedMatch.scenario.frameworks.disarm.id}</span> : null}
+                      {selectedMatch.scenario.frameworks.f3?.id ? <span>F3 {selectedMatch.scenario.frameworks.f3.id}</span> : null}
                     </div>
                     <div className="decision-meta-grid">
                       <p><b>{t.evidenceBase}</b>{formatEvidenceBasis(selectedMatch, language)}</p>
@@ -527,6 +531,7 @@ function buildEvidence(run?: RunRecord): EvidenceSignal[] {
       sourceRefs: ["validated_finding"],
       disarmSignal: /\b(disinformation|desinformacion|narrative manipulation|influence operation)\b/i.test(text),
       atlasSignal: /\b(ai model|ai agent|prompt injection|model supply chain|atlas)\b/i.test(text),
+      f3Signal: false,
       frameworkIds: extractFrameworkIds(text, [])
     };
   });
@@ -550,6 +555,11 @@ function formatEvidenceBasis(match: ScenarioMatch, language: LanguageMode): stri
 function eventToSignal(event: ThreatEvent, domains: string[]): EvidenceSignal {
   const text = `${event.title} ${event.category} ${event.source} ${event.technique ?? ""} ${(event.tags ?? []).join(" ")}`;
   const tags = new Set((event.tags ?? []).map((tag) => normalize(tag)));
+  const validation = event.technical_validation ?? {};
+  const f3Mappings = Array.isArray(validation.f3_mappings) ? validation.f3_mappings : [];
+  const f3Ids = f3Mappings
+    .map((item) => typeof item === "object" && item !== null && "id" in item ? String(item.id).toUpperCase() : "")
+    .filter(Boolean);
   return {
     id: event.id,
     title: event.title,
@@ -569,18 +579,23 @@ function eventToSignal(event: ThreatEvent, domains: string[]): EvidenceSignal {
     atlasSignal:
       ["ai_security", "ai_model_exposure"].includes(normalize(event.category)) ||
       ["atlas_signal", "ai_asset", "ai_model", "ai_agent", "prompt_injection", "model_supply_chain"].some((tag) => tags.has(tag)),
-    frameworkIds: extractFrameworkIds(`${text} ${event.external_id ?? ""}`, event.tags ?? [])
+    f3Signal: f3Ids.length > 0,
+    frameworkIds: new Set([
+      ...extractFrameworkIds(`${text} ${event.external_id ?? ""}`, event.tags ?? []),
+      ...f3Ids
+    ])
   };
 }
 
 function extractFrameworkIds(text: string, tags: string[]): Set<string> {
   const identifiers = new Set<string>();
   for (const tag of tags) {
-    const match = tag.match(/^(?:atlas|disarm|framework_id):\s*(AML\.TA\d{4}|T\d{4}(?:\.\d{3})?)$/i);
+    const match = tag.match(/^(?:atlas|disarm|f3|framework_id):\s*(AML\.TA\d{4}|T\d{4}(?:\.\d{3})?|F\d{4}(?:\.\d{3})?|FA\d{4})$/i);
     if (match) identifiers.add(match[1].toUpperCase());
   }
   for (const match of text.matchAll(/\bAML\.TA\d{4}\b/gi)) identifiers.add(match[0].toUpperCase());
   for (const match of text.matchAll(/\bDISARM\s*[:#-]?\s*(T\d{4}(?:\.\d{3})?)\b/gi)) identifiers.add(match[1].toUpperCase());
+  for (const match of text.matchAll(/\bF3\s*[:#-]?\s*(F\d{4}(?:\.\d{3})?|FA\d{4}|T\d{4}(?:\.\d{3})?)\b/gi)) identifiers.add(match[1].toUpperCase());
   return identifiers;
 }
 
@@ -593,7 +608,7 @@ function buildScenarioMatches(scenarios: DisinformationScenario[], evidence: Evi
     .sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
   return matches.filter((match) => {
-    const key = `${match.scenario.frameworks.attack.id}-${match.scenario.frameworks.disarm.id}-${match.scenario.frameworks.d3fend.id}`;
+    const key = `${match.scenario.frameworks.attack.id}-${match.scenario.frameworks.disarm.id}-${match.scenario.frameworks.d3fend.id}-${match.scenario.frameworks.f3?.id ?? ""}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -615,8 +630,16 @@ function scoreScenario(scenario: DisinformationScenario, evidence: EvidenceSigna
   const atlasMatches = evidence.filter((signal) =>
     signal.atlasSignal && signal.confidenceScore >= 0.65 && signal.frameworkIds.has(scenario.frameworks.atlas.id.toUpperCase())
   );
+  const f3Id = scenario.frameworks.f3?.id?.toUpperCase() ?? "";
+  const f3Matches = evidence.filter((signal) =>
+    Boolean(f3Id) && signal.f3Signal && signal.frameworkIds.has(f3Id)
+  );
   let matched: EvidenceSignal[] = [];
-  if (attackMatches.length) {
+  if (f3Matches.length) {
+    matched = f3Matches;
+    primaryFramework = "f3";
+    reasons.add(`F3 ${scenario.frameworks.f3?.id}`);
+  } else if (attackMatches.length) {
     matched = attackMatches;
     primaryFramework = "attack";
     reasons.add(`ATT&CK ${scenario.frameworks.attack.id}`);
@@ -640,7 +663,11 @@ function scoreScenario(scenario: DisinformationScenario, evidence: EvidenceSigna
   const sectorContext = sector && normalize(scenario.sector).includes(sector) ? 2 : 0;
   const score = meanConfidence * 100 + evidenceCount * 5 + sectorContext;
   const confidence = Math.min(95, Math.round(meanConfidence * 100));
-  const fallbackReason = scenario.frameworks.attack.id ? `ATT&CK ${scenario.frameworks.attack.id}` : scenario.frameworks.disarm.tactic;
+  const fallbackReason = scenario.frameworks.f3?.id
+    ? `F3 ${scenario.frameworks.f3.id}`
+    : scenario.frameworks.attack.id
+      ? `ATT&CK ${scenario.frameworks.attack.id}`
+      : scenario.frameworks.disarm.tactic;
   return {
     scenario,
     score,
@@ -706,13 +733,15 @@ function frameworkCoverage(matches: ScenarioMatch[]): Array<{ key: FrameworkKey;
     attack: new Set(),
     d3fend: new Set(),
     atlas: new Set(),
-    disarm: new Set()
+    disarm: new Set(),
+    f3: new Set()
   };
   matches.forEach((match) => {
-    sets.attack.add(match.scenario.frameworks.attack.id);
-    sets.d3fend.add(match.scenario.frameworks.d3fend.id);
-    sets.atlas.add(match.scenario.frameworks.atlas.id);
-    sets.disarm.add(match.scenario.frameworks.disarm.id);
+    if (match.scenario.frameworks.attack.id) sets.attack.add(match.scenario.frameworks.attack.id);
+    if (match.scenario.frameworks.d3fend.id) sets.d3fend.add(match.scenario.frameworks.d3fend.id);
+    if (match.scenario.frameworks.atlas.id) sets.atlas.add(match.scenario.frameworks.atlas.id);
+    if (match.scenario.frameworks.disarm.id) sets.disarm.add(match.scenario.frameworks.disarm.id);
+    if (match.scenario.frameworks.f3?.id) sets.f3.add(match.scenario.frameworks.f3.id);
   });
   return (Object.keys(sets) as FrameworkKey[]).map((key) => ({ key, value: sets[key].size }));
 }
@@ -766,6 +795,7 @@ function scenarioFamily(match: ScenarioMatch): ScenarioFamily {
     scenario.frameworks.disarm.tactic,
     scenario.frameworks.d3fend.name,
     scenario.frameworks.atlas.name,
+    scenario.frameworks.f3?.name ?? "",
     match.reasons.join(" ")
   ].join(" "));
   if (/ransom|extortion|backup|continuity|destruct|wipe|availability|impact/.test(text)) return "continuity";
@@ -784,6 +814,9 @@ function scenarioDecisionLens(match: ScenarioMatch, language: LanguageMode): Dec
   const control = `${match.scenario.frameworks.d3fend.id} ${match.scenario.frameworks.d3fend.name}`;
   const atlas = `${match.scenario.frameworks.atlas.id} ${match.scenario.frameworks.atlas.name}`;
   const disarm = `${match.scenario.frameworks.disarm.id} ${match.scenario.frameworks.disarm.name}`;
+  const f3 = match.scenario.frameworks.f3?.id
+    ? `${match.scenario.frameworks.f3.id} ${match.scenario.frameworks.f3.name}`
+    : language === "es" ? "F3 sin mapeo" : "F3 not mapped";
   const support = formatScenarioRisk(match.confidence, language);
   const signal = match.reasons.slice(0, 2).join(" / ");
 
@@ -801,8 +834,8 @@ function scenarioDecisionLens(match: ScenarioMatch, language: LanguageMode): Dec
       },
       fraud: {
         criteria: "CISM/CISA/COBIT/CIPM: fraud accountability, evidence quality, customer impact, third parties and escalation controls.",
-        question: `For ${primaryDomain}, can ${attack} plus ${disarm} enable impersonation, payment abuse or trust degradation in customer or employee channels?`,
-        decision: `Evaluate a fraud-control scenario tied to ${disarm}: channel validation, takedown/legal coordination, transaction monitoring and customer-communication thresholds based on evidence quality.`
+        question: `For ${primaryDomain}, can ${f3} with ${attack} plus ${disarm} enable impersonation, payment abuse or trust degradation in customer or employee channels?`,
+        decision: `Evaluate F3 behavior ${f3}: channel validation, identity and payment controls, takedown/legal coordination, transaction monitoring and customer-communication thresholds based on evidence quality.`
       },
       influence: {
         criteria: "Threat intelligence/CISM/CyBOK: intelligence requirement, source confidence, narrative reach, reputation and risk communication.",
@@ -841,8 +874,8 @@ function scenarioDecisionLens(match: ScenarioMatch, language: LanguageMode): Dec
     },
     fraud: {
       criteria: "CISM/CISA/COBIT/CIPM: responsabilidad antifraude, calidad de evidencia, impacto a clientes, terceros y controles de escalamiento.",
-      question: `Para ${primaryDomain}, ¿${attack} más ${disarm} puede habilitar suplantación, abuso de pagos o deterioro de confianza en canales de clientes o empleados?`,
-      decision: `Evaluar escenario antifraude asociado a ${disarm}: validación de canales, coordinación legal/takedown, monitoreo transaccional y umbrales de comunicación ligados a calidad de evidencia.`
+      question: `Para ${primaryDomain}, ¿${f3} junto con ${attack} y ${disarm} puede habilitar suplantación, abuso de pagos o deterioro de confianza en canales de clientes o empleados?`,
+      decision: `Evaluar la conducta F3 ${f3}: validación de canales, controles de identidad y pago, coordinación legal/takedown, monitoreo transaccional y umbrales de comunicación ligados a calidad de evidencia.`
     },
     influence: {
       criteria: "Threat Intelligence/CISM/CyBOK: requerimiento de inteligencia, confianza de fuente, alcance narrativo, reputación y comunicación de riesgo.",
@@ -903,9 +936,10 @@ function hydrateScenarioTemplate(template: string, match: ScenarioMatch, languag
     attack: `${match.scenario.frameworks.attack.id} ${match.scenario.frameworks.attack.name}`,
     control: `${match.scenario.frameworks.d3fend.id} ${match.scenario.frameworks.d3fend.name}`,
     atlas: `${match.scenario.frameworks.atlas.id} ${match.scenario.frameworks.atlas.name}`,
-    disarm: `${match.scenario.frameworks.disarm.id} ${match.scenario.frameworks.disarm.name}`
+    disarm: `${match.scenario.frameworks.disarm.id} ${match.scenario.frameworks.disarm.name}`,
+    f3: `${match.scenario.frameworks.f3?.id ?? ""} ${match.scenario.frameworks.f3?.name ?? ""}`.trim()
   };
-  return template.replace(/\{(domain|attack|control|atlas|disarm)\}/g, (_, key: string) => replacements[key] ?? "");
+  return template.replace(/\{(domain|attack|control|atlas|disarm|f3)\}/g, (_, key: string) => replacements[key] ?? "");
 }
 
 function hashString(value: string): number {
@@ -918,7 +952,7 @@ function hashString(value: string): number {
 }
 
 function frameworkName(key: FrameworkKey): string {
-  return { attack: "ATT&CK", d3fend: "D3FEND", atlas: "ATLAS", disarm: "DISARM" }[key];
+  return { attack: "ATT&CK", d3fend: "D3FEND", atlas: "ATLAS", disarm: "DISARM", f3: "F3" }[key];
 }
 
 function decisionHorizon(confidence: number, language: LanguageMode): string {
@@ -934,6 +968,7 @@ function scenarioStrategicVector(match: ScenarioMatch, family: ScenarioFamily, l
       d3fend: "efectividad de control, monitoreo y evidencia de cobertura",
       atlas: "gobierno de automatización, IA y trazabilidad de decisión",
       disarm: "narrativa pública, reputación y respuesta coordinada",
+      f3: "conducta antifraude, identidad, transacción y protección de marca",
       exploit: "reducir superficie y confirmar activos críticos",
       identity: "proteger identidad, sesión y privilegios",
       fraud: "prevenir abuso de marca, pagos y confianza del cliente",
@@ -947,6 +982,7 @@ function scenarioStrategicVector(match: ScenarioMatch, family: ScenarioFamily, l
       d3fend: "control effectiveness, monitoring and coverage evidence",
       atlas: "automation, AI governance and decision traceability",
       disarm: "public narrative, reputation and coordinated response",
+      f3: "fraud behavior, identity, transaction and brand protection",
       exploit: "reduce surface and confirm critical assets",
       identity: "protect identity, session and privileges",
       fraud: "prevent brand, payment and customer-trust abuse",

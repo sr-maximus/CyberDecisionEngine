@@ -94,7 +94,20 @@ def load_simple_json(path: Path) -> list[dict[str, str]]:
     return [{"id": key, "name": value} for key, value in data.items()]
 
 
-def scenario_record(index: int, attack: dict[str, Any], disarm: dict[str, Any], d3fend: dict[str, str], atlas: dict[str, str], sector: str) -> dict[str, Any]:
+def load_f3() -> list[dict[str, Any]]:
+    records = json.loads((FRAMEWORK_DIR / "mitre_f3_v1_1.json").read_text(encoding="utf-8"))
+    return [item for item in records if isinstance(item, dict) and item.get("tactic") is not True]
+
+
+def scenario_record(
+    index: int,
+    attack: dict[str, Any],
+    disarm: dict[str, Any],
+    d3fend: dict[str, str],
+    atlas: dict[str, str],
+    sector: str,
+) -> dict[str, Any]:
+    f3 = attack.get("f3") or {}
     return {
         "id": f"CDE-SCN-{index:04d}",
         "status": "preventive_template",
@@ -106,6 +119,7 @@ def scenario_record(index: int, attack: dict[str, Any], disarm: dict[str, Any], 
             "disarm": {"id": disarm["id"], "name": disarm["name"], "tactic": disarm.get("tactic", "")},
             "d3fend": d3fend,
             "atlas": atlas,
+            "f3": f3,
         },
         "scores": {
             "likelihood": 0.0,
@@ -127,48 +141,237 @@ def scenario_record(index: int, attack: dict[str, Any], disarm: dict[str, Any], 
     }
 
 
+def f3_scenario_record(
+    index: int,
+    technique: dict[str, Any],
+    d3fend: dict[str, str],
+) -> dict[str, Any]:
+    attack = (
+        {"id": technique["id"], "name": technique["name"], "tactics": technique.get("tactics", [])}
+        if technique.get("isAttack")
+        else {"id": "", "name": "", "tactics": []}
+    )
+    return {
+        "id": f"CDE-SCN-{index:04d}",
+        "status": "preventive_template",
+        "sector": "all",
+        "title_es": f"Conducta antifraude F3: {technique['name']}",
+        "title_en": f"F3 fraud behavior: {technique['name']}",
+        "frameworks": {
+            "attack": attack,
+            "disarm": {"id": "", "name": "", "tactic": ""},
+            "d3fend": d3fend,
+            "atlas": {"id": "", "name": ""},
+            "f3": {
+                "id": technique["id"],
+                "name": technique["name"],
+                "tactics": technique.get("tactics", []),
+                "isAttack": bool(technique.get("isAttack")),
+            },
+        },
+        "scores": {
+            "likelihood": 0.0,
+            "impact": 0.0,
+            "inherent_risk": 0.0,
+            "control_effectiveness": 0.0,
+            "residual_risk": 0.0,
+            "geographic_relevance": 0.0,
+        },
+        "math": {
+            "z": 0.0,
+            "formula": "not_calculated_until_current_run_evidence_is_validated",
+            "variables": {},
+        },
+        "recommendation_es": (
+            f"Si la evidencia de la corrida mapea explícitamente a F3 {technique['id']}, "
+            f"contrastar el comportamiento y validar controles defensivos relacionados con "
+            f"{d3fend['id']} {d3fend['name']} antes de decidir tratamiento."
+        ),
+        "recommendation_en": (
+            f"If current-run evidence maps explicitly to F3 {technique['id']}, "
+            f"contrast the behavior and validate defensive controls related to "
+            f"{d3fend['id']} {d3fend['name']} before deciding treatment."
+        ),
+        "strategic_question_es": (
+            "¿La evidencia actual demuestra una conducta antifraude compatible y qué validación "
+            "adicional separa una señal preventiva de un fraude confirmado?"
+        ),
+        "strategic_question_en": (
+            "Does current evidence support a compatible fraud behavior and what additional "
+            "validation separates a preventive signal from confirmed fraud?"
+        ),
+    }
+
+
+def framework_scenario_record(
+    index: int,
+    framework: str,
+    technique: dict[str, Any],
+    f3_overlap: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    empty_attack = {"id": "", "name": "", "tactics": []}
+    empty_disarm = {"id": "", "name": "", "tactic": ""}
+    empty_d3fend = {"id": "", "name": ""}
+    empty_atlas = {"id": "", "name": ""}
+    empty_f3 = {"id": "", "name": "", "tactics": [], "isAttack": False}
+    framework_entries: dict[str, dict[str, Any]] = {
+        "attack": {
+            "attack": {
+                "id": technique.get("id", ""),
+                "name": technique.get("name", ""),
+                "tactics": technique.get("tactics", []),
+            },
+            "disarm": empty_disarm,
+            "d3fend": empty_d3fend,
+            "atlas": empty_atlas,
+            "f3": f3_overlap or empty_f3,
+        },
+        "disarm": {
+            "attack": empty_attack,
+            "disarm": {
+                "id": technique.get("id", ""),
+                "name": technique.get("name", ""),
+                "tactic": technique.get("tactic", ""),
+            },
+            "d3fend": empty_d3fend,
+            "atlas": empty_atlas,
+            "f3": empty_f3,
+        },
+        "atlas": {
+            "attack": empty_attack,
+            "disarm": empty_disarm,
+            "d3fend": empty_d3fend,
+            "atlas": {"id": technique.get("id", ""), "name": technique.get("name", "")},
+            "f3": empty_f3,
+        },
+        "f3": {
+            "attack": (
+                {
+                    "id": technique.get("id", ""),
+                    "name": technique.get("name", ""),
+                    "tactics": technique.get("tactics", []),
+                }
+                if technique.get("isAttack")
+                else empty_attack
+            ),
+            "disarm": empty_disarm,
+            "d3fend": empty_d3fend,
+            "atlas": empty_atlas,
+            "f3": {
+                "id": technique.get("id", ""),
+                "name": technique.get("name", ""),
+                "tactics": technique.get("tactics", []),
+                "isAttack": bool(technique.get("isAttack")),
+            },
+        },
+    }
+    framework_labels = {
+        "attack": "MITRE ATT&CK",
+        "disarm": "DISARM",
+        "atlas": "MITRE ATLAS",
+        "f3": "MITRE F3",
+    }
+    framework_label = framework_labels[framework]
+    technique_id = str(technique.get("id") or "")
+    technique_name = str(technique.get("name") or technique_id)
+    return {
+        "id": f"CDE-SCN-{index:04d}",
+        "status": "preventive_template",
+        "sector": "all",
+        "title_es": f"{framework_label}: {technique_id} {technique_name}".strip(),
+        "title_en": f"{framework_label}: {technique_id} {technique_name}".strip(),
+        "frameworks": framework_entries[framework],
+        "scores": {
+            "likelihood": 0.0,
+            "impact": 0.0,
+            "inherent_risk": 0.0,
+            "control_effectiveness": 0.0,
+            "residual_risk": 0.0,
+            "geographic_relevance": 0.0,
+        },
+        "math": {
+            "z": 0.0,
+            "formula": "not_calculated_until_current_run_evidence_is_validated",
+            "variables": {},
+        },
+        "recommendation_es": (
+            f"Si evidencia directa o validada de la corrida activa {framework_label} {technique_id}, "
+            "contrastar el comportamiento con el activo afectado y con los controles de referencia "
+            "mapeados antes de decidir tratamiento."
+        ),
+        "recommendation_en": (
+            f"If direct or validated current-run evidence activates {framework_label} {technique_id}, "
+            "compare the behavior with the affected asset and mapped reference controls before "
+            "deciding treatment."
+        ),
+        "strategic_question_es": (
+            "¿La evidencia de la corrida satisface el criterio explícito del marco y mantiene relación "
+            "directa con el dominio, activo o entidad del alcance?"
+        ),
+        "strategic_question_en": (
+            "Does current-run evidence satisfy the framework's explicit criterion and retain a direct "
+            "relationship to the in-scope domain, asset or entity?"
+        ),
+    }
+
+
 def build_scenarios() -> dict[str, Any]:
     disarm = load_disarm()
     attack = load_attack()
     d3fend = load_simple_json(FRAMEWORK_DIR / "mitre_d3fend_minimal.json")
     atlas = load_simple_json(FRAMEWORK_DIR / "mitre_atlas_minimal.json")
-    sectors = ["financial", "government", "energy", "healthcare", "telecom", "retail", "education", "transport", "technology", "media"]
+    f3 = load_f3()
     usable_disarm = [item for item in disarm["techniques"] if item["usable"]] or disarm["techniques"]
-    attack = attack[:90]
-    usable_disarm = usable_disarm[:70]
-
-    records = []
+    records: list[dict[str, Any]] = []
     index = 1
-    for sector in sectors:
-        for atk in attack:
-            for dis in usable_disarm:
-                d3 = d3fend[(index - 1) % len(d3fend)]
-                atl = atlas[(index - 1) % len(atlas)]
-                records.append(scenario_record(index, atk, dis, d3, atl, sector))
-                index += 1
-                if len(records) >= 1500:
-                    payload = scenario_payload(records)
-                    write_scenarios(payload)
-                    return payload
-    payload = scenario_payload(records)
+    f3_by_attack_id = {
+        item["id"]: item
+        for item in f3
+        if item.get("isAttack") and str(item.get("id", "")).startswith("T")
+    }
+    for framework, techniques in (
+        ("attack", attack),
+        ("disarm", usable_disarm),
+        ("atlas", atlas),
+        ("f3", f3),
+    ):
+        for technique in techniques:
+            overlap = f3_by_attack_id.get(str(technique.get("id") or "")) if framework == "attack" else None
+            records.append(framework_scenario_record(index, framework, technique, overlap))
+            index += 1
+    payload = scenario_payload(
+        records,
+        catalog_counts={
+            "MITRE ATT&CK": len(attack),
+            "DISARM": len(usable_disarm),
+            "MITRE ATLAS": len(atlas),
+            "MITRE F3": len(f3),
+            "MITRE D3FEND controls": len(d3fend),
+        },
+    )
     write_scenarios(payload)
     return payload
 
 
-def scenario_payload(records: list[dict[str, Any]]) -> dict[str, Any]:
+def scenario_payload(
+    records: list[dict[str, Any]],
+    catalog_counts: dict[str, int] | None = None,
+) -> dict[str, Any]:
     return {
         "generated_by": "CyberDecisionEngine",
-        "version": "2026.07.evidence-gated-attack-d3fend-atlas-disarm",
+        "version": "2026.07.evidence-gated-framework-derived-v2",
         "scenario_count": len(records),
+        "catalog_counts": catalog_counts or {},
         "sources": [
             "MITRE ATT&CK Enterprise STIX",
             "MITRE D3FEND minimal local mapping",
             "MITRE ATLAS minimal local mapping",
             "DISARM Foundation DISARM 2.0 Observations Framework",
+            "MITRE Fight Fraud Framework (F3) v1.1",
         ],
         "math_model": {
-            "es": "La biblioteca contiene plantillas preventivas sin probabilidad ni riesgo precalculado. La corrida solo prioriza una plantilla cuando evidencia directa, validada o confirmada satisface criterios explícitos ATT&CK, ATLAS o DISARM.",
-            "en": "The library contains preventive templates without precomputed probability or risk. A run only prioritizes a template when direct, validated or confirmed evidence satisfies explicit ATT&CK, ATLAS or DISARM criteria.",
+            "es": "La biblioteca deriva una plantilla por técnica o conducta publicada en ATT&CK, ATLAS, DISARM y F3, sin combinaciones aleatorias ni riesgo precalculado. D3FEND y los marcos de gobierno se cruzan como controles de referencia. La corrida solo activa una plantilla cuando evidencia directa, validada o confirmada satisface el criterio explícito.",
+            "en": "The library derives one template per published ATT&CK, ATLAS, DISARM and F3 technique or behavior, without random combinations or precomputed risk. D3FEND and governance frameworks are cross-referenced as control references. A run activates a template only when direct, validated or confirmed evidence satisfies the explicit criterion.",
             "formula": "scenario_support = assured_current_run_evidence_only",
         },
         "scenarios": records,

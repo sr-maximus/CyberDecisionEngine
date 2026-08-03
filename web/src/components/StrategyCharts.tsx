@@ -16,9 +16,18 @@ const strategyCopy = {
     noActiveRisk: "Sin riesgo activo",
     runToPopulate: "Ejecuta un análisis para poblar el modelo de riesgo.",
     noPrediction: "No se puede calcular presión hasta que la corrida tenga evidencia directa o validada.",
-    predictiveModel: "Presión de señales",
+    predictiveModel: "Índice prospectivo de presión",
     noLeading: "Sin escenario líder disponible",
     confidence: "Confianza de evidencia",
+    attackProbability: "Probabilidad de ataque",
+    notCalibrated: "N/D · modelo no calibrado",
+    trend: "Tendencia",
+    rising: "En aumento",
+    stable: "Estable",
+    falling: "En descenso",
+    insufficient_evidence: "Evidencia insuficiente",
+    horizon: "Horizonte",
+    scenarioSupport: "Respaldo",
     signals: "señales",
     posture: "Índice de postura externa",
     postureEmpty: "Sin controles externos evaluados en esta corrida.",
@@ -61,9 +70,18 @@ const strategyCopy = {
     noActiveRisk: "No active risk",
     runToPopulate: "Run analysis to populate the risk model.",
     noPrediction: "Pressure cannot be calculated until the run has direct or validated evidence.",
-    predictiveModel: "Signal pressure",
+    predictiveModel: "Prospective pressure index",
     noLeading: "No leading scenario available",
     confidence: "Evidence confidence",
+    attackProbability: "Attack probability",
+    notCalibrated: "N/A · model not calibrated",
+    trend: "Trend",
+    rising: "Rising",
+    stable: "Stable",
+    falling: "Falling",
+    insufficient_evidence: "Insufficient evidence",
+    horizon: "Horizon",
+    scenarioSupport: "Support",
     signals: "signals",
     posture: "External posture index",
     postureEmpty: "No external controls were assessed in this run.",
@@ -480,34 +498,48 @@ export function RiskRadarChart({ rows, language = "en" }: { rows: RiskHeatRow[];
 
 export function AttackPredictionPanel({ prediction, language = "en" }: { prediction: AttackPredictionModel; language?: LanguageMode }) {
   const copy = strategyCopy[language];
-  if (!prediction.scenarios.length) {
+  if (prediction.status === "insufficient_evidence") {
     return <div className="chart-empty">{copy.noPrediction}</div>;
   }
   const leading = prediction.leadingScenario;
   const horizons = [
     { label: "7d", value: prediction.pressure7d },
     { label: "14d", value: prediction.pressure14d },
-    { label: "30d", value: prediction.pressure30d }
+    { label: "30d", value: prediction.pressure30d },
+    { label: "90d", value: prediction.pressure90d }
   ];
+  const trendLabel = copy[prediction.trendDirection];
   return (
     <div className="prediction-panel">
       <div className="prediction-hero">
-        <BrainCircuit size={24} />
-        <span>{copy.predictiveModel}</span>
-        <strong>{Math.round(prediction.pressure30d * 100)}/100</strong>
-        <p>{leading ? `${localizeAnalyticText(leading.modality, language)} ${copy.via} ${localizeAnalyticText(leading.technique, language)}` : copy.noLeading}</p>
+        <div className="prediction-hero-heading">
+          <BrainCircuit size={24} />
+          <span>{copy.predictiveModel}</span>
+        </div>
+        <strong>{Math.round(prediction.pressure30d * 100)}<small>/100 · 30d</small></strong>
+        <p>{leading ? localizeAnalyticText(leading.modality, language) : copy.noLeading}</p>
+        <div className={`prediction-trend ${prediction.trendDirection}`}>
+          <Activity size={15} />
+          <span>{copy.trend}</span>
+          <b>{trendLabel}</b>
+          {prediction.trendChangeRatio !== null ? (
+            <em>{prediction.trendChangeRatio > 0 ? "+" : ""}{Math.round(prediction.trendChangeRatio * 100)}%</em>
+          ) : null}
+        </div>
       </div>
-      <div className="prediction-horizons">
+      <div className="prediction-probability-note">
+        <span>{copy.attackProbability}</span>
+        <strong>{prediction.probabilityValue === null ? copy.notCalibrated : `${Math.round(prediction.probabilityValue * 100)}%`}</strong>
+        <small>{copy.confidence}: {Math.round(prediction.evidenceConfidence)}% · {prediction.modelVersion}</small>
+      </div>
+      <div className="prediction-horizons" aria-label={copy.horizon}>
         {horizons.map((item) => (
           <div key={item.label}>
             <span>{item.label}</span>
             <strong>{Math.round(item.value * 100)}/100</strong>
+            <i><b style={{ width: `${Math.max(2, Math.round(item.value * 100))}%` }} /></i>
           </div>
         ))}
-        <div>
-          <span>{copy.confidence}</span>
-          <strong>{prediction.evidenceConfidence}%</strong>
-        </div>
       </div>
       <div className="prediction-drivers">
         {prediction.drivers.map((driver) => (
@@ -522,14 +554,14 @@ export function AttackPredictionPanel({ prediction, language = "en" }: { predict
       </div>
       <div className="prediction-scenarios">
         {prediction.scenarios.map((scenario) => (
-          <article key={`${scenario.modality}-${scenario.technique}`}>
+          <article key={scenario.id || `${scenario.modality}-${scenario.technique}`}>
             <div>
               <Activity size={15} />
               <strong>{localizeAnalyticText(scenario.modality, language)}</strong>
-              <span>{Math.round(scenario.supportScore * 100)}/100</span>
+              <span>{copy.scenarioSupport}: {Math.round(scenario.supportScore * 100)}/100</span>
             </div>
-            <p>{localizeAnalyticText(scenario.technique, language)} | {localizeAnalyticText(scenario.group, language)} | {localizeAnalyticText(scenario.sector, language)}</p>
-            <em>{scenario.evidenceCount} {copy.signals}. {localizeAnalyticText(scenario.decision, language)}</em>
+            <p>{scenario.technique !== "N/D" ? localizeAnalyticText(scenario.technique, language) : localizeAnalyticText(scenario.status || "", language)}</p>
+            <em>{scenario.evidenceCount} {copy.signals} · {scenario.sourceCount ?? 0} fuentes. {localizeAnalyticText(scenario.decision, language)}</em>
           </article>
         ))}
       </div>

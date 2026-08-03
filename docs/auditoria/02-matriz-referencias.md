@@ -1,12 +1,13 @@
 # Matriz de referencias y frameworks
 
-**Corte de verificación:** 2026-07-19. Las versiones dinámicas se verificaron contra fuentes oficiales cuando fue posible. Los análisis históricos conservan la versión registrada en su snapshot.
+**Corte de verificación:** 2026-07-26. Las versiones dinámicas se verificaron contra fuentes oficiales cuando fue posible. Los análisis históricos conservan la versión registrada en su snapshot.
 
 | Referencia | Versión | Módulo | Uso real | Evidencia en código/datos | Necesaria | Decisión | Justificación |
 |---|---|---|---|---|---|---|---|
 | MITRE ATT&CK Enterprise | 19.1 | escenarios, mapping, dashboard, informe | clasificación de técnicas y actores; no prueba observación por sí sola | `mitre_mapping.py`, STIX local | sí | conservar actualizada | versión oficial vigente 2026-04-28 |
 | MITRE D3FEND | ontología 1.4.0 | mapping defensivo | relación de técnicas defensivas; no mide eficacia de control | `mitre_mapping.py`, JSON oficial | sí | conservar actualizada | versión oficial 2026-03-31 |
 | MITRE ATLAS | datos 5.6.0 | riesgo de IA | clasificación solo ante señales explícitas de IA | `build_atlas_profile` | condicional | conservar | evita mapear ATLAS por palabras ambiguas |
+| MITRE Fight Fraud Framework (F3) | 1.1 | marca y fraude, escenarios, mapping, dashboard e informes | clasifica conductas antifraude mediante técnicas y tácticas oficiales solo sobre registros asegurados y reglas explícitas | `f3.py`, `f3_mapping.py`, JSON oficial local | sí | incorporar y versionar | complementa ATT&CK para fraude; un mapeo compatible no confirma fraude ni incidente |
 | DISARM | catálogo sincronizado | desinformación | taxonomía de tácticas/técnicas sobre registros compatibles | `disinformation.py` | sí | conservar y versionar | complementa ATT&CK; no es score de riesgo |
 | NIST CSF | 2.0 / CSWP 29 | control mapping, gobierno | resultados de cobertura de mapeo | configuración e informe | sí | conservar | lenguaje ejecutivo y de gobierno |
 | NIST SP 800-30 | Rev. 1 | metodología de riesgo | referencia conceptual de probabilidad, impacto y riesgo | `REFERENCES`, docs de cálculo | sí | conservar | no se presenta como certificación |
@@ -45,6 +46,7 @@
 ## Reglas de presentación
 
 - ATT&CK observado exige telemetría de comportamiento, activo, timestamp y evidencia.
+- F3 mapeado describe compatibilidad conductual sobre evidencia asegurada; no equivale a fraude confirmado ni genera porcentajes de pérdida.
 - Un mapeo de control indica cobertura de mapeo, no cumplimiento ni madurez.
 - CVE + CVSS no demuestra aplicabilidad sin producto y versión confirmados.
 - EPSS es un dato externo calibrado para CVE, no una probabilidad de ataque organizacional.
@@ -55,5 +57,6 @@
 - MITRE ATT&CK Version History: https://attack.mitre.org/resources/versions/
 - MITRE D3FEND Version Information: https://d3fend.mitre.org/version/
 - MITRE ATLAS data releases: https://github.com/mitre-atlas/atlas-data/releases
+- MITRE Fight Fraud Framework: https://ctid.mitre.org/fraud
+- MITRE Fight Fraud Framework source: https://github.com/center-for-threat-informed-defense/fight-fraud-framework
 - NIST CSF 2.0: https://www.nist.gov/publications/nist-cybersecurity-framework-csf-20
-

@@ -6,6 +6,7 @@ from cyberdeck.analysis.risk_engine import (
     decay,
     inherent_risk,
     log_norm,
+    monte_carlo_risk,
     normalize,
     poisson_forecast,
     residual_risk,
@@ -32,3 +33,21 @@ def test_core_risk_formulas_are_bounded():
 def test_bayesian_and_poisson_outputs():
     assert bayesian_update(0.2, 3.0) > 0.2
     assert 0 < poisson_forecast(0.02, 30) < 1
+
+
+def test_pcider_likelihood_excludes_controls_from_inherent_score():
+    baseline = contextual_likelihood(
+        0.8, 0.7, 0.9, 0.2, 1, 0.4, 0.8, 0.5, 0.0, 0.0, 0.0
+    )
+    controlled = contextual_likelihood(
+        0.8, 0.7, 0.9, 0.2, 1, 0.4, 0.8, 0.5, 1.0, 1.0, 1.0
+    )
+    assert controlled == baseline
+
+
+def test_pcider_monte_carlo_reports_decision_risk_and_traceability():
+    result = monte_carlo_risk(0.45, 0.70, 0.40, n=250)
+    assert result["iterations"] == 250
+    assert result["model_version"] == "1.0.0"
+    assert result["p10"] <= result["p50"] <= result["p90"]
+    assert result["decision_risk"] == result["residual_mean"]

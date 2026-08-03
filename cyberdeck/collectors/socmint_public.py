@@ -30,7 +30,11 @@ class SocmintPublicCollector(Collector):
         events: List[ThreatEvent] = []
         seen: set[str] = set()
         warnings: List[str] = []
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": "CyberDecisionEngine/1.0 by Edwin Penuela"}) as client:
+        async with httpx.AsyncClient(
+            timeout=20,
+            follow_redirects=True,
+            headers={"User-Agent": "CyberDecisionEngine/1.0 by Edwin Javier Peñuela Camacho"},
+        ) as client:
             for query in self.keywords[: self.max_queries]:
                 if len(events) >= self.max_records:
                     break

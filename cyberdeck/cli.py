@@ -9,7 +9,7 @@ import time
 import webbrowser
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -17,12 +17,20 @@ from rich.table import Table
 
 from cyberdeck.analysis.control_theory import prioritize_actions
 from cyberdeck.analysis.cyber_radar import build_cyber_risk_radar
-from cyberdeck.analysis.forecasting import build_forecast
+from cyberdeck.analysis.f3_mapping import build_f3_profile, enrich_f3_mappings
+from cyberdeck.analysis.framework_evidence import build_framework_evidence_mapping
+from cyberdeck.analysis.geographic_intelligence import build_geographic_intelligence
 from cyberdeck.analysis.fraud import FRAUD_REFERENCE_NOTES, build_fraud_findings, fraud_pressure_index
 from cyberdeck.analysis.game_theory import minimax_recommendations
+from cyberdeck.analysis.layered_scenario_risk import calculate_layered_scenario_risk
 from cyberdeck.analysis.mitre_mapping import build_atlas_profile, build_d3fend_profile, build_mitre_profile
 from cyberdeck.analysis.narratives import build_narrative_intelligence
+from cyberdeck.analysis.public_entities import build_public_entity_intelligence
+from cyberdeck.analysis.pivot_intelligence import build_pivot_intelligence
+from cyberdeck.analysis.prospective_risk import build_prospective_attack_risk
+from cyberdeck.analysis.sector_intelligence import build_sector_intelligence
 from cyberdeck.analysis.strategic_news import build_strategic_intelligence
+from cyberdeck.analysis.threat_news import build_threat_news
 from cyberdeck.analysis.risk_engine import business_impact, contextual_likelihood, control_effectiveness, inherent_risk, matrix_4x4, monte_carlo_risk, residual_risk, threat_activity_score
 from cyberdeck.analysis.source_intel import build_actor_profile, build_pattern_profile, build_source_coverage
 from cyberdeck.analysis.strategy import build_strategic_action_plan
@@ -36,6 +44,7 @@ from cyberdeck.collectors.common_crawl import CommonCrawlCollector
 from cyberdeck.collectors.darkweb_authorized import DarkwebAuthorizedCollector
 from cyberdeck.collectors.evidence_explorer import EvidenceExplorerCollector
 from cyberdeck.collectors.epss import EpssCollector
+from cyberdeck.collectors.exploit_db import ExploitDbCollector
 from cyberdeck.collectors.fraud_intelligence import FraudIntelligenceCollector
 from cyberdeck.collectors.github_advisories import GithubAdvisoriesCollector
 from cyberdeck.collectors.kali_surface import KaliSurfaceCollector
@@ -55,6 +64,7 @@ from cyberdeck.collectors.web_search import WebSearchCollector
 from cyberdeck.enrichment.cve_enricher import cves_from_events
 from cyberdeck.enrichment.evidence_pipeline import process_evidence_records
 from cyberdeck.enrichment.normalizer import normalize_events
+from cyberdeck.enrichment.unstructured_artifacts import enrich_unstructured_artifacts
 from cyberdeck.frameworks.sync import sync_frameworks
 from cyberdeck.knowledge import create_knowledge_backend, knowledge_records_from_bundle
 from cyberdeck.logging import console, fail, ok, warn
@@ -280,7 +290,13 @@ async def run_pipeline(
             if real_only:
                 context.raw_events = [event for event in context.raw_events if not event.demo]
             context.raw_events = [event for event in context.raw_events if _event_within_window(event, lookback_days, lookback_hours)]
-        context.processing_summary = dict(processed.summary)
+        artifact_summary = enrich_unstructured_artifacts(context.raw_events)
+        f3_summary = enrich_f3_mappings(context.raw_events)
+        context.processing_summary = {
+            **dict(processed.summary),
+            "artifact_extraction": artifact_summary,
+            "mitre_f3_mapping": f3_summary,
+        }
         stored = store_events(context.raw_events, app_config.get("cache_db", "data/cyberdeck.sqlite"))
         context.source_statuses.append(SourceStatus(name="Cache local de evidencias", status="ok", records=stored, mode="cache"))
 
@@ -470,9 +486,20 @@ async def _collect_primary_sources(source_config: Dict[str, object], org_data: D
 async def _collect_vulnerability_enrichment(source_config: Dict[str, object], cves: List[str]):
     epss_config = source_config.get("epss", {})
     nvd_config = source_config.get("nvd", {})
+    exploit_db_config = source_config.get("exploit_db", {})
+    kali_surface_config = source_config.get("kali_surface", {})
     collectors = [
         EpssCollector(epss_config.get("api", "https://api.first.org/data/v1/epss"), cves),
         NvdCollector(nvd_config.get("api", "https://services.nvd.nist.gov/rest/json/cves/2.0"), cves, nvd_config.get("env_key", "NVD_API_KEY")),
+        ExploitDbCollector(
+            cves,
+            endpoint=exploit_db_config.get("endpoint")
+            or kali_surface_config.get("endpoint")
+            or os.getenv("KALI_SURFACE_URL", "http://kali-surface:7010"),
+            enabled=bool(exploit_db_config.get("enabled", True)),
+            max_records=int(exploit_db_config.get("max_records", 40)),
+            timeout_seconds=float(exploit_db_config.get("timeout_seconds", 45)),
+        ),
     ]
     return await asyncio.gather(*(_collect_safely(collector) for collector in collectors))
 
@@ -492,20 +519,8 @@ async def _collect_evidence_validation(source_config: Dict[str, object], events:
 
 
 async def _collect_safely(collector: Collector) -> CollectionResult:
-    timeout_seconds = _collector_timeout_budget(collector)
     try:
-        return await asyncio.wait_for(collector.collect(), timeout=timeout_seconds)
-    except asyncio.TimeoutError:
-        return CollectionResult(
-            SourceStatus(
-                name=getattr(collector, "name", collector.__class__.__name__),
-                status="timeout",
-                records=0,
-                mode="real",
-                warning=f"Collector exceeded {int(timeout_seconds)} seconds and was skipped to keep the report generation flow available.",
-            ),
-            [],
-        )
+        return await collector.collect()
     except Exception as exc:  # pragma: no cover - runtime/network defensive guard
         return CollectionResult(
             SourceStatus(
@@ -517,29 +532,6 @@ async def _collect_safely(collector: Collector) -> CollectionResult:
             ),
             [],
         )
-
-
-def _collector_timeout_budget(collector: Collector) -> float:
-    raw_timeout: Any = getattr(collector, "timeout_seconds", None)
-    try:
-        configured = float(raw_timeout) if raw_timeout is not None else 45.0
-    except (TypeError, ValueError):
-        configured = 45.0
-    name = getattr(collector, "name", collector.__class__.__name__).lower()
-    if "spiderfoot" in name or "inventario pasivo" in name:
-        domain_count = len(getattr(collector, "domains", []) or [])
-        waves = max(1, (domain_count + 1) // 2)
-        return min(max(configured * waves + 25.0, 75.0), float(os.getenv("CDE_SPIDERFOOT_COLLECTOR_TIMEOUT_SECONDS", "1800")))
-    if "kali" in name or "superficie externa" in name:
-        return min(max(configured + 18.0, 45.0), float(os.getenv("CDE_KALI_COLLECTOR_TIMEOUT_SECONDS", "360")))
-    if "internet search" in name or "busqueda publica" in name:
-        collection_budget = float(getattr(collector, "collection_timeout_seconds", 120.0) or 120.0)
-        return min(collection_budget + 25.0, float(os.getenv("CDE_WEB_SEARCH_COLLECTOR_TIMEOUT_SECONDS", "1200")))
-    if "osint tools" in name or "correlacion osint" in name:
-        return min(max(configured + 20.0, 45.0), float(os.getenv("CDE_OSINT_TOOLS_COLLECTOR_TIMEOUT_SECONDS", "600")))
-    if "evidencia web" in name or "evidence" in name:
-        return min(max(configured * 16 + 20.0, 45.0), float(os.getenv("CDE_EVIDENCE_EXPLORER_TIMEOUT_SECONDS", "360")))
-    return min(max(configured + 10.0, 20.0), float(os.getenv("CDE_DEFAULT_COLLECTOR_TIMEOUT_SECONDS", "60")))
 
 
 def _scope_terms(org: OrganizationProfile) -> List[str]:
@@ -683,9 +675,8 @@ def _build_general_findings(events: List[ThreatEvent], org: OrganizationProfile)
             T=event_activity,
             S=sector_targeting,
             G=0.0,
-            C=control.get("iso27001_score", 0.0),
-            D=control.get("attack_detection_coverage", 0.0),
-            R=control.get("incident_response_maturity", 0.0),
+            data_sufficiency=confidence_input,
+            base_rate=0.10,
         )
         impact = _impact_for_event(event)
         inherent = inherent_risk(likelihood, impact)
@@ -713,6 +704,7 @@ def _build_general_findings(events: List[ThreatEvent], org: OrganizationProfile)
                 likelihood_inputs={
                     "activity": round(activity_input, 4),
                     "evidence_confidence": round(confidence_input, 4),
+                    "data_sufficiency": round(confidence_input, 4),
                     "exposure": round(exposure_input, 4),
                     "vulnerability_applicability": round(vulnerability_input, 4),
                     "epss": round(epss_input, 4),
@@ -792,7 +784,11 @@ def _owner_for_event(event: ThreatEvent) -> str:
 
 
 def _build_metrics(events: List[ThreatEvent], findings: List[RiskFinding], org: OrganizationProfile, statuses: List[SourceStatus]) -> Dict[str, object]:
-    analysis_events = _scope_relevant_events(events, org)
+    analysis_events = [
+        event
+        for event in _scope_relevant_events(events, org)
+        if event.evidence_status not in {EvidenceStatus.FALSE_POSITIVE, EvidenceStatus.DISCARDED}
+    ]
     assured_events = [
         event
         for event in analysis_events
@@ -836,15 +832,14 @@ def _build_metrics(events: List[ThreatEvent], findings: List[RiskFinding], org: 
         else 0.0
     )
     monte_carlo = monte_carlo_risk(avg_likelihood, avg_impact, avg_ce, n=2000)
-    declared_sector = (org.sector or "").strip().lower()
-    sector_targeting_observed = any(
-        "sector_targeting" in {tag.lower() for tag in event.tags}
-        or "sector_campaign" in {tag.lower() for tag in event.tags}
-        or (declared_sector and f"sector:{declared_sector}" in {tag.lower() for tag in event.tags})
-        for event in assured_events
-    )
-    darkweb_signal = min(1.0, sum(1 for event in assured_events if event.category.startswith("darkweb") or "darkweb" in event.tags) / 10)
     strategic_news = build_strategic_intelligence(analysis_events, org)
+    prospective_attack_risk = build_prospective_attack_risk(
+        assured_events,
+        findings,
+        sector=org.sector,
+        controls=org.control_maturity,
+        source_coverage=source_coverage,
+    )
     return {
         "posture_index": round(external_posture, 2),
         "external_cyber_intelligence_posture_index": round(external_posture, 2),
@@ -864,30 +859,39 @@ def _build_metrics(events: List[ThreatEvent], findings: List[RiskFinding], org: 
         "mitre": build_mitre_profile(analysis_events),
         "d3fend": build_d3fend_profile(analysis_events),
         "atlas": build_atlas_profile(analysis_events),
+        "f3": build_f3_profile(analysis_events),
         "source_coverage": source_coverage,
         "vulnerability_intelligence": build_vulnerability_intelligence(analysis_events, findings),
+        "layered_scenario_risk": calculate_layered_scenario_risk(org.scenario_risk_inputs),
         "risk_heat_radar": build_cyber_risk_radar(analysis_events, findings),
         "strategy": build_strategic_action_plan(findings, analysis_events, org, source_coverage),
         "strategic_news": strategic_news,
+        "threat_news": build_threat_news(analysis_events),
+        "framework_mapping": build_framework_evidence_mapping(analysis_events, findings, org),
+        "geographic_intelligence": build_geographic_intelligence(analysis_events, org),
+        "sector_intelligence": build_sector_intelligence(analysis_events, org),
+        "public_entity_intelligence": build_public_entity_intelligence(analysis_events, org),
+        "pivot_intelligence": build_pivot_intelligence(analysis_events),
         "pestel": strategic_news["pestel"],
         "porter": strategic_news["porter"],
         "narrative_intelligence": build_narrative_intelligence(analysis_events, org),
-        "forecast": build_forecast(
-            kev_signal=1.0 if any(event.vulnerability_status in {"cve_applicable", "kev_exposed", "exploitation_observed"} for event in assured_events) else 0.0,
-            sector_signal=0.2 if sector_targeting_observed else 0.0,
-            socmint_signal=fraud_pressure,
-            darkweb_signal=darkweb_signal,
-        ),
+        "prospective_attack_risk": prospective_attack_risk,
+        "forecast": prospective_attack_risk["horizons"],
         "monte_carlo": monte_carlo,
         "risk_methodology": {
             "purpose": "La estructura de riesgo convierte evidencia trazable en una estimacion contextual de plausibilidad, impacto de negocio, riesgo inherente, riesgo residual y matriz 4x4; no confirma incidentes.",
-            "likelihood": "L es una estimacion contextual acotada. Solo usa CVE/KEV como aplicables cuando activo, producto y version han sido confirmados; los controles no declarados no se presumen.",
+            "likelihood": "L es una estimacion contextual acotada de P-CIDER v1.0. Solo usa CVE/KEV como aplicables cuando activo, producto y version han sido confirmados. Los controles se excluyen de la plausibilidad inherente.",
             "impact": "I pondera impacto financiero, operacional, confidencialidad, integridad, disponibilidad, legal y reputacional.",
-            "control_effectiveness": "CE combina ISO, NIST, SOC2, D3FEND, cobertura ATT&CK y respuesta a incidentes, con tope de reduccion de 0.85 para evitar riesgo cero.",
+            "control_effectiveness": "CE agrega controles declarados con la formula P-CIDER de fallo residual y se aplica una sola vez al riesgo residual, con tope de reduccion de 0.85 para evitar riesgo cero.",
             "matrix": "La matriz 4x4 usa ceil(4*L) y ceil(4*I). 1-3 Bajo, 4-7 Medio, 8-11 Alto, 12-16 Critico.",
-            "monte_carlo": f"P10={monte_carlo['p10']}, P50={monte_carlo['p50']}, P90={monte_carlo['p90']}",
+            "monte_carlo": f"P10={monte_carlo['p10']}, P50={monte_carlo['p50']}, P90={monte_carlo['p90']}; riesgo decision={monte_carlo['decision_risk']}",
             "pestel_porter": "PESTEL y Porter son lentes contextuales sustentadas por evidencia explícita. Sus índices expresan soporte relativo de señales, no riesgo, probabilidad, cumplimiento ni madurez.",
             "chaos_sensitivity": "K=|R(x+epsilon)-R(x)|/(epsilon+1e-6). K alto indica que pequenos cambios de evidencia o controles pueden cambiar prioridad.",
+            "prospective_pressure": (
+                "El índice prospectivo combina únicamente evidencia directa o validada, recencia, vulnerabilidades "
+                "aplicables, exposición, SOCMINT, dark web y comportamiento adversario. No publica probabilidad hasta "
+                "disponer de resultados históricos etiquetados y calibración verificable."
+            ),
         },
         "system_model": build_systemic_model(org.crown_jewels, org.technologies),
         "game_theory": minimax_recommendations(expected_loss=max((f.residual_risk for f in findings), default=20), control_cost=8.0),

@@ -11,9 +11,9 @@ import {
   LogOut,
   MessageSquareWarning,
   Moon,
+  Network,
   PanelLeftClose,
   PanelLeftOpen,
-  RadioTower,
   ScanSearch,
   SearchCode,
   Settings2,
@@ -51,13 +51,13 @@ const nav: Array<{ key: ViewKey; group: "strategy" | "intel" | "ops"; label: Rec
   { key: "overview", group: "strategy", label: { es: "Visión general", en: "Overview" }, icon: Gauge, roles: allRoles },
   { key: "dashboards", group: "strategy", label: { es: "Tablero estratégico", en: "Strategic Dashboard" }, icon: ChartNoAxesCombined, roles: allRoles },
   { key: "scenarios", group: "strategy", label: { es: "Escenarios de decisión", en: "Decision Scenarios" }, icon: Waypoints, roles: executiveRoles },
-  { key: "ai", group: "strategy", label: { es: "IA estratégica", en: "Strategic AI" }, icon: BrainCircuit, roles: executiveRoles },
+  { key: "ai", group: "strategy", label: { es: "Asistente estratégico", en: "Strategic Assistant" }, icon: BrainCircuit, roles: executiveRoles },
   { key: "attackSurface", group: "strategy", label: { es: "Superficie de ataque", en: "Attack Surface" }, icon: ScanSearch, roles: executiveRoles },
   { key: "brand", group: "strategy", label: { es: "Marca y Fraude", en: "Brand & Fraud" }, icon: Fingerprint, roles: executiveRoles },
   { key: "employeeRisk", group: "intel", label: { es: "Riesgo Empleados", en: "Employee Risk" }, icon: UserRoundSearch, roles: analystRoles },
   { key: "disinformation", group: "intel", label: { es: "Desinformación", en: "Disinformation" }, icon: MessageSquareWarning, roles: executiveRoles },
-  { key: "osint", group: "intel", label: { es: "OSINT", en: "OSINT" }, icon: SearchCode, roles: analystRoles },
-  { key: "socmint", group: "intel", label: { es: "SOCMINT", en: "SOCMINT" }, icon: RadioTower, roles: analystRoles },
+  { key: "osint", group: "intel", label: { es: "OSINT y SOCMINT", en: "OSINT & SOCMINT" }, icon: SearchCode, roles: analystRoles },
+  { key: "relationshipGraph", group: "intel", label: { es: "Grafo de relaciones", en: "Relationship Graph" }, icon: Network, roles: analystRoles },
   { key: "darkweb", group: "intel", label: { es: "Dark Web", en: "Dark Web" }, icon: GlobeLock, roles: analystRoles },
   { key: "frameworks", group: "intel", label: { es: "Mapeo de Frameworks", en: "Framework Mapping" }, icon: GitBranch, roles: executiveRoles },
   { key: "runs", group: "ops", label: { es: "Historial", en: "Runs" }, icon: DatabaseZap, roles: analystRoles },
@@ -90,6 +90,9 @@ export function AppShell({
     if (!item.roles.includes(currentUser.role)) return false;
     if (currentUser.role === "super_admin") return true;
     if (!currentUser.licenseModules?.length) return true;
+    if (item.key === "osint") {
+      return currentUser.licenseModules.includes("osint") || currentUser.licenseModules.includes("socmint");
+    }
     return currentUser.licenseModules.includes(item.key);
   });
   const shellCopy = {
@@ -149,7 +152,7 @@ export function AppShell({
                 <span>{group.label[language]}</span>
                 {items.map((item) => (
                   <button
-                    className={activeView === item.key ? "nav-item active" : "nav-item"}
+                    className={activeView === item.key || (item.key === "osint" && activeView === "socmint") ? "nav-item active" : "nav-item"}
                     key={item.key}
                     onClick={() => onViewChange(item.key)}
                     title={item.label[language]}

@@ -43,12 +43,12 @@ const content = {
       {
         icon: BrainCircuit,
         title: "Escenarios de decisión",
-        body: "Cruza evidencia de dominios con ATT&CK, D3FEND, ATLAS y DISARM para mostrar posibilidades accionables por dominio y grupo, sin afirmar eventos no evidenciados."
+        body: "Cruza evidencia de dominios con ATT&CK, D3FEND, ATLAS, DISARM y MITRE F3 para mostrar posibilidades accionables por dominio y grupo, sin afirmar eventos no evidenciados."
       },
       {
         icon: Bot,
-        title: "IA estratégica",
-        body: "Construye un prompt maestro, contexto exacto, payloads multi-IA y propuestas OpenClaw para análisis aumentado. No ejecuta automatizaciones externas hasta que el borrador sea aprobado."
+        title: "Asistente estratégico",
+        body: "Prepara contexto exacto de la corrida y propuestas analíticas controladas. No ejecuta automatizaciones externas hasta que el borrador sea aprobado."
       },
       {
         icon: Crosshair,
@@ -81,6 +81,11 @@ const content = {
         body: "Presenta redes de menciones públicas, nodos, relaciones y comportamiento de tendencia. Si no hay datos, el tablero queda vacío para evitar inventar información."
       },
       {
+        icon: GitBranch,
+        title: "Grafo de relaciones",
+        body: "Procesa la corrida seleccionada como una red trazable de alcance, entidades, fuentes y evidencias. El tamaño muestra centralidad de grado; cada vínculo conserva los registros y URLs que lo sustentan."
+      },
+      {
         icon: LockKeyhole,
         title: "Dark Web",
         body: "Trabaja con indices publicos, importaciones autorizadas y metadatos redacted. No interactua con mercados, no compra datos y no descarga payloads."
@@ -88,7 +93,7 @@ const content = {
       {
         icon: GitBranch,
         title: "Mapeo de Frameworks",
-        body: "Relaciona hallazgos con NIST, ISO 27001, PCI DSS, SOC 2, GDPR, MITRE ATT&CK, D3FEND y ATLAS para explicar controles afectados y decisiones de remediación."
+        body: "Relaciona hallazgos con NIST, ISO 27001, PCI DSS, SOC 2, GDPR, MITRE ATT&CK, D3FEND, ATLAS y Fight Fraud Framework (F3) para explicar controles afectados y decisiones de remediación."
       },
       {
         icon: FileClock,
@@ -125,18 +130,18 @@ const content = {
         focus: "Panel para ver qué escenarios aplican al dominio o grupo analizado y qué posibilidades de decisión se abren.",
         boards: [
           "Lectura por dominio: filtra escenarios por uno, varios o todos los dominios.",
-          "Mapa de frameworks: ATT&CK, D3FEND, ATLAS y DISARM presentes.",
+          "Mapa de frameworks: ATT&CK, D3FEND, ATLAS, F3 y DISARM presentes.",
           "Tarjetas de escenario: evidencia, criterio, pregunta directiva, posibilidad de decisión y dominios relacionados."
         ]
       },
       {
         icon: Bot,
-        title: "IA estratégica",
-        focus: "Prepara análisis aumentado para modelos actuales con contexto controlado, límites de tokens y reglas anti-alucinación.",
+        title: "Asistente estratégico",
+        focus: "Prepara análisis aumentado con contexto controlado, límites explícitos y reglas anti-alucinación.",
         boards: [
-          "Proveedores IA: selecciona OpenAI, Azure OpenAI, Anthropic, Gemini, Mistral, endpoint local compatible u OpenClaw Gateway.",
-          "Presupuesto de tokens: estima entrada/salida para evitar prompts excesivos.",
-          "Prompt maestro y payloads: conserva sistema, usuario, esquema JSON, manifiesto de evidencia y política de automatización antes de aprobar."
+          "Proveedor opcional: permite endpoint compatible u OpenClaw Gateway cuando exista autorización.",
+          "Presupuesto de contexto: estima entrada/salida para evitar paquetes excesivos.",
+          "Paquete de análisis: conserva sistema, usuario, esquema JSON, manifiesto de evidencia y política de automatización antes de aprobar."
         ]
       },
       {
@@ -201,6 +206,17 @@ const content = {
         ]
       },
       {
+        icon: GitBranch,
+        title: "Grafo de análisis y relaciones",
+        focus: "Explora conexiones sustentadas por la evidencia de una sola corrida, sin mezclar históricos ni inferir entidades no observadas.",
+        boards: [
+          "Red completa: alcance, fuentes, evidencias y entidades.",
+          "Vistas especializadas: infraestructura, evidencia, SOCMINT y amenazas/TTP.",
+          "Detalle por nodo: metadatos, centralidad, conexiones directas y URLs de evidencia.",
+          "Tendencia prospectiva: presión heurística por horizonte; no probabilidad calibrada de ataque."
+        ]
+      },
+      {
         icon: LockKeyhole,
         title: "Dark Web",
         focus: "Revisión pasiva y segura de índices, imports autorizados y metadatos redacted.",
@@ -216,7 +232,7 @@ const content = {
         focus: "Traduce hallazgos a controles, aspectos afectados y decisiones de remediación.",
         boards: [
           "NIST, ISO, PCI, SOC 2, GDPR: controles y aspectos a revisar.",
-          "MITRE ATT&CK/D3FEND/ATLAS: ofensiva, defensa y riesgos de IA.",
+          "MITRE ATT&CK/D3FEND/ATLAS/F3: comportamiento adversario, defensa, riesgo de IA y conductas antifraude.",
           "Detalle expandible: evidencia usada, análisis y uso para decisión."
         ]
       },
@@ -289,11 +305,11 @@ const content = {
       },
       {
         title: "MITRE + DISARM",
-        body: "ATT&CK modela comportamiento adversario, D3FEND controles defensivos, ATLAS riesgos de IA y DISARM narrativas/influencia. Los escenarios aparecen solo cuando cruzan con evidencia."
+        body: "ATT&CK modela comportamiento adversario, D3FEND controles defensivos, ATLAS riesgos de IA, F3 conductas antifraude y DISARM narrativas/influencia. Los escenarios aparecen solo cuando cruzan con evidencia explícita de la corrida; un mapeo F3 no confirma fraude."
       },
       {
-        title: "IA aumentada controlada",
-        body: "El análisis IA usa solo el contexto comprimido de la corrida, reglas anti-alucinación, manifiesto de evidencia y aprobación humana antes de cualquier automatización externa. OpenClaw se usa como gateway/asistente de propuestas, no como ejecución libre."
+        title: "Asistencia aumentada controlada",
+        body: "El análisis asistido usa solo el contexto comprimido de la corrida, reglas anti-alucinación, manifiesto de evidencia y aprobación humana antes de cualquier automatización externa. OpenClaw se usa como gateway de propuestas, no como ejecución libre."
       },
       {
         title: "Graph intelligence",
@@ -335,7 +351,7 @@ const content = {
       },
       {
         title: "3. Riesgo contextual",
-        body: "La plausibilidad contextual usa una función logística acotada. Solo combina evidencia sustentada de actividad, exposición, vulnerabilidad aplicable y controles declarados; no es una probabilidad calibrada de ataque."
+        body: "La plausibilidad contextual usa una función logística acotada. Solo combina evidencia sustentada de actividad, exposición y vulnerabilidad aplicable; los controles se aplican después al riesgo residual. No es una probabilidad calibrada de ataque."
       },
       {
         title: "4. Impacto y residual",
@@ -351,19 +367,19 @@ const content = {
       },
       {
         title: "7. Estrategia",
-        body: "PESTEL explica presiones externas; Porter explica fuerzas competitivas; el mapeo de frameworks traduce hallazgos a controles NIST, ISO, PCI, SOC, GDPR, ATT&CK, D3FEND y ATLAS."
+        body: "PESTEL explica presiones externas; Porter explica fuerzas competitivas; el mapeo de frameworks traduce hallazgos a controles NIST, ISO, PCI, SOC, GDPR, ATT&CK, D3FEND, ATLAS y F3."
       },
       {
         title: "8. Escenarios avanzados",
-        body: "La biblioteca de escenarios cruza ATT&CK, D3FEND, ATLAS, DISARM, PESTEL, Porter, riesgo reputacional y continuidad para generar posibilidades preventivas que solo se muestran como presentes cuando se cruzan con evidencia."
+        body: "La biblioteca de escenarios cruza ATT&CK, D3FEND, ATLAS, F3, DISARM, PESTEL, Porter, riesgo reputacional y continuidad para generar posibilidades preventivas que solo se muestran como presentes cuando se cruzan con evidencia."
       },
       {
         title: "9. Licenciamiento y auditoría",
         body: "El super admin administra empresas y licencias; el admin de empresa administra usuarios operativos. Acceso efectivo = rol + módulos del plan de usuario o licencia de empresa + overrides autorizados. Cada cambio crítico genera registro de auditoría para seguridad, soporte y trazabilidad comercial."
       },
       {
-        title: "10. IA estratégica y tokens",
-        body: "El paquete IA usa selección por riesgo y recencia: primero hallazgos de mayor riesgo residual, luego eventos recientes y diversidad de fuente. El presupuesto estimado aproxima tokens = caracteres/4 y corta evidencia de menor prioridad antes de modificar conclusiones. OpenClaw puede recibir el mismo contexto como propuesta de análisis/agenda, sin herramientas ni comandos hasta aprobación."
+        title: "10. Asistente estratégico y presupuesto de contexto",
+        body: "El paquete asistido usa selección por riesgo y recencia: primero hallazgos de mayor riesgo residual, luego eventos recientes y diversidad de fuente. El presupuesto estimado aproxima tokens = caracteres/4 y corta evidencia de menor prioridad antes de modificar conclusiones. OpenClaw puede recibir el mismo contexto como propuesta de análisis/agenda, sin herramientas ni comandos hasta aprobación."
       },
       {
         title: "11. Acceso, MFA y recuperación",
@@ -404,12 +420,12 @@ const content = {
       {
         icon: BrainCircuit,
         title: "Decision Scenarios",
-        body: "Crosses domain evidence with ATT&CK, D3FEND, ATLAS and DISARM to show actionable possibilities by domain and group, without asserting unevidenced events."
+        body: "Crosses domain evidence with ATT&CK, D3FEND, ATLAS, DISARM and MITRE F3 to show actionable possibilities by domain and group, without asserting unevidenced events."
       },
       {
         icon: Bot,
-        title: "Strategic AI",
-        body: "Builds a master prompt, exact context, multi-AI payloads and OpenClaw proposals for augmented analysis. It does not run external automations until the draft is approved."
+        title: "Strategic Assistant",
+        body: "Builds exact run context and controlled analytical proposals. It does not run external automations until the draft is approved."
       },
       {
         icon: Crosshair,
@@ -442,6 +458,11 @@ const content = {
         body: "Shows public mention networks, nodes, relationships and trend behavior. If no data exists, the board remains empty to avoid invented information."
       },
       {
+        icon: GitBranch,
+        title: "Relationship Graph",
+        body: "Processes the selected run as a traceable network of scope, entities, sources and evidence. Node size shows degree centrality; each link retains the records and URLs that support it."
+      },
+      {
         icon: LockKeyhole,
         title: "Dark Web",
         body: "Uses public indexes, authorized imports and redacted metadata. It does not interact with markets, buy data or download payloads."
@@ -449,7 +470,7 @@ const content = {
       {
         icon: GitBranch,
         title: "Framework Mapping",
-        body: "Maps findings to NIST, ISO 27001, PCI DSS, SOC 2, GDPR, MITRE ATT&CK, D3FEND and ATLAS to explain affected controls and remediation decisions."
+        body: "Maps findings to NIST, ISO 27001, PCI DSS, SOC 2, GDPR, MITRE ATT&CK, D3FEND, ATLAS and Fight Fraud Framework (F3) to explain affected controls and remediation decisions."
       },
       {
         icon: FileClock,
@@ -486,18 +507,18 @@ const content = {
         focus: "Shows which scenarios apply to the analyzed domain or group and which decision possibilities open.",
         boards: [
           "Domain reading: filters scenarios by one, many or all domains.",
-          "Framework map: ATT&CK, D3FEND, ATLAS and DISARM presence.",
+          "Framework map: ATT&CK, D3FEND, ATLAS, F3 and DISARM presence.",
           "Scenario cards: evidence, criterion, executive question, decision possibility and related domains."
         ]
       },
       {
         icon: Bot,
-        title: "Strategic AI",
-        focus: "Prepares augmented analysis for current models with controlled context, token limits and anti-hallucination rules.",
+        title: "Strategic Assistant",
+        focus: "Prepares augmented analysis with controlled context, explicit limits and anti-hallucination rules.",
         boards: [
-          "AI providers: select OpenAI, Azure OpenAI, Anthropic, Gemini, Mistral, a local compatible endpoint or OpenClaw Gateway.",
-          "Token budget: estimates input/output to avoid oversized prompts.",
-          "Master prompt and payloads: preserves system, user, JSON schema, evidence manifest and automation policy before approval."
+          "Optional provider: use a compatible endpoint or OpenClaw Gateway when authorized.",
+          "Context budget: estimates input/output to avoid oversized packages.",
+          "Analysis package: preserves system, user, JSON schema, evidence manifest and automation policy before approval."
         ]
       },
       {
@@ -542,6 +563,17 @@ const content = {
         boards: ["Mention network", "Trends", "Related public entities when available"]
       },
       {
+        icon: GitBranch,
+        title: "Relationship Analysis Graph",
+        focus: "Explores evidence-supported connections from one run without mixing history or inferring unobserved entities.",
+        boards: [
+          "Complete network: scope, sources, evidence and entities.",
+          "Focused views: infrastructure, evidence, SOCMINT and threats/TTPs.",
+          "Node detail: metadata, centrality, direct connections and evidence URLs.",
+          "Prospective trend: heuristic signal pressure by horizon, not calibrated attack probability."
+        ]
+      },
+      {
         icon: LockKeyhole,
         title: "Dark Web",
         focus: "Safe passive review of indexes, authorized imports and redacted metadata.",
@@ -551,7 +583,7 @@ const content = {
         icon: GitBranch,
         title: "Framework Mapping",
         focus: "Translates findings into controls, affected aspects and remediation decisions.",
-        boards: ["NIST, ISO, PCI, SOC 2, GDPR", "MITRE ATT&CK/D3FEND/ATLAS", "Expandable evidence and decision detail"]
+        boards: ["NIST, ISO, PCI, SOC 2, GDPR", "MITRE ATT&CK/D3FEND/ATLAS/F3", "Expandable evidence and decision detail"]
       },
       {
         icon: FileClock,
@@ -622,11 +654,11 @@ const content = {
       },
       {
         title: "MITRE + DISARM",
-        body: "ATT&CK models adversary behavior, D3FEND defensive controls, ATLAS AI risk and DISARM narratives/influence. Scenarios activate only when evidence matches."
+        body: "ATT&CK models adversary behavior, D3FEND defensive controls, ATLAS AI risk, F3 fraud behaviors and DISARM narratives/influence. Scenarios activate only when explicit run evidence matches; an F3 mapping is not confirmed fraud."
       },
       {
-        title: "Controlled augmented AI",
-        body: "AI analysis uses only the compressed run context, anti-hallucination rules, an evidence manifest and human approval before any external automation. OpenClaw is used as a proposal gateway/assistant, not as unrestricted execution."
+        title: "Controlled Augmented Assistance",
+        body: "Assisted analysis uses only the compressed run context, anti-hallucination rules, an evidence manifest and human approval before any external automation. OpenClaw is used as a proposal gateway, not as unrestricted execution."
       },
       {
         title: "Graph intelligence",
@@ -668,7 +700,7 @@ const content = {
       },
       {
         title: "3. Contextual risk",
-        body: "Contextual plausibility uses a bounded logistic function. It only combines supported activity, exposure, applicable vulnerabilities and declared controls; it is not a calibrated attack probability."
+        body: "Contextual plausibility uses a bounded logistic function. It only combines supported activity, exposure and applicable vulnerabilities; controls are applied later to residual risk. It is not a calibrated attack probability."
       },
       {
         title: "4. Impact and residual",
@@ -684,19 +716,19 @@ const content = {
       },
       {
         title: "7. Strategy",
-        body: "PESTEL explains external pressure; Porter explains competitive forces; Framework Mapping translates findings into NIST, ISO, PCI, SOC, GDPR, ATT&CK, D3FEND and ATLAS controls."
+        body: "PESTEL explains external pressure; Porter explains competitive forces; Framework Mapping translates findings into NIST, ISO, PCI, SOC, GDPR, ATT&CK, D3FEND, ATLAS and F3 controls."
       },
       {
         title: "8. Advanced scenarios",
-        body: "The scenario library crosses ATT&CK, D3FEND, ATLAS, DISARM, PESTEL, Porter, reputation risk and continuity to generate preventive scenarios that activate only when matched to evidence."
+        body: "The scenario library crosses ATT&CK, D3FEND, ATLAS, F3, DISARM, PESTEL, Porter, reputation risk and continuity to generate preventive scenarios that activate only when matched to evidence."
       },
       {
         title: "9. Licensing and audit",
         body: "The super admin manages companies and licenses; the company admin manages operational users. Effective access = role + modules from user plan or company license + authorized overrides. Every critical change creates an audit event for security, support and commercial traceability."
       },
       {
-        title: "10. Strategic AI and tokens",
-        body: "The AI package selects evidence by risk and recency: highest residual-risk findings first, then recent events and source diversity. Estimated tokens approximate characters/4 and lower-priority evidence is omitted before conclusions are changed. OpenClaw can receive the same context as an analysis/scheduling proposal, without tools or commands until approval."
+        title: "10. Strategic Assistant and Context Budget",
+        body: "The assisted package selects evidence by risk and recency: highest residual-risk findings first, then recent events and source diversity. Estimated tokens approximate characters/4 and lower-priority evidence is omitted before conclusions are changed. OpenClaw can receive the same context as an analysis/scheduling proposal, without tools or commands until approval."
       },
       {
         title: "11. Access, MFA and recovery",
@@ -862,24 +894,41 @@ function FormulaGallery({ language }: { language: LanguageMode }) {
         {language === "es" ? "Modelos activos en producción" : "Active production models"} · {language === "es" ? "registro" : "registry"} v{registryVersion}
       </p>
       <div className="formula-visual-grid methodology-registry-grid">
-        {activeMethods.map((method) => (
-          <article className={`math-card ${method.formula.length > 75 ? "formula-wide" : ""}`.trim()} key={method.methodId}>
-            <div className="methodology-card-heading">
-              <div>
-                <strong>{method.name[language]}</strong>
-                <small>{method.methodId} · v{method.version}</small>
+        {activeMethods.map((method) => {
+          const guide = methodologyGuidance(method.methodId, language);
+          return (
+            <article className="math-card" key={method.methodId}>
+              <div className="methodology-card-heading">
+                <div>
+                  <strong>{method.name[language]}</strong>
+                  <small>{method.methodId} · v{method.version}</small>
+                </div>
+                <span className={`methodology-status ${method.status}`}>{statusLabel[method.status]}</span>
               </div>
-              <span className={`methodology-status ${method.status}`}>{statusLabel[method.status]}</span>
-            </div>
-            <BookFormula methodId={method.methodId} fallback={method.formula} />
-            <p>{method.interpretation[language]}</p>
-            <dl className="methodology-details">
-              <div><dt>{language === "es" ? "Rango" : "Range"}</dt><dd>{method.outputRange}</dd></div>
-              <div><dt>{language === "es" ? "Datos faltantes" : "Missing data"}</dt><dd>{method.missingDataPolicy}</dd></div>
-              <div><dt>{language === "es" ? "Ejemplo" : "Example"}</dt><dd>{method.example}</dd></div>
-            </dl>
-          </article>
-        ))}
+              <BookFormula methodId={method.methodId} fallback={method.formula} />
+              <p className="methodology-interpretation">{method.interpretation[language]}</p>
+              <div className="methodology-purpose-grid">
+                <div>
+                  <span>{language === "es" ? "Propósito" : "Purpose"}</span>
+                  <p>{guide.purpose}</p>
+                </div>
+                <div>
+                  <span>{language === "es" ? "Qué demuestra" : "What it demonstrates"}</span>
+                  <p>{guide.demonstrates}</p>
+                </div>
+                <div>
+                  <span>{language === "es" ? "Uso en el análisis" : "Use in analysis"}</span>
+                  <p>{guide.usedIn}</p>
+                </div>
+              </div>
+              <dl className="methodology-details">
+                <div><dt>{language === "es" ? "Rango" : "Range"}</dt><dd>{method.outputRange}</dd></div>
+                <div><dt>{language === "es" ? "Datos faltantes" : "Missing data"}</dt><dd>{method.missingDataPolicy}</dd></div>
+                <div><dt>{language === "es" ? "Ejemplo" : "Example"}</dt><dd>{method.example}</dd></div>
+              </dl>
+            </article>
+          );
+        })}
       </div>
       {referenceMethods.length ? (
         <details className="methodology-archive">
@@ -901,6 +950,124 @@ function FormulaGallery({ language }: { language: LanguageMode }) {
       ) : null}
     </div>
   );
+}
+
+function methodologyGuidance(methodId: string, language: LanguageMode) {
+  const guidance = {
+    "risk.threat_activity": {
+      es: {
+        purpose: "Resumir la concentración de señales recientes ponderando confiabilidad, relevancia y pérdida de vigencia.",
+        demonstrates: "Qué tan intensa es la actividad externa observada en la cobertura disponible; no demuestra que ocurrirá un ataque.",
+        usedIn: "Alimenta la lectura de presión de señales, las tendencias y la priorización inicial del tablero."
+      },
+      en: {
+        purpose: "Summarize recent signal concentration while weighting reliability, relevance and time decay.",
+        demonstrates: "How intense observed external activity is within available coverage; it does not prove an attack will occur.",
+        usedIn: "Feeds signal-pressure readings, trends and initial dashboard prioritization."
+      }
+    },
+    "risk.contextual_likelihood": {
+      es: {
+        purpose: "Ordenar escenarios combinando amenaza, exposición, vulnerabilidad, contexto sectorial y controles observables.",
+        demonstrates: "Plausibilidad comparativa para priorizar revisión; no es una probabilidad calibrada.",
+        usedIn: "Se usa en escenarios, mapas de riesgo y orden de atención técnica y ejecutiva."
+      },
+      en: {
+        purpose: "Rank scenarios by combining threat, exposure, vulnerability, sector context and observable controls.",
+        demonstrates: "Comparative plausibility for review prioritization; it is not a calibrated probability.",
+        usedIn: "Used in scenarios, risk maps and technical and executive attention ordering."
+      }
+    },
+    "risk.business_impact": {
+      es: {
+        purpose: "Integrar consecuencias financieras, operativas, de información, disponibilidad, legales y reputacionales.",
+        demonstrates: "La magnitud relativa del impacto potencial cuando existen entradas sustentadas.",
+        usedIn: "Participa en el riesgo inherente, la priorización de escenarios y la explicación del impacto."
+      },
+      en: {
+        purpose: "Combine financial, operational, information, availability, legal and reputational consequences.",
+        demonstrates: "The relative magnitude of potential impact when supported inputs exist.",
+        usedIn: "Contributes to inherent risk, scenario prioritization and impact explanation."
+      }
+    },
+    "risk.control_effectiveness": {
+      es: {
+        purpose: "Estimar la reducción sustentada por controles evidenciados y capacidades de detección y respuesta.",
+        demonstrates: "Cuánta exposición relativa puede reducirse con controles observables; no equivale a cumplimiento.",
+        usedIn: "Reduce el riesgo inherente para obtener riesgo residual y orientar brechas de control."
+      },
+      en: {
+        purpose: "Estimate reduction supported by evidenced controls and detection and response capabilities.",
+        demonstrates: "How much relative exposure observable controls may reduce; it is not compliance.",
+        usedIn: "Reduces inherent risk to obtain residual risk and guide control gaps."
+      }
+    },
+    "risk.inherent": {
+      es: {
+        purpose: "Combinar plausibilidad e impacto antes de considerar controles.",
+        demonstrates: "La prioridad relativa de un escenario en ausencia de reducción por controles.",
+        usedIn: "Sirve como línea base para el mapa de calor y la comparación con riesgo residual."
+      },
+      en: {
+        purpose: "Combine plausibility and impact before controls are considered.",
+        demonstrates: "The relative priority of a scenario without control reduction.",
+        usedIn: "Provides the baseline for the heatmap and comparison with residual risk."
+      }
+    },
+    "risk.residual": {
+      es: {
+        purpose: "Calcular la prioridad que permanece después de aplicar la efectividad sustentada de controles.",
+        demonstrates: "El riesgo relativo remanente con la evidencia de control disponible.",
+        usedIn: "Se muestra en el radar ejecutivo, mapas de riesgo, escenarios e informes."
+      },
+      en: {
+        purpose: "Calculate the priority remaining after supported control effectiveness is applied.",
+        demonstrates: "Relative residual risk using the available control evidence.",
+        usedIn: "Displayed in the executive radar, risk maps, scenarios and reports."
+      }
+    },
+    "risk.monte_carlo": {
+      es: {
+        purpose: "Representar incertidumbre mediante múltiples combinaciones plausibles de las variables de riesgo.",
+        demonstrates: "Un intervalo de resultados posibles, no una certeza ni una predicción puntual.",
+        usedIn: "Apoya el análisis de sensibilidad y la comunicación de incertidumbre en el informe técnico."
+      },
+      en: {
+        purpose: "Represent uncertainty through multiple plausible combinations of risk variables.",
+        demonstrates: "A range of possible outcomes, not certainty or a point prediction.",
+        usedIn: "Supports sensitivity analysis and uncertainty communication in the technical report."
+      }
+    },
+    "strategy.pestel_porter_pressure": {
+      es: {
+        purpose: "Convertir señales externas en presión estratégica por dimensiones PESTEL y fuerzas Porter con cobertura y directitud explícitas.",
+        demonstrates: "Dónde se concentra el contexto cibernético relevante para la organización, el sector y los países analizados.",
+        usedIn: "Es el núcleo de Cyber-PESTEL y Cyber-Porter en el tablero estratégico y los informes para toma de decisiones."
+      },
+      en: {
+        purpose: "Convert external signals into strategic pressure across PESTEL dimensions and Porter forces with explicit coverage and directness.",
+        demonstrates: "Where relevant cyber context concentrates for the organization, sector and analyzed countries.",
+        usedIn: "Powers Cyber-PESTEL and Cyber-Porter in the strategic dashboard and decision reports."
+      }
+    },
+    "risk.layered_scenario": {
+      es: {
+        purpose: "Evaluar cómo varias capas de protección reducen la frecuencia residual de un escenario organizacional.",
+        demonstrates: "La reducción esperada bajo supuestos declarados de independencia y desempeño por capa.",
+        usedIn: "Se aplica a escenarios organizacionales cuando existen frecuencia, consecuencia y datos de barreras declarados."
+      },
+      en: {
+        purpose: "Assess how multiple protection layers reduce the residual frequency of an organizational scenario.",
+        demonstrates: "Expected reduction under declared independence and per-layer performance assumptions.",
+        usedIn: "Applied to organizational scenarios when frequency, consequence and declared barrier data are available."
+      }
+    }
+  } as const;
+  return guidance[methodId as keyof typeof guidance]?.[language] ?? {
+    purpose: language === "es" ? "Explicar una transformación matemática versionada del proceso analítico." : "Explain a versioned mathematical transformation in the analytical process.",
+    demonstrates: language === "es" ? "El resultado definido por su rango y sus datos de entrada." : "The result defined by its range and input data.",
+    usedIn: language === "es" ? "Se utiliza únicamente en los módulos registrados por la metodología." : "Used only by the modules registered in the methodology."
+  };
 }
 
 function BookFormula({ methodId, fallback }: { methodId: string; fallback: string }) {
@@ -931,6 +1098,14 @@ function BookFormula({ methodId, fallback }: { methodId: string; fallback: strin
         <mtr><mtd><msub><mi>q</mi><mi>i</mi></msub></mtd><mtd><mo>=</mo></mtd><mtd><mn>.18</mn><mi>M</mi><mo>+</mo><mn>.16</mn><mi>Q</mi><mo>+</mo><mn>.10</mn><mi>R</mi><mo>+</mo><mn>.16</mn><mi>D</mi><mo>+</mo><mn>.08</mn><mi>N</mi><mo>+</mo><mn>.12</mn><mi>C</mi><mo>+</mo><mn>.10</mn><mi>X</mi><mo>+</mo><mn>.10</mn><mi>G</mi></mtd></mtr>
         <mtr><mtd><msub><mi>m</mi><mi>d</mi></msub></mtd><mtd><mo>=</mo></mtd><mtd><mo>∑</mo><msub><mi>q</mi><mi>i</mi></msub><mo>·</mo><msub><mi>magnitud</mi><mi>i</mi></msub></mtd></mtr>
         <mtr><mtd><msub><mi>S</mi><mi>d</mi></msub></mtd><mtd><mo>=</mo></mtd><mtd><mn>100</mn><mo>[</mo><mn>.65</mn><msub><mi>cobertura</mi><mi>d</mi></msub><mo>+</mo><mn>.20</mn><msub><mi>directitud</mi><mi>d</mi></msub><mo>+</mo><mn>.15</mn><mi>min</mi><mo>(</mo><mn>1</mn><mo>,</mo><msub><mi>n</mi><mi>d</mi></msub><mo>/</mo><mn>4</mn><mo>)</mo><mo>]</mo></mtd></mtr>
+      </mtable>
+    ),
+    "risk.layered_scenario": (
+      <mtable>
+        <mtr><mtd><msub><mi>PFD</mi><mtext>efectiva,j</mtext></msub></mtd><mtd><mo>=</mo></mtd><mtd><msub><mi>PFD</mi><mi>j</mi></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><msub><mi>PFD</mi><mi>j</mi></msub><mo>)</mo><msub><mi>D</mi><mi>j</mi></msub></mtd></mtr>
+        <mtr><mtd><msub><mi>PFD</mi><mtext>combinada</mtext></msub></mtd><mtd><mo>=</mo></mtd><mtd><mo>∏</mo><msub><mi>PFD</mi><mtext>efectiva,j</mtext></msub></mtd></mtr>
+        <mtr><mtd><msub><mi>f</mi><mtext>residual</mtext></msub></mtd><mtd><mo>=</mo></mtd><mtd><msub><mi>f</mi><mtext>inicial</mtext></msub><mo>·</mo><msub><mi>PFD</mi><mtext>combinada</mtext></msub></mtd></mtr>
+        <mtr><mtd><mi>EAL</mi></mtd><mtd><mo>=</mo></mtd><mtd><msub><mi>f</mi><mtext>residual</mtext></msub><mo>·</mo><mi>Consecuencia</mi></mtd></mtr>
       </mtable>
     )
   };

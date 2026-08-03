@@ -33,6 +33,7 @@ def load_scenario_library() -> dict[str, Any]:
         "d3fend": set(),
         "atlas": set(),
         "disarm": set(),
+        "f3": set(),
     }
     for scenario in scenarios:
         frameworks = scenario.get("frameworks", {})
@@ -64,6 +65,7 @@ def load_scenario_library() -> dict[str, Any]:
             "d3fend_controls": len(framework_sets["d3fend"]),
             "atlas_tactics": len(framework_sets["atlas"]),
             "disarm_techniques": len(framework_sets["disarm"]),
+            "f3_techniques": len(framework_sets["f3"]),
         },
         "scenarios": sorted_scenarios,
     }

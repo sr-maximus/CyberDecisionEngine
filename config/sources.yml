@@ -13,6 +13,16 @@ sources:
     requires_key: false
     env_key: NVD_API_KEY
     source_weight: 0.85
+  exploit_db:
+    enabled: true
+    provider: local_searchsploit
+    endpoint_env: KALI_SURFACE_URL
+    max_records: 40
+    timeout_seconds: 45
+    policy:
+      purpose: public_exploit_reference_by_cve
+      execute_exploits: false
+      assert_asset_applicability: false
   rss:
     enabled: true
     feeds:
@@ -25,15 +35,71 @@ sources:
       - name: FTC Consumer Blog
         url: https://www.consumer.ftc.gov/blog/gd-rss.xml
       - name: Microsoft Security
-        url: https://msrc.microsoft.com/blog/feed
+        url: https://www.microsoft.com/en-us/security/blog/feed/
       - name: Cisco Talos
         url: https://blog.talosintelligence.com/rss/
       - name: Unit 42
         url: https://unit42.paloaltonetworks.com/feed/
-      - name: Mandiant
-        url: https://www.mandiant.com/resources/blog/rss.xml
+      - name: Google Threat Intelligence
+        url: https://feeds.feedburner.com/threatintelligence/pvexyqv7v0v
+      - name: The Hacker News
+        url: https://feeds.feedburner.com/TheHackersNews
+      - name: BleepingComputer
+        url: https://www.bleepingcomputer.com/feed/
+      - name: SecurityWeek
+        url: https://www.securityweek.com/feed/
       - name: CSIRT Salud Colombia
         url: https://csirtsalud.gov.co/feed/
+      - name: BBC Business
+        url: https://feeds.bbci.co.uk/news/business/rss.xml
+        feed_type: strategic
+        context_topics: [economic, investment, market, competition, supply_chain]
+        source_weight: 0.78
+      - name: BBC Technology
+        url: https://feeds.bbci.co.uk/news/technology/rss.xml
+        feed_type: strategic
+        context_topics: [technological, ai, cloud, digital_regulation, cyber_resilience]
+        source_weight: 0.78
+      - name: BBC World
+        url: https://feeds.bbci.co.uk/news/world/rss.xml
+        feed_type: strategic
+        context_topics: [political, social, geopolitical, regional, continuity]
+        source_weight: 0.78
+      - name: UN News
+        url: https://news.un.org/feed/subscribe/en/news/all/rss.xml
+        feed_type: strategic
+        context_topics: [political, social, environmental, regional, human_security]
+        source_weight: 0.88
+      - name: SEC Press Releases
+        url: https://www.sec.gov/news/pressreleases.rss
+        feed_type: strategic
+        context_topics: [legal, regulatory, economic, investment, market]
+        source_weight: 0.92
+        max_items: 8
+      - name: NIST Cybersecurity Insights
+        url: https://www.nist.gov/blogs/cybersecurity-insights/rss.xml
+        feed_type: strategic
+        context_topics: [technological, regulatory, standards, cyber_resilience, supply_chain]
+        source_weight: 0.92
+        max_items: 10
+      - name: European Commission Digital Strategy
+        url: https://digital-strategy.ec.europa.eu/en/rss.xml
+        feed_type: strategic
+        context_topics: [technological, legal, regulatory, ai, cloud, digital_sovereignty]
+        source_weight: 0.90
+        max_items: 10
+      - name: European Environment Agency
+        url: https://www.eea.europa.eu/en/newsroom/rss-feeds/eeas-press-releases-rss/rss.xml
+        feed_type: strategic
+        context_topics: [environmental, energy, climate, resilience, regulation]
+        source_weight: 0.90
+        max_items: 8
+      - name: US DOJ Antitrust
+        url: https://www.justice.gov/news/rss?type%5B0%5D=image_gallery&type%5B1%5D=press_release&type%5B2%5D=speech&type%5B3%5D=youtube_video&field_component=376&search_api_language=en&show_public_archived=0&require_all=0
+        feed_type: strategic
+        context_topics: [legal, competition, market, consolidation, barriers_to_entry]
+        source_weight: 0.94
+        max_items: 8
   github_advisories:
     enabled: true
     api: https://api.github.com/advisories
@@ -108,7 +174,7 @@ sources:
     use_case: passive
     depth: deep
     max_records: 120
-    timeout_seconds: 900
+    timeout_seconds: 0
     max_threads: 4
     include_raw: false
     domains: []
@@ -116,6 +182,7 @@ sources:
       real_only: true
       no_visual_ui: true
       execution: serialized_background_collection
+      completion: wait_until_configured_modules_finish
       raw_records: filtered_by_default
       modules: curated_passive_deep
   socmint_public:

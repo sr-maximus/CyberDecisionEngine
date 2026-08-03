@@ -12,6 +12,7 @@ import { PlatformBrief } from "./components/PlatformBrief";
 import { RiskTrend } from "./components/RiskTrend";
 import { RunTimeline } from "./components/RunTimeline";
 import { AnalysisContextBar } from "./components/AnalysisContextBar";
+import type { RiskContextDraft } from "./components/DomainComposer";
 import type {
   AnalysisMode,
   AnalysisWindow,
@@ -33,9 +34,10 @@ const FrameworksView = lazy(() => import("./components/FrameworksView").then((mo
 const DomainsView = lazy(() => import("./components/ManagementViews").then((module) => ({ default: module.DomainsView })));
 const RunsView = lazy(() => import("./components/ManagementViews").then((module) => ({ default: module.RunsView })));
 const ReportsView = lazy(() => import("./components/ReportsView").then((module) => ({ default: module.ReportsView })));
+const RelationshipGraphView = lazy(() => import("./components/RelationshipGraphView").then((module) => ({ default: module.RelationshipGraphView })));
 const ScenarioDecisionView = lazy(() => import("./components/ScenarioDecisionView").then((module) => ({ default: module.ScenarioDecisionView })));
 const SettingsView = lazy(() => import("./components/SettingsView").then((module) => ({ default: module.SettingsView })));
-const SocmintView = lazy(() => import("./components/SocmintView").then((module) => ({ default: module.SocmintView })));
+const OpenSourceIntelligenceView = lazy(() => import("./components/OpenSourceIntelligenceView").then((module) => ({ default: module.OpenSourceIntelligenceView })));
 const SourceIntelligenceView = lazy(() => import("./components/SourceIntelligenceView").then((module) => ({ default: module.SourceIntelligenceView })));
 const StrategicDashboard = lazy(() => import("./components/StrategicDashboard").then((module) => ({ default: module.StrategicDashboard })));
 const UsageGuideView = lazy(() => import("./components/UsageGuideView").then((module) => ({ default: module.UsageGuideView })));
@@ -44,6 +46,46 @@ const AIAssistantView = lazy(() => import("./components/AIAssistantView").then((
 const seedDomains = "";
 const seedOrganizationName = "";
 const scopeDefaultsPrefix = "cyberdecision.defaultScope.";
+const emptyRiskContext: RiskContextDraft = {
+  scenarioName: "",
+  initiatingEventFrequency: "",
+  consequenceValue: "",
+  scenarioCurrency: "USD",
+  protectionLayers: ""
+};
+
+function parsedNumber(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function buildScenarioRiskInputs(draft: RiskContextDraft): Record<string, unknown> {
+  const initiatingFrequency = parsedNumber(draft.initiatingEventFrequency);
+  const consequenceValue = parsedNumber(draft.consequenceValue);
+  const layers = draft.protectionLayers
+    .split(/\r?\n/)
+    .map((line) => line.split("|").map((part) => part.trim()))
+    .filter((parts) => parts.some(Boolean))
+    .map(([name, probability, degradation]) => ({
+      name,
+      probability_of_failure: probability === undefined ? undefined : parsedNumber(probability),
+      cyber_degradation: degradation === undefined ? 0 : parsedNumber(degradation)
+    }));
+  const hasInput = Boolean(draft.scenarioName.trim() || initiatingFrequency !== undefined || consequenceValue !== undefined || layers.length);
+  if (!hasInput) return {};
+  return {
+    scenarios: [
+      {
+        scenario_name: draft.scenarioName.trim(),
+        initiating_event_frequency: initiatingFrequency,
+        consequence_value: consequenceValue,
+        currency: draft.scenarioCurrency.trim().toUpperCase() || "USD",
+        protection_layers: layers
+      }
+    ]
+  };
+}
 
 const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
   es: {
@@ -54,11 +96,12 @@ const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
     attackSurface: "Superficie de ataque",
     employeeRisk: "Riesgo virtual de empleados",
     disinformation: "Desinformación",
-    osint: "Inteligencia OSINT",
-    socmint: "Inteligencia SOCMINT",
+    osint: "Inteligencia OSINT y SOCMINT",
+    socmint: "Inteligencia OSINT y SOCMINT",
+    relationshipGraph: "Grafo de análisis y relaciones",
     darkweb: "Inteligencia Dark Web",
     frameworks: "Mapeo de Frameworks",
-    ai: "IA estratégica",
+    ai: "Asistente estratégico",
     runs: "Historial de análisis",
     reports: "Informes CyberDecisionEngine",
     help: "Uso de la plataforma",
@@ -72,11 +115,12 @@ const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
     attackSurface: "Attack Surface",
     employeeRisk: "Employee Virtual Risk",
     disinformation: "Disinformation",
-    osint: "OSINT Intelligence",
-    socmint: "SOCMINT Intelligence",
+    osint: "OSINT & SOCMINT Intelligence",
+    socmint: "OSINT & SOCMINT Intelligence",
+    relationshipGraph: "Relationship Analysis Graph",
     darkweb: "Dark Web Intelligence",
     frameworks: "Framework Mapping",
-    ai: "Strategic AI",
+    ai: "Strategic Assistant",
     runs: "Analysis Runs",
     reports: "CyberDecisionEngine Reports",
     help: "Platform Usage",
@@ -94,6 +138,7 @@ const allViews: ViewKey[] = [
   "disinformation",
   "osint",
   "socmint",
+  "relationshipGraph",
   "darkweb",
   "frameworks",
   "ai",
@@ -112,7 +157,7 @@ function initialViewFromUrl(): ViewKey {
 const viewAccess: Record<UserRole, ViewKey[]> = {
   super_admin: allViews,
   admin: allViews,
-  analyst: ["overview", "dashboards", "scenarios", "attackSurface", "brand", "employeeRisk", "disinformation", "osint", "socmint", "darkweb", "frameworks", "ai", "runs", "reports", "help"],
+  analyst: ["overview", "dashboards", "scenarios", "attackSurface", "brand", "employeeRisk", "disinformation", "osint", "socmint", "relationshipGraph", "darkweb", "frameworks", "ai", "runs", "reports", "help"],
   executive: ["overview", "dashboards", "scenarios", "attackSurface", "brand", "disinformation", "frameworks", "ai", "reports", "help"],
   viewer: ["overview", "dashboards", "reports", "help"]
 };
@@ -150,6 +195,9 @@ function hasViewAccess(user: LocalUser, view: ViewKey): boolean {
   if (user.role === "super_admin") return true;
   if (!user.licenseModules?.length) return true;
   if (view === "settings") return user.role === "admin" && user.licenseModules.includes("settings");
+  if (view === "osint" || view === "socmint") {
+    return user.licenseModules.includes("osint") || user.licenseModules.includes("socmint");
+  }
   return user.licenseModules.includes(view);
 }
 
@@ -185,13 +233,14 @@ export function App() {
   const [organizationName, setOrganizationName] = useState(seedOrganizationName);
   const [mode, setMode] = useState<AnalysisMode>("deep");
   const [analysisWindow, setAnalysisWindow] = useState<AnalysisWindow>(DEFAULT_ANALYSIS_WINDOW);
-  const [scanTimeBudgetMinutes, setScanTimeBudgetMinutes] = useState(30);
+  const [scanTimeBudgetMinutes, setScanTimeBudgetMinutes] = useState(0);
   const [reportDisplayAt, setReportDisplayAt] = useState("");
   const [selectedSectors, setSelectedSectors] = useState<string[]>([ALL_SECTORS]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([ALL_COUNTRIES]);
   const [realOnly, setRealOnly] = useState(true);
   const [authorizedScope, setAuthorizedScope] = useState(true);
   const [allowTor, setAllowTor] = useState(true);
+  const [riskContext, setRiskContext] = useState<RiskContextDraft>(emptyRiskContext);
   const [hasTouchedDomains, setHasTouchedDomains] = useState(false);
   const [scopeDefaultMessage, setScopeDefaultMessage] = useState<string | null>(null);
   const [users, setUsers] = useState<LocalUser[]>(() => loadUsers());
@@ -410,6 +459,7 @@ export function App() {
         authorized_scope: authorizedScope,
         allow_tor: authorizedScope && allowTor,
         scan_time_budget_minutes: scanTimeBudgetMinutes,
+        scenario_risk_inputs: buildScenarioRiskInputs(riskContext),
         report_display_at: currentUser?.role === "super_admin" && reportDisplayAt.trim() ? reportDisplayAt.trim() : undefined,
         ...overrides
       });
@@ -601,7 +651,9 @@ export function App() {
     canSaveDefaults: false,
     onSaveDefaults: saveDefaultScope,
     defaultScopeMessage: scopeDefaultMessage,
-    reusableScopeName: reusableScopeProfile?.request.organization_name ?? null
+    reusableScopeName: reusableScopeProfile?.request.organization_name ?? null,
+    riskContext,
+    onRiskContextChange: setRiskContext
   };
 
   function renderView() {
@@ -611,11 +663,28 @@ export function App() {
     if (activeView === "brand") return <BrandRiskView run={selectedRun} language={language} />;
     if (activeView === "employeeRisk") return <EmployeeRiskView language={language} onReportReady={refreshReports} />;
     if (activeView === "disinformation") return <DisinformationView run={selectedRun} language={language} />;
-    if (activeView === "osint") return <SourceIntelligenceView run={selectedRun} channel="osint" language={language} />;
-    if (activeView === "socmint") return <SocmintView run={selectedRun} language={language} />;
+    if (activeView === "osint" || activeView === "socmint") {
+      return (
+        <OpenSourceIntelligenceView
+          run={selectedRun}
+          language={language}
+          initialSection={activeView === "socmint" ? "socmint" : "integrated"}
+        />
+      );
+    }
+    if (activeView === "relationshipGraph") return <RelationshipGraphView run={selectedRun} runs={runs} language={language} />;
     if (activeView === "darkweb") return <SourceIntelligenceView run={selectedRun} channel="darkweb" language={language} />;
     if (activeView === "frameworks") return <FrameworksView run={selectedRun} language={language} />;
-    if (activeView === "ai") return <AIAssistantView run={selectedRun} language={language} />;
+    if (activeView === "ai") {
+      return (
+        <AIAssistantView
+          run={selectedRun}
+          language={language}
+          onGenerateReport={handleGenerateReport}
+          onOpenView={setActiveView}
+        />
+      );
+    }
     if (activeView === "runs") return <RunsView runs={runs} language={language} onOpenRun={(runId) => { setSelectedRunId(runId); setActiveView("dashboards"); }} onGenerateReport={handleGenerateReport} />;
     if (activeView === "reports") {
       return (

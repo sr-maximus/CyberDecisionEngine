@@ -9,7 +9,7 @@ from typing import Any, Sequence
 from cyberdeck.schemas import OrganizationProfile, ThreatEvent
 
 
-MODEL_VERSION = "narrative-intelligence-v1.1.1"
+MODEL_VERSION = "narrative-intelligence-v1.2.0"
 
 _CONTENT_RULES: tuple[tuple[str, set[str]], ...] = (
     ("fact_check", {"fact_check", "debunk", "verification"}),
@@ -17,6 +17,7 @@ _CONTENT_RULES: tuple[tuple[str, set[str]], ...] = (
     ("brand_impersonation", {"brand_impersonation", "impersonation", "suplantacion", "fake_profile"}),
     ("phishing", {"phishing", "credential_phishing"}),
     ("fake_domain", {"fake_domain", "lookalike_domain", "typosquatting", "homograph"}),
+    ("fake_recruitment", {"fake_recruitment", "job_scam", "employment_scam", "empleo_falso", "oferta_laboral_falsa"}),
     ("fraud_report", {"fraud", "fraud_report", "scam", "estafa"}),
     ("user_complaint", {"complaint", "user_complaint", "queja", "reclamo", "denuncia"}),
     ("potential_disinformation", {"disinformation", "misinformation", "potential_disinformation"}),
@@ -30,7 +31,9 @@ _CONTENT_RULES: tuple[tuple[str, set[str]], ...] = (
 _NARRATIVE_TERMS = re.compile(
     r"\b(fraud|fraude|estafa|scam|phish|suplant|imperson|complaint|queja|reclamo|denuncia|"
     r"rumou?r|falso|false|fake|mislead|enganos|desinform|misinform|narrativ|campaign|campana|"
-    r"coordin|amplif|propaganda|fact[ -]?check|desment|correction|criticism|reputacion)\w*\b",
+    r"coordin|amplif|propaganda|fact[ -]?check|desment|correction|criticism|reputacion|"
+    r"(?:fake|false|fals[oa]s?|fraudulent)\s+(?:job|jobs|recruitment|employment)|"
+    r"(?:empleo|trabajo|oferta laboral|vacante)s?\s+(?:fals[oa]s?|fraudulent[oa]s?))\w*\b",
     re.IGNORECASE,
 )
 
@@ -77,6 +80,8 @@ def build_narrative_intelligence(events: Sequence[ThreatEvent], organization: Or
 
 
 def _claim_from_event(event: ThreatEvent, organization: OrganizationProfile) -> dict[str, Any] | None:
+    if str(getattr(event.evidence_status, "value", event.evidence_status)) in {"false_positive", "discarded"}:
+        return None
     tags = {str(tag).strip().lower() for tag in event.tags if str(tag).strip()}
     category = str(event.category or "").strip().lower()
     title = str(event.title or "").strip()
@@ -216,7 +221,7 @@ def _confidence(event: ThreatEvent, evidence_status: str, content_type: str, tru
 
 def _cybersecurity_relevance(event: ThreatEvent, labels: set[str], content_type: str) -> float:
     score = 25.0
-    if content_type in {"phishing", "fake_domain", "brand_impersonation", "fraud_report"}:
+    if content_type in {"phishing", "fake_domain", "fake_recruitment", "brand_impersonation", "fraud_report"}:
         score += 35
     if labels.intersection({"credential", "account_takeover", "identity_theft", "data_breach", "leak", "malware"}):
         score += 20

@@ -29,7 +29,7 @@ class SpiderFootCollector(Collector):
         self.endpoint = endpoint.rstrip("/")
         self.enabled = enabled
         self.max_records = max(1, int(max_records))
-        self.timeout_seconds = max(15.0, float(timeout_seconds))
+        self.timeout_seconds = max(0.0, float(timeout_seconds))
         self.max_threads = max(1, min(8, int(max_threads)))
         self.include_raw = include_raw
         self.depth = depth if depth in {"standard", "deep"} else "deep"
@@ -40,8 +40,13 @@ class SpiderFootCollector(Collector):
         if not self.domains:
             return CollectionResult(SourceStatus(name=self.name, status="skipped", records=0, mode="real", warning="No domains configured."), [])
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds + 12.0) as client:
-                health = await client.get(f"{self.endpoint}/health")
+            request_timeout = (
+                httpx.Timeout(None, connect=10.0)
+                if self.timeout_seconds <= 0
+                else httpx.Timeout(self.timeout_seconds + 12.0, connect=10.0)
+            )
+            async with httpx.AsyncClient(timeout=request_timeout) as client:
+                health = await client.get(f"{self.endpoint}/health", timeout=10.0)
                 health.raise_for_status()
                 payload = {"domains": [], "warnings": []}
                 semaphore = asyncio.Semaphore(2)
@@ -71,7 +76,7 @@ class SpiderFootCollector(Collector):
                         "domains": [domain],
                         "use_case": "passive",
                         "depth": self.depth,
-                        "timeout_seconds": min(600, int(self.timeout_seconds)),
+                        "timeout_seconds": int(self.timeout_seconds),
                         "max_records": self.max_records,
                         "max_threads": self.max_threads,
                         "include_raw": self.include_raw,

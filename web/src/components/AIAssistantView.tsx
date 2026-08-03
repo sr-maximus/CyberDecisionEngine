@@ -1,187 +1,268 @@
-import { Bot, BrainCircuit, CheckCircle2, ClipboardCheck, Cpu, FileJson, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { createAIAnalysisPackage, getAIOrchestrationConfig } from "../api";
-import type { AIAnalysisPackage, AIOrchestrationConfig, AIProvider, AIProviderDescriptor, LanguageMode, RunRecord } from "../types";
+import {
+  Bot,
+  BrainCircuit,
+  CheckCircle2,
+  ChevronRight,
+  CircleAlert,
+  Database,
+  FileChartColumn,
+  FileCode2,
+  Gauge,
+  Layers3,
+  LoaderCircle,
+  MessageSquareText,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  SquareArrowOutUpRight,
+  Target,
+  Trash2
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  apiUrl,
+  chatWithAI,
+  generateRunReport,
+  getAIOrchestrationConfig
+} from "../api";
+import type {
+  AIChatScope,
+  AIExecutionResult,
+  AIOrchestrationConfig,
+  LanguageMode,
+  RunRecord,
+  ViewKey
+} from "../types";
 
 interface AIAssistantViewProps {
   run?: RunRecord;
   language: LanguageMode;
+  onGenerateReport?: (runId: string) => Promise<void>;
+  onOpenView?: (view: ViewKey) => void;
 }
 
-const copy = {
-  es: {
-    title: "IA estratégica controlada",
-    subtitle: "Prepara análisis trazables y usa el gateway OpenClaw aislado cuando exista un modelo configurado y el borrador haya sido aprobado.",
-    noRun: "Selecciona o ejecuta una corrida para construir un paquete IA con evidencia real.",
-    providers: "Proveedores IA",
-    promptInput: "Prompt orientado al análisis",
-    promptInputHelp: "Edita el enfoque antes de generar el paquete. Si lo dejas vacío, se usa este prompt base defensivo.",
-    budget: "Presupuesto de tokens",
-    inputBudget: "Entrada",
-    outputBudget: "Salida",
-    audience: "Audiencia",
-    depth: "Profundidad",
-    objective: "Objetivo",
-    instructions: "Instrucciones adicionales",
-    generate: "Generar prompt y payload",
-    approve: "Aprobar borrador local",
-    approved: "Borrador aprobado localmente",
-    pending: "Borrador pendiente de aprobación",
-    context: "Contexto exacto",
-    prompt: "Prompt maestro",
-    systemPrompt: "System prompt editable",
-    userPrompt: "User prompt editable",
-    promptEditHelp: "Puedes ajustar estos textos antes de aprobar el paquete local. La ejecución externa sigue deshabilitada hasta configurar credenciales.",
-    payloads: "Payloads por proveedor",
-    guardrails: "Reglas anti-alucinación",
-    evidence: "Manifiesto de evidencia",
-    providerHint: "El estado distingue gateway operativo de modelo disponible. Las credenciales se gestionan fuera del navegador.",
-    tokenFit: "Disponible",
-    tokenUsed: "Estimado",
-    automation: "Automatización deshabilitada hasta aprobar prompt, credenciales y gateway.",
-    objectiveStrategic: "Análisis estratégico",
-    objectiveSearch: "Plan de búsqueda aumentada",
-    searchModeHint: "OpenClaw propondrá consultas, reintentos y mejoras de fuente. CyberDecisionEngine ejecuta solo colectores permitidos tras aprobación.",
-    options: {
-      executive: "Directivo",
-      technical: "Técnico",
-      board: "Junta",
-      incident: "Incidente",
-      fraud: "Fraude",
-      standard: "Estándar",
-      deep: "Profundo",
-      boardDepth: "Junta"
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  result?: AIExecutionResult;
+}
+
+interface ModuleOption {
+  scope: AIChatScope;
+  view: ViewKey;
+  labelEs: string;
+  labelEn: string;
+}
+
+const moduleOptions: ModuleOption[] = [
+  { scope: "overview", view: "dashboards", labelEs: "Visión estratégica", labelEn: "Strategic overview" },
+  { scope: "evidence", view: "dashboards", labelEs: "Evidencia", labelEn: "Evidence" },
+  { scope: "risk", view: "dashboards", labelEs: "Riesgo", labelEn: "Risk" },
+  { scope: "scenarios", view: "scenarios", labelEs: "Escenarios", labelEn: "Scenarios" },
+  { scope: "frameworks", view: "frameworks", labelEs: "Frameworks", labelEn: "Frameworks" },
+  { scope: "osint", view: "osint", labelEs: "OSINT", labelEn: "OSINT" },
+  { scope: "socmint", view: "socmint", labelEs: "SOCMINT", labelEn: "SOCMINT" },
+  { scope: "darkweb", view: "darkweb", labelEs: "Dark web", labelEn: "Dark web" },
+  { scope: "attack_surface", view: "attackSurface", labelEs: "Superficie", labelEn: "Attack surface" },
+  { scope: "brand_fraud", view: "brand", labelEs: "Marca y fraude", labelEn: "Brand and fraud" },
+  { scope: "disinformation", view: "disinformation", labelEs: "Desinformación", labelEn: "Disinformation" },
+  { scope: "geography", view: "dashboards", labelEs: "Geografía", labelEn: "Geography" },
+  { scope: "vulnerabilities", view: "attackSurface", labelEs: "Vulnerabilidades", labelEn: "Vulnerabilities" }
+];
+
+const quickQuestions = {
+  es: [
+    {
+      label: "Resumen ejecutivo",
+      prompt: "Resume qué se analizó, qué se encontró, qué tan confiable es y cuáles son las tres decisiones prioritarias.",
+      scopes: ["overview", "risk", "evidence"] as AIChatScope[]
+    },
+    {
+      label: "Lectura técnica",
+      prompt: "Explica los hallazgos técnicos, la evidencia que los sustenta, sus limitaciones y qué validaciones siguen pendientes.",
+      scopes: ["evidence", "attack_surface", "vulnerabilities"] as AIChatScope[]
+    },
+    {
+      label: "Riesgo y escenarios",
+      prompt: "Explica el riesgo y los escenarios aplicables sin confundir presión de señales con probabilidad calibrada.",
+      scopes: ["risk", "scenarios", "frameworks"] as AIChatScope[]
+    },
+    {
+      label: "Calidad de evidencia",
+      prompt: "Audita la cobertura, las fuentes, los vacíos de información, las contradicciones y el riesgo de falsos positivos.",
+      scopes: ["evidence", "osint", "socmint", "darkweb"] as AIChatScope[]
     }
-  },
-  en: {
-    title: "Controlled strategic AI",
-    subtitle: "Prepare traceable analysis and use the isolated OpenClaw gateway when a model is configured and the draft is approved.",
-    noRun: "Select or run an analysis to build an AI package from real evidence.",
-    providers: "AI providers",
-    promptInput: "Analysis-oriented prompt",
-    promptInputHelp: "Edit the focus before generating the package. If left empty, this defensive base prompt is used.",
-    budget: "Token budget",
-    inputBudget: "Input",
-    outputBudget: "Output",
-    audience: "Audience",
-    depth: "Depth",
-    objective: "Objective",
-    instructions: "Additional instructions",
-    generate: "Generate prompt and payload",
-    approve: "Approve local draft",
-    approved: "Draft approved locally",
-    pending: "Draft pending approval",
-    context: "Exact context",
-    prompt: "Master prompt",
-    systemPrompt: "Editable system prompt",
-    userPrompt: "Editable user prompt",
-    promptEditHelp: "You can adjust these texts before approving the local package. External execution remains disabled until credentials are configured.",
-    payloads: "Provider payloads",
-    guardrails: "Anti-hallucination rules",
-    evidence: "Evidence manifest",
-    providerHint: "Status distinguishes an operational gateway from an available model. Credentials stay outside the browser.",
-    tokenFit: "Available",
-    tokenUsed: "Estimated",
-    automation: "Automation disabled until prompt, credentials and gateway are approved.",
-    objectiveStrategic: "Strategic analysis",
-    objectiveSearch: "Augmented search plan",
-    searchModeHint: "OpenClaw will propose queries, retries and source improvements. CyberDecisionEngine executes only allowlisted collectors after approval.",
-    options: {
-      executive: "Executive",
-      technical: "Technical",
-      board: "Board",
-      incident: "Incident",
-      fraud: "Fraud",
-      standard: "Standard",
-      deep: "Deep",
-      boardDepth: "Board"
+  ],
+  en: [
+    {
+      label: "Executive brief",
+      prompt: "Summarize what was analyzed, what was found, how reliable it is and the top three decision priorities.",
+      scopes: ["overview", "risk", "evidence"] as AIChatScope[]
+    },
+    {
+      label: "Technical reading",
+      prompt: "Explain the technical findings, supporting evidence, limitations and pending validation checks.",
+      scopes: ["evidence", "attack_surface", "vulnerabilities"] as AIChatScope[]
+    },
+    {
+      label: "Risk and scenarios",
+      prompt: "Explain applicable risk and scenarios without confusing signal pressure with calibrated probability.",
+      scopes: ["risk", "scenarios", "frameworks"] as AIChatScope[]
+    },
+    {
+      label: "Evidence quality",
+      prompt: "Audit coverage, sources, information gaps, contradictions and false-positive risk.",
+      scopes: ["evidence", "osint", "socmint", "darkweb"] as AIChatScope[]
     }
-  }
+  ]
 };
 
-const defaultProviders: AIProvider[] = ["openai", "openclaw_gateway"];
-
-export function AIAssistantView({ run, language }: AIAssistantViewProps) {
-  const labels = copy[language];
+export function AIAssistantView({
+  run,
+  language,
+  onGenerateReport,
+  onOpenView
+}: AIAssistantViewProps) {
   const [config, setConfig] = useState<AIOrchestrationConfig | null>(null);
-  const [providers, setProviders] = useState<AIProvider[]>(defaultProviders);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [question, setQuestion] = useState("");
   const [audience, setAudience] = useState<"executive" | "technical" | "board" | "incident" | "fraud">("executive");
-  const [depth, setDepth] = useState<"standard" | "deep" | "board">("deep");
-  const [objective, setObjective] = useState("decision_intelligence");
-  const [inputBudget, setInputBudget] = useState(12000);
-  const [outputBudget, setOutputBudget] = useState(4000);
-  const [customInstructions, setCustomInstructions] = useState("");
-  const [aiPackage, setAiPackage] = useState<AIAnalysisPackage | null>(null);
-  const [systemPromptDraft, setSystemPromptDraft] = useState("");
-  const [userPromptDraft, setUserPromptDraft] = useState("");
-  const [approved, setApproved] = useState(false);
+  const [scopes, setScopes] = useState<AIChatScope[]>(["overview", "evidence", "risk"]);
   const [loading, setLoading] = useState(false);
+  const [deepAnalysisLoading, setDeepAnalysisLoading] = useState(false);
+  const [runtimeLoading, setRuntimeLoading] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+
+  const runtime = config?.openclaw_gateway ?? config?.ollama_chat ?? {};
+  const runtimeReady = runtime.ready === true;
+  const runtimeStatus = String(runtime.runtime_status ?? "unknown");
+  const modelStatus = String(runtime.model_status ?? "unknown");
+  const modelName = String(runtime.model ?? "cyberdecision-cti");
+  const subject = run
+    ? run.request.person_name || run.request.organization_name || run.domains.join(", ")
+    : "";
+  const report = run?.report;
+  const questions = quickQuestions[language];
+
+  const sourceCoverage = useMemo(() => {
+    if (!run) return "N/D";
+    const queried = run.summary.kpis.queried_sources ?? 0;
+    const productive = run.summary.kpis.productive_sources ?? 0;
+    return queried > 0 ? `${productive}/${queried}` : "N/D";
+  }, [run]);
 
   useEffect(() => {
-    getAIOrchestrationConfig().then(setConfig).catch((exc) => setError(exc instanceof Error ? exc.message : String(exc)));
+    void refreshRuntime();
   }, []);
 
-  const tokenPercent = useMemo(() => {
-    if (!aiPackage) return 0;
-    return Math.min(100, Math.round(((aiPackage.token_estimate.input_total ?? 0) / inputBudget) * 100));
-  }, [aiPackage, inputBudget]);
-  const providerCatalog: AIProviderDescriptor[] = config?.provider_catalog?.length
-    ? config.provider_catalog
-    : defaultProviders.map((provider) => ({
-        key: provider,
-        label: provider === "openclaw_gateway" ? "OpenClaw Gateway" : provider.toUpperCase(),
-        endpoint_hint: "",
-        model_hint: "Configure API key in Settings",
-        headers_required: [],
-        enabled: false
-      }));
-  const defaultPrompt = useMemo(() => strategicPrompt(language, run), [language, run]);
+  useEffect(() => {
+    if (!run) {
+      setMessages([]);
+      return;
+    }
+    setMessages(loadConversation(run.id));
+    setQuestion("");
+    setError(null);
+  }, [run?.id]);
 
   useEffect(() => {
-    setSystemPromptDraft(aiPackage?.system_prompt ?? "");
-    setUserPromptDraft(aiPackage?.user_prompt ?? "");
-  }, [aiPackage]);
+    if (!run) return;
+    saveConversation(run.id, messages);
+    requestAnimationFrame(() => {
+      if (messageListRef.current) {
+        messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+      }
+    });
+  }, [messages, run?.id]);
 
-  function toggleProvider(provider: AIProvider) {
-    setProviders((current) => {
-      if (current.includes(provider)) return current.filter((item) => item !== provider);
-      return [...current, provider];
+  async function refreshRuntime() {
+    setRuntimeLoading(true);
+    try {
+      setConfig(await getAIOrchestrationConfig());
+      setError(null);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+    } finally {
+      setRuntimeLoading(false);
+    }
+  }
+
+  function toggleScope(scope: AIChatScope) {
+    setScopes((current) => {
+      if (current.includes(scope)) {
+        return current.length === 1 ? current : current.filter((item) => item !== scope);
+      }
+      return [...current, scope];
     });
   }
 
-  function selectObjectiveMode(mode: "strategic" | "search") {
-    if (mode === "search") {
-      setObjective("evidence_search_planning");
-      setCustomInstructions(searchPlanningPrompt(language, run));
-      setDepth("deep");
-      setProviders((current) => (current.includes("openclaw_gateway") ? current : [...current, "openclaw_gateway"]));
-      return;
-    }
-    setObjective("decision_intelligence");
-    setCustomInstructions(strategicPrompt(language, run));
-  }
-
-  async function generatePackage() {
-    if (!run || !providers.length) return;
+  async function sendQuestion(prompt = question, selectedScopes = scopes) {
+    const cleanPrompt = prompt.trim();
+    const reportCommand = requestsReportGeneration(cleanPrompt);
+    if (!run || !cleanPrompt || loading || (!runtimeReady && !reportCommand)) return;
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: cleanPrompt,
+      createdAt: new Date().toISOString()
+    };
+    setMessages((current) => [...current, userMessage]);
+    setQuestion("");
+    setScopes(selectedScopes);
     setLoading(true);
     setError(null);
-    setApproved(false);
     try {
-      const nextPackage = await createAIAnalysisPackage({
+      if (reportCommand) {
+        if (onGenerateReport) {
+          await onGenerateReport(run.id);
+        } else {
+          await generateRunReport(run.id);
+        }
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: language === "es"
+              ? "Los informes ejecutivo y técnico fueron generados desde la corrida seleccionada. Ya puedes abrirlos y descargarlos desde este tablero o desde Informes."
+              : "The executive and technical reports were generated from the selected run. You can now open and download them here or from Reports.",
+            createdAt: new Date().toISOString()
+          }
+        ]);
+        return;
+      }
+      const result = await chatWithAI({
         run_id: run.id,
-        providers,
-        audience,
-        depth,
-        objective,
+        message: cleanPrompt,
         language,
-        input_token_budget: inputBudget,
-        output_token_budget: outputBudget,
-        include_findings_limit: 12,
-        include_events_limit: 30,
-        custom_instructions: customInstructions.trim() || defaultPrompt
+        audience,
+        scopes: selectedScopes,
+        history: messages.slice(-8).map((message) => ({
+          role: message.role,
+          content: message.content
+        })),
+        output_token_budget: 500,
+        analysis_mode: "interactive"
       });
-      setAiPackage(nextPackage);
+      if (result.status === "failed") {
+        throw new Error(result.limitations.join(" ") || (language === "es" ? "La IA local no produjo una respuesta." : "Local AI did not produce a response."));
+      }
+      const answer = analysisText(result.analysis, language);
+      setMessages((current) => [
+        ...current,
+        {
+          id: result.id,
+          role: "assistant",
+          content: answer,
+          createdAt: result.generated_at,
+          result
+        }
+      ]);
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : String(exc));
     } finally {
@@ -189,214 +270,556 @@ export function AIAssistantView({ run, language }: AIAssistantViewProps) {
     }
   }
 
+  async function runDeepAnalysis() {
+    if (!run || !runtimeReady || deepAnalysisLoading) return;
+    setDeepAnalysisLoading(true);
+    setError(null);
+    try {
+      const result = await chatWithAI({
+        run_id: run.id,
+        message: language === "es"
+          ? "Realiza un análisis profundo y trazable de la corrida: contrasta cobertura, evidencia, contradicciones, presión prospectiva, escenarios, vulnerabilidades, marcos y controles. Separa hechos, inferencias y limitaciones, y publica posibilidades de decisión solo cuando tengan sustento."
+          : "Perform a deep, traceable analysis of the run: cross-check coverage, evidence, contradictions, prospective pressure, scenarios, vulnerabilities, frameworks and controls. Separate facts, inferences and limitations, and only publish decision options when supported.",
+        language,
+        audience,
+        scopes: moduleOptions.map((item) => item.scope),
+        history: messages.slice(-4).map((message) => ({
+          role: message.role,
+          content: message.content
+        })),
+        output_token_budget: 1000,
+        analysis_mode: "deep"
+      });
+      if (result.status === "failed") {
+        throw new Error(result.limitations.join(" ") || (language === "es" ? "OpenClaw no completó el análisis." : "OpenClaw did not complete the analysis."));
+      }
+      setMessages((current) => [
+        ...current,
+        {
+          id: result.id,
+          role: "assistant",
+          content: analysisText(result.analysis, language),
+          createdAt: result.generated_at,
+          result
+        }
+      ]);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+    } finally {
+      setDeepAnalysisLoading(false);
+    }
+  }
+
+  async function requestReports() {
+    if (!run || reportLoading || run.status !== "completed") return;
+    setReportLoading(true);
+    setError(null);
+    try {
+      if (onGenerateReport) {
+        await onGenerateReport(run.id);
+      } else {
+        await generateRunReport(run.id);
+      }
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
+  function clearConversation() {
+    if (!run) return;
+    localStorage.removeItem(conversationKey(run.id));
+    setMessages([]);
+  }
+
   if (!run) {
     return (
-      <section className="dashboard-grid ai-dashboard-grid">
-        <article className="panel chart-card span-12 ai-hero">
-          <Bot size={24} />
-          <div>
-            <h2>{labels.title}</h2>
-            <p>{labels.subtitle}</p>
-          </div>
-          <div className="chart-empty">{labels.noRun}</div>
-        </article>
+      <section className="panel ai-empty-workspace">
+        <Bot size={28} />
+        <div>
+          <h2>{language === "es" ? "Asistente IA de auditoría" : "AI audit assistant"}</h2>
+          <p>
+            {language === "es"
+              ? "Selecciona una corrida para conversar sobre sus resultados y evidencias."
+              : "Select a run to discuss its results and evidence."}
+          </p>
+        </div>
       </section>
     );
   }
 
   return (
-    <div className="view-stack">
-      <section className="dashboard-grid ai-dashboard-grid">
-        <article className="panel chart-card span-12 ai-hero">
-          <Bot size={24} />
+    <div className="view-stack ai-audit-view">
+      <section className="panel ai-audit-hero">
+        <div className="ai-audit-heading">
+          <span className="ai-icon-box"><BrainCircuit size={23} /></span>
           <div>
-            <h2>{labels.title}</h2>
-            <p>{labels.subtitle}</p>
+            <h2>{language === "es" ? "Copiloto de análisis y decisión" : "Analysis and decision copilot"}</h2>
+            <p>
+              {language === "es"
+                ? "Consulta la ejecución seleccionada, verifica su trazabilidad y traduce resultados técnicos en posibilidades de decisión."
+                : "Query the selected run, verify traceability and translate technical results into decision options."}
+            </p>
           </div>
-          <span className={approved ? "ai-status approved" : "ai-status"}>{approved ? labels.approved : labels.pending}</span>
-        </article>
-
-        <article className="panel chart-card span-6 ai-control-card">
-          <div className="panel-title-row compact">
-            <div>
-              <h2>{labels.providers}</h2>
-              <p>{labels.providerHint}</p>
-            </div>
-            <KeyRound size={18} />
-          </div>
-          <div className="ai-provider-list">
-            {providerCatalog.map((provider) => (
-              <button className={providers.includes(provider.key) ? "selected" : ""} key={provider.key} onClick={() => toggleProvider(provider.key)}>
-                <span>{provider.label}</span>
-                <small>{provider.model_hint}</small>
-                {provider.key === "openclaw_gateway" ? (
-                  <em>
-                    {provider.enabled
-                      ? provider.model_status === "available"
-                        ? language === "es" ? "Gateway y modelo disponibles" : "Gateway and model available"
-                        : provider.model_status === "configured_unverified"
-                          ? language === "es" ? "Gateway activo · credencial de modelo por validar" : "Gateway ready · model credential unverified"
-                          : language === "es" ? "Gateway activo · modelo pendiente" : "Gateway ready · model pending"
-                      : language === "es" ? "Gateway no disponible" : "Gateway unavailable"}
-                  </em>
-                ) : null}
-              </button>
-            ))}
-          </div>
-          <div className="settings-form settings-stack">
-            <select value={audience} onChange={(event) => setAudience(event.target.value as typeof audience)}>
-              <option value="executive">{labels.options.executive}</option>
-              <option value="technical">{labels.options.technical}</option>
-              <option value="board">{labels.options.board}</option>
-              <option value="incident">{labels.options.incident}</option>
-              <option value="fraud">{labels.options.fraud}</option>
-            </select>
-            <select value={depth} onChange={(event) => setDepth(event.target.value as typeof depth)}>
-              <option value="standard">{labels.options.standard}</option>
-              <option value="deep">{labels.options.deep}</option>
-              <option value="board">{labels.options.boardDepth}</option>
-            </select>
-            <input value={objective} onChange={(event) => setObjective(event.target.value)} placeholder={labels.objective} />
-            <div className="ai-mode-actions">
-              <button className="secondary-button compact" type="button" onClick={() => selectObjectiveMode("strategic")}>
-                {labels.objectiveStrategic}
-              </button>
-              <button className="secondary-button compact" type="button" onClick={() => selectObjectiveMode("search")}>
-                {labels.objectiveSearch}
-              </button>
-            </div>
-            <em className="ai-mode-hint">{labels.searchModeHint}</em>
-            <label className="ai-prompt-input">
-              <span>{labels.promptInput}</span>
-              <textarea value={customInstructions} onChange={(event) => setCustomInstructions(event.target.value)} placeholder={defaultPrompt} />
-              <em>{labels.promptInputHelp}</em>
-            </label>
-            <button className="primary-button" onClick={generatePackage} disabled={loading || !providers.length}>
-              <Sparkles size={17} />
-              <span>{labels.generate}</span>
-            </button>
-            {error ? <div className="error-banner inline">{error}</div> : null}
-          </div>
-        </article>
-
-        <article className="panel chart-card span-3 ai-token-card">
-          <div className="panel-title-row compact">
-            <div>
-              <h2>{labels.budget}</h2>
-              <p>{labels.automation}</p>
-            </div>
-            <Cpu size={18} />
-          </div>
-          <div className="ai-budget-grid">
-            <label>
-              <span>{labels.inputBudget}</span>
-              <input type="number" min={2000} max={64000} step={1000} value={inputBudget} onChange={(event) => setInputBudget(Number(event.target.value))} />
-            </label>
-            <label>
-              <span>{labels.outputBudget}</span>
-              <input type="number" min={1000} max={32000} step={500} value={outputBudget} onChange={(event) => setOutputBudget(Number(event.target.value))} />
-            </label>
-          </div>
-          <div className="ai-token-meter">
-            <span style={{ width: `${tokenPercent}%` }} />
-          </div>
-          <div className="ai-token-readout">
-            <strong>{labels.tokenUsed}: {aiPackage?.token_estimate.input_total ?? 0}</strong>
-            <em>{labels.tokenFit}: {aiPackage?.token_estimate.budget_remaining ?? inputBudget}</em>
-          </div>
-        </article>
-
-        <article className="panel chart-card span-3 compact-card ai-guardrail-card">
-          <div className="panel-title-row compact">
-            <div>
-              <h2>{labels.guardrails}</h2>
-              <p>{aiPackage?.prompt_version ?? config?.prompt_version}</p>
-            </div>
-            <ShieldCheck size={18} />
-          </div>
-          <div className="ai-guardrail-list">
-            {(aiPackage?.guardrails ?? []).map((guardrail) => (
-              <span key={guardrail}>{guardrail}</span>
-            ))}
-            {!aiPackage ? <div className="chart-empty">{labels.generate}</div> : null}
-          </div>
-        </article>
-
-        <article className="panel chart-card span-6 scroll-card">
-          <div className="panel-title-row compact">
-            <div>
-              <h2>{labels.context}</h2>
-              <p>{run.request.person_name || run.request.organization_name || run.domains.join(", ")}</p>
-            </div>
-            <BrainCircuit size={18} />
-          </div>
-          <pre className="ai-code-block">{JSON.stringify(aiPackage?.context_digest ?? { run_id: run.id, status: run.status }, null, 2)}</pre>
-        </article>
-
-        <article className="panel chart-card span-6 scroll-card">
-          <div className="panel-title-row compact">
-            <div>
-              <h2>{labels.evidence}</h2>
-              <p>{aiPackage?.approval_question ?? labels.pending}</p>
-            </div>
-            <ClipboardCheck size={18} />
-          </div>
-          <pre className="ai-code-block">{JSON.stringify(aiPackage?.evidence_manifest ?? {}, null, 2)}</pre>
-          <button className="primary-button subtle" onClick={() => setApproved(true)} disabled={!aiPackage}>
-            <CheckCircle2 size={17} />
-            <span>{labels.approve}</span>
+        </div>
+        <div className={`ai-runtime-pill ${runtimeReady ? "ready" : "unavailable"}`}>
+          {runtimeReady ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}
+          <span>
+            <strong>{runtimeReady ? (language === "es" ? "IA local disponible" : "Local AI available") : (language === "es" ? "IA local no disponible" : "Local AI unavailable")}</strong>
+            <small>{modelName} · {runtimeStatus}/{modelStatus}</small>
+          </span>
+          <button type="button" title={language === "es" ? "Comprobar estado" : "Check status"} onClick={refreshRuntime} disabled={runtimeLoading}>
+            <RefreshCw size={16} className={runtimeLoading ? "spin" : ""} />
           </button>
+        </div>
+      </section>
+
+      <section className="ai-context-strip" aria-label={language === "es" ? "Contexto de corrida" : "Run context"}>
+        <div><Database size={17} /><span>{language === "es" ? "Corrida" : "Run"}<strong>#{run.id}</strong></span></div>
+        <div><Target size={17} /><span>{language === "es" ? "Objeto" : "Subject"}<strong>{subject}</strong></span></div>
+        <div><Gauge size={17} /><span>{language === "es" ? "Estado" : "Status"}<strong>{run.status} · {run.progress}%</strong></span></div>
+        <div><ShieldCheck size={17} /><span>{language === "es" ? "Fuente productiva" : "Productive sources"}<strong>{sourceCoverage}</strong></span></div>
+      </section>
+
+      <section className="ai-workbench">
+        <article className="panel ai-conversation-card">
+          <header className="ai-section-header">
+            <div>
+              <span className="eyebrow">{language === "es" ? "CONVERSACIÓN TRAZABLE" : "TRACEABLE CONVERSATION"}</span>
+              <h2>{language === "es" ? "Analiza la corrida con la IA" : "Analyze the run with AI"}</h2>
+            </div>
+            <button className="icon-button" type="button" title={language === "es" ? "Limpiar conversación" : "Clear conversation"} onClick={clearConversation} disabled={!messages.length}>
+              <Trash2 size={17} />
+            </button>
+          </header>
+
+          <div className="ai-quick-questions">
+            <button
+              className="deep-analysis"
+              type="button"
+              onClick={() => void runDeepAnalysis()}
+              disabled={loading || deepAnalysisLoading || !runtimeReady}
+            >
+              {deepAnalysisLoading ? <LoaderCircle size={15} className="spin" /> : <BrainCircuit size={15} />}
+              <span>{language === "es" ? "Análisis profundo" : "Deep analysis"}</span>
+            </button>
+            {questions.map((item) => (
+              <button key={item.label} type="button" onClick={() => void sendQuestion(item.prompt, item.scopes)} disabled={loading || !runtimeReady}>
+                <Sparkles size={15} />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="ai-message-list" ref={messageListRef}>
+            {!messages.length ? (
+              <div className="ai-welcome-message">
+                <MessageSquareText size={22} />
+                <strong>{language === "es" ? "Pregunta sobre los resultados reales" : "Ask about real results"}</strong>
+                <p>
+                  {language === "es"
+                    ? "Puedo explicar KPI, hallazgos, evidencia, escenarios, frameworks, PESTEL, Porter, SOCMINT, OSINT, dark web y limitaciones de esta corrida."
+                    : "I can explain KPIs, findings, evidence, scenarios, frameworks, PESTEL, Porter, SOCMINT, OSINT, dark web and limitations for this run."}
+                </p>
+              </div>
+            ) : null}
+            {messages.map((message) => (
+              <div className={`ai-message ${message.role}`} key={message.id}>
+                <div className="ai-message-avatar">
+                  {message.role === "assistant" ? <Bot size={17} /> : <span>U</span>}
+                </div>
+                <div className="ai-message-body">
+                  <div className="ai-message-meta">
+                    <strong>{message.role === "assistant" ? "CyberDecision AI" : (language === "es" ? "Auditor" : "Auditor")}</strong>
+                    <time>{formatTime(message.createdAt, language)}</time>
+                  </div>
+                  <p>{message.content}</p>
+                  {message.result ? (
+                    <AssistantAnalysis
+                      result={message.result}
+                      language={language}
+                      onOpenView={onOpenView}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ))}
+            {loading ? (
+              <div className="ai-message assistant loading">
+                <div className="ai-message-avatar"><LoaderCircle size={17} className="spin" /></div>
+                <div className="ai-message-body">
+                  <strong>{language === "es" ? "Contrastando datos, evidencia y limitaciones..." : "Cross-checking data, evidence and limitations..."}</strong>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {error ? <div className="error-banner inline">{error}</div> : null}
+
+          <div className="ai-composer">
+            <textarea
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendQuestion();
+                }
+              }}
+              placeholder={language === "es" ? "Pregunta qué significa un resultado, qué evidencia lo sustenta o qué decisión considerar..." : "Ask what a result means, what supports it or which decision to consider..."}
+              disabled={!runtimeReady || loading}
+            />
+            <button className="primary-button ai-send-button" type="button" onClick={() => void sendQuestion()} disabled={!question.trim() || !runtimeReady || loading}>
+              <Send size={17} />
+              <span>{language === "es" ? "Analizar" : "Analyze"}</span>
+            </button>
+          </div>
+          <p className="ai-composer-note">
+            {language === "es"
+              ? "La pregunta y el historial orientan la respuesta, pero no se aceptan como evidencia. Shift + Enter crea una nueva línea."
+              : "The question and history guide the answer but are never accepted as evidence. Shift + Enter adds a new line."}
+          </p>
         </article>
 
-        <article className="panel chart-card span-12 scroll-card ai-prompt-card">
-          <div className="panel-title-row compact">
-            <div>
-              <h2>{labels.prompt}</h2>
-              <p>{aiPackage?.approval_question ?? labels.promptEditHelp}</p>
+        <aside className="ai-audit-sidebar">
+          <article className="panel ai-scope-card">
+            <header className="ai-section-header compact">
+              <div>
+                <span className="eyebrow">{language === "es" ? "CONTEXTO" : "CONTEXT"}</span>
+                <h2>{language === "es" ? "Módulos consultados" : "Queried modules"}</h2>
+              </div>
+              <Layers3 size={18} />
+            </header>
+            <p>{language === "es" ? "Selecciona una o varias áreas. La IA recibirá solo datos de esta corrida." : "Select one or more areas. AI receives data only from this run."}</p>
+            <div className="ai-scope-grid">
+              {moduleOptions.map((item) => (
+                <button
+                  className={scopes.includes(item.scope) ? "selected" : ""}
+                  key={item.scope}
+                  type="button"
+                  onClick={() => toggleScope(item.scope)}
+                >
+                  {scopes.includes(item.scope) ? <CheckCircle2 size={14} /> : <span className="scope-dot" />}
+                  <span>{language === "es" ? item.labelEs : item.labelEn}</span>
+                </button>
+              ))}
             </div>
-            <FileJson size={18} />
-          </div>
-          <div className="ai-prompt-grid">
-            <label>
-              <span>{labels.systemPrompt}</span>
-              <textarea value={systemPromptDraft} onChange={(event) => setSystemPromptDraft(event.target.value)} placeholder="System prompt" />
+            <label className="ai-audience-control">
+              <span>{language === "es" ? "Perspectiva de respuesta" : "Response perspective"}</span>
+              <select value={audience} onChange={(event) => setAudience(event.target.value as typeof audience)}>
+                <option value="executive">{language === "es" ? "Ejecutiva" : "Executive"}</option>
+                <option value="technical">{language === "es" ? "Técnica" : "Technical"}</option>
+                <option value="board">{language === "es" ? "Junta directiva" : "Board"}</option>
+                <option value="incident">{language === "es" ? "Respuesta a incidentes" : "Incident response"}</option>
+                <option value="fraud">{language === "es" ? "Fraude y marca" : "Fraud and brand"}</option>
+              </select>
             </label>
-            <label>
-              <span>{labels.userPrompt}</span>
-              <textarea value={userPromptDraft} onChange={(event) => setUserPromptDraft(event.target.value)} placeholder="User prompt" />
-            </label>
-          </div>
-        </article>
+          </article>
 
-        <article className="panel chart-card span-12 scroll-card">
-          <div className="panel-title-row compact">
-            <div>
-              <h2>{labels.payloads}</h2>
-              <p>{labels.providerHint}</p>
+          <article className="panel ai-run-facts-card">
+            <header className="ai-section-header compact">
+              <div>
+                <span className="eyebrow">{language === "es" ? "FUENTE DE VERDAD" : "SOURCE OF TRUTH"}</span>
+                <h2>{language === "es" ? "Datos disponibles" : "Available data"}</h2>
+              </div>
+              <Database size={18} />
+            </header>
+            <div className="ai-run-facts">
+              <Fact label={language === "es" ? "Registros únicos" : "Unique records"} value={run.summary.kpis.unique_records ?? run.summary.events.length} />
+              <Fact label={language === "es" ? "Evidencia validada" : "Validated evidence"} value={run.summary.kpis.validated_evidence ?? 0} />
+              <Fact label={language === "es" ? "Hallazgos validados" : "Validated findings"} value={run.summary.kpis.validated_findings ?? 0} />
+              <Fact label={language === "es" ? "Riesgo residual máximo" : "Maximum residual risk"} value={formatRisk(run.summary.kpis.max_residual_risk)} />
             </div>
-            <FileJson size={18} />
-          </div>
-          <pre className="ai-code-block">{JSON.stringify(aiPackage?.provider_payloads ?? [], null, 2)}</pre>
-        </article>
+            <button className="secondary-button ai-open-dashboard" type="button" onClick={() => onOpenView?.("dashboards")}>
+              <Gauge size={16} />
+              <span>{language === "es" ? "Abrir tablero estratégico" : "Open strategic dashboard"}</span>
+              <ChevronRight size={16} />
+            </button>
+          </article>
+
+          <article className="panel ai-report-actions">
+            <header className="ai-section-header compact">
+              <div>
+                <span className="eyebrow">{language === "es" ? "INFORMES" : "REPORTS"}</span>
+                <h2>{language === "es" ? "Ejecutivo y técnico" : "Executive and technical"}</h2>
+              </div>
+              <FileChartColumn size={18} />
+            </header>
+            <p>
+              {language === "es"
+                ? "La IA explica los resultados; el botón usa el generador trazable de la plataforma para producir ambos informes."
+                : "AI explains results; the button uses the platform's traceable generator to produce both reports."}
+            </p>
+            <button className="primary-button" type="button" onClick={requestReports} disabled={reportLoading || run.status !== "completed"}>
+              {reportLoading ? <LoaderCircle size={17} className="spin" /> : <FileChartColumn size={17} />}
+              <span>{reportLoading ? (language === "es" ? "Generando..." : "Generating...") : (language === "es" ? "Generar ambos informes" : "Generate both reports")}</span>
+            </button>
+            {report ? (
+              <div className="ai-report-links">
+                <button type="button" onClick={() => window.open(apiUrl(report.url), "_blank", "noopener,noreferrer")}>
+                  <FileChartColumn size={16} />
+                  <span>{language === "es" ? "Informe ejecutivo" : "Executive report"}</span>
+                  <SquareArrowOutUpRight size={14} />
+                </button>
+                {report.technical_url ? (
+                  <button type="button" onClick={() => window.open(apiUrl(report.technical_url ?? ""), "_blank", "noopener,noreferrer")}>
+                    <FileCode2 size={16} />
+                    <span>{language === "es" ? "Informe técnico" : "Technical report"}</span>
+                    <SquareArrowOutUpRight size={14} />
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <span className="ai-report-empty">{language === "es" ? "Aún no hay informes para esta corrida." : "No reports for this run yet."}</span>
+            )}
+          </article>
+
+          <details className="panel ai-trace-details">
+            <summary>
+              <BrainCircuit size={17} />
+              <span>{language === "es" ? "Trazabilidad del motor IA" : "AI engine traceability"}</span>
+            </summary>
+            <dl>
+              <div><dt>Gateway</dt><dd>OpenClaw</dd></div>
+              <div><dt>Modelo</dt><dd>{modelName}</dd></div>
+              <div><dt>Prompt</dt><dd>{config?.chat_prompt_version ?? config?.prompt_version ?? "N/D"}</dd></div>
+              <div><dt>Modo</dt><dd>analysis_only</dd></div>
+              <div><dt>Run ID</dt><dd>{run.id}</dd></div>
+            </dl>
+          </details>
+        </aside>
       </section>
     </div>
   );
 }
 
-function strategicPrompt(language: LanguageMode, run?: RunRecord): string {
-  const subject = run ? run.request.person_name || run.request.organization_name || run.domains.join(", ") : "the selected CyberDecisionEngine run";
-  const runId = run?.id ?? "current";
-  if (language === "en") {
-    return `Act as a strategic cyberintelligence analyst. Use only the evidence from run ${runId} for ${subject}. Produce concise executive decisions, technical validation, risk forecast, attack-surface implications, SOCMINT/OSINT/Dark Web caveats, and actionable options. Do not invent facts; cite signal URLs when available and mark uncertainty.`;
-  }
-  return `Actua como analista senior de ciberinteligencia estrategica. Usa solo la evidencia de la corrida ${runId} para ${subject}. Entrega decisiones ejecutivas concisas, validacion tecnica, proyeccion de riesgo, implicaciones de superficie de ataque, salvedades OSINT/SOCMINT/Dark Web y opciones accionables. No inventes hechos; cita URLs de senales cuando existan y marca la incertidumbre.`;
+function AssistantAnalysis({
+  result,
+  language,
+  onOpenView
+}: {
+  result: AIExecutionResult;
+  language: LanguageMode;
+  onOpenView?: (view: ViewKey) => void;
+}) {
+  const analysis = result.analysis;
+  const decisions = firstRecordArray(
+    analysis.decision_options,
+    analysis.posibilidades_de_decision,
+    analysis.strategic_decisions
+  );
+  const checks = firstRecordArray(
+    analysis.technical_checks,
+    analysis.acciones_tecnicas,
+    analysis.technical_actions
+  );
+  const inferences = recordArray(analysis.inferences);
+  const limitations = stringArray(analysis.limitations);
+  const visibleLimitations = Array.from(
+    new Set([...limitations, ...result.limitations].filter(Boolean))
+  );
+  const followUps = stringArray(analysis.follow_up_questions);
+  const dashboardTargets = recordArray(analysis.dashboard_targets);
+  const agentTrace = result.agent_trace ?? [];
+  const validatedCount = numberValue(result.evidence_validation.validated_count);
+  const requestedCount = numberValue(result.evidence_validation.requested_count);
+
+  return (
+    <div className="ai-analysis-detail">
+      {decisions.length ? (
+        <section>
+          <h3>{language === "es" ? "Posibilidades de decisión" : "Decision options"}</h3>
+          <div className="ai-decision-list">
+            {decisions.slice(0, 4).map((item, index) => (
+              <div key={`${stringValue(item.option)}-${index}`}>
+                <span>{stringValue(item.priority) || `P${index + 1}`}</span>
+                <p>
+                  <strong>{stringValue(item.option) || stringValue(item.decision)}</strong>
+                  {stringValue(item.rationale) || stringValue(item.why_now)
+                    ? ` ${stringValue(item.rationale) || stringValue(item.why_now)}`
+                    : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {checks.length || inferences.length ? (
+        <div className="ai-analysis-columns">
+          {checks.length ? (
+            <section>
+              <h3>{language === "es" ? "Validaciones técnicas" : "Technical checks"}</h3>
+              {checks.slice(0, 4).map((item, index) => (
+                <p key={`${stringValue(item.check) || stringValue(item.action)}-${index}`}>
+                  <CheckCircle2 size={14} />
+                  {stringValue(item.check) || stringValue(item.action)}
+                  {stringValue(item.reason) || stringValue(item.validation_evidence)
+                    ? `: ${stringValue(item.reason) || stringValue(item.validation_evidence)}`
+                    : ""}
+                </p>
+              ))}
+            </section>
+          ) : null}
+          {inferences.length ? (
+            <section>
+              <h3>{language === "es" ? "Inferencias" : "Inferences"}</h3>
+              {inferences.slice(0, 4).map((item, index) => (
+                <p key={`${stringValue(item.statement)}-${index}`}><CircleAlert size={14} />{stringValue(item.statement)} <em>{stringValue(item.confidence)}</em></p>
+              ))}
+            </section>
+          ) : null}
+        </div>
+      ) : null}
+      {dashboardTargets.length ? (
+        <div className="ai-dashboard-targets">
+          {dashboardTargets.slice(0, 5).map((item, index) => {
+            const scope = stringValue(item.module) as AIChatScope;
+            const target = moduleOptions.find((option) => option.scope === scope);
+            if (!target) return null;
+            return (
+              <button key={`${scope}-${index}`} type="button" onClick={() => onOpenView?.(target.view)}>
+                <span>{language === "es" ? target.labelEs : target.labelEn}</span>
+                <ChevronRight size={14} />
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      {agentTrace.length ? (
+        <details className="ai-agent-trace">
+          <summary>
+            <BrainCircuit size={14} />
+            {language === "es"
+              ? `${agentTrace.length} etapas especializadas`
+              : `${agentTrace.length} specialist stages`}
+          </summary>
+          <div>
+            {agentTrace.map((agent) => (
+              <span className={agent.status} key={`${result.id}-${agent.agent_id}`}>
+                <i />
+                <strong>{agent.label || agent.agent_id}</strong>
+                <small>{agent.execution_mode.replace(/_/g, " ")}</small>
+              </span>
+            ))}
+          </div>
+        </details>
+      ) : null}
+      <footer className="ai-answer-validation">
+        <span className={requestedCount > 0 && validatedCount === requestedCount ? "validated" : "limited"}>
+          <ShieldCheck size={14} />
+          {language === "es" ? `${validatedCount}/${requestedCount} referencias verificadas` : `${validatedCount}/${requestedCount} references verified`}
+        </span>
+        <span>
+          {language === "es"
+            ? "Análisis sustentado en la corrida"
+            : "Run-grounded analysis"}
+        </span>
+      </footer>
+      {visibleLimitations.length ? (
+        <details className="ai-limitations">
+          <summary>{language === "es" ? "Limitaciones de esta respuesta" : "Response limitations"}</summary>
+          {visibleLimitations.map((item) => <p key={item}>{item}</p>)}
+        </details>
+      ) : null}
+      {followUps.length ? (
+        <div className="ai-follow-up">
+          <strong>{language === "es" ? "Preguntas sugeridas" : "Suggested questions"}</strong>
+          {followUps.slice(0, 3).map((item) => <span key={item}>{item}</span>)}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
-function searchPlanningPrompt(language: LanguageMode, run?: RunRecord): string {
-  const subject = run ? run.request.person_name || run.request.organization_name || run.domains.join(", ") : "the selected CyberDecisionEngine run";
-  const runId = run?.id ?? "current";
-  if (language === "en") {
-    return `Create an augmented evidence-search plan for run ${runId} and ${subject}. Review source health, timeout/skipped/partial collectors, domains with low evidence, infrastructure, subdomains, technologies, exposed documents, OSINT/SOCMINT/brand-fraud/surface/dark-web gaps and authorized people-profile scope. Propose safe allowlisted queries for configured search engines such as Google CSE when available, retries, official APIs, caching, scheduling and false-positive checks. Do not execute anything or suggest block evasion.`;
+function Fact({ label, value }: { label: string; value: string | number }) {
+  return <div><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function analysisText(analysis: Record<string, unknown>, language: LanguageMode): string {
+  const answer = stringValue(analysis.answer);
+  if (answer) return answer;
+  const narrative = stringValue(analysis.narrative);
+  if (narrative) return narrative;
+  const summaries = firstRecordArray(
+    analysis.resumen_ejecutivo,
+    analysis.executive_summary,
+    analysis.executiveImplications
+  );
+  const summaryText = summaries
+    .map((item) => stringValue(item.finding) || stringValue(item.implication))
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(" ");
+  if (summaryText) return summaryText;
+  return language === "es"
+    ? "El modelo devolvió una estructura sin resumen narrativo. Revisa el detalle trazable de la respuesta."
+    : "The model returned structured data without a narrative summary. Review the traceable response details.";
+}
+
+function recordArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
+function firstRecordArray(...values: unknown[]): Record<string, unknown>[] {
+  for (const value of values) {
+    const rows = recordArray(value);
+    if (rows.length) return rows;
   }
-  return `Crea un plan de busqueda aumentada de evidencia para la corrida ${runId} y ${subject}. Revisa salud de fuentes, colectores timeout/skipped/partial, dominios con poca evidencia, infraestructura, subdominios, tecnologias, documentos expuestos, gaps OSINT/SOCMINT/marca-fraude/superficie/dark web y perfiles de personas dentro del consentimiento/alcance autorizado. Propone consultas permitidas para buscadores configurados como Google CSE cuando este disponible, reintentos seguros, APIs oficiales, cache, programacion y controles anti-falso positivo. No ejecutes nada ni sugieras evasion de bloqueos.`;
+  return [];
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function formatRisk(value?: number | null): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value * (value <= 1 ? 100 : 1))}%` : "N/D";
+}
+
+function formatTime(value: string, language: LanguageMode): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(language === "es" ? "es-CO" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function requestsReportGeneration(message: string): boolean {
+  const normalized = message.toLocaleLowerCase();
+  const hasAction = ["genera", "generar", "crear", "generate", "create"].some((token) => normalized.includes(token));
+  const hasArtifact = ["informe", "reporte", "report"].some((token) => normalized.includes(token));
+  return hasAction && hasArtifact;
+}
+
+function conversationKey(runId: string): string {
+  return `cde-ai-conversation:${runId}`;
+}
+
+function loadConversation(runId: string): ChatMessage[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(conversationKey(runId)) ?? "[]");
+    return Array.isArray(parsed) ? parsed.slice(-20) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveConversation(runId: string, messages: ChatMessage[]) {
+  try {
+    localStorage.setItem(conversationKey(runId), JSON.stringify(messages.slice(-20)));
+  } catch {
+    // The assistant remains usable when browser storage is unavailable.
+  }
 }

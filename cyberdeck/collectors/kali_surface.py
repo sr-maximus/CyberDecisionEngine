@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 from typing import Any, Iterable, List
 
 import httpx
 
 from cyberdeck.collectors.base import CollectionResult, Collector
 from cyberdeck.schemas import SourceStatus, ThreatEvent
+from cyberdeck.enrichment.vulnerability_correlation import parse_observed_technology
 
 
 class KaliSurfaceCollector(Collector):
@@ -25,7 +27,7 @@ class KaliSurfaceCollector(Collector):
         self.domains = [item for item in domains if item]
         self.endpoint = endpoint.rstrip("/")
         self.enabled = enabled
-        self.mode = mode if mode in {"passive", "light"} else "passive"
+        self.mode = mode if mode in {"passive", "light", "deep"} else "passive"
         self.max_records = max(1, int(max_records))
         self.max_hosts = max(1, int(max_hosts))
         self.timeout_seconds = max(20.0, float(timeout_seconds))
@@ -49,7 +51,10 @@ class KaliSurfaceCollector(Collector):
                                 "mode": self.mode,
                                 "max_hosts": self.max_hosts,
                                 "timeout_seconds": min(300, int(self.timeout_seconds)),
-                                "light_probe": self.mode == "light",
+                                "light_probe": self.mode != "passive",
+                                "web_crawl": self.mode != "passive",
+                                "crawl_depth": 2 if self.mode == "deep" else 1,
+                                "crawl_concurrency": 6 if self.mode == "deep" else 4,
                             },
                         )
                         response.raise_for_status()
@@ -109,12 +114,26 @@ def _event_from_finding(domain: str, finding: dict[str, Any]) -> ThreatEvent:
     finding_type = str(finding.get("type") or "attack_surface")
     validation = finding.get("validation") if isinstance(finding.get("validation"), dict) else {}
     validation_result = str(validation.get("validation_result") or "requires_owner_validation")
-    evidence_url = None if finding_type == "email_security" else f"https://{asset}" if "." in asset else None
+    candidate_url = str(finding.get("url") or validation.get("canonical_url") or "").strip()
+    evidence_url = candidate_url if candidate_url.startswith(("http://", "https://")) else None
+    if evidence_url is None and finding_type != "email_security" and "." in asset:
+        evidence_url = f"https://{asset}"
+    category = (
+        "attack_surface_web_artifact"
+        if finding_type in {
+            "public_file",
+            "web_parameter",
+            "application_error_candidate",
+            "information_indicator",
+            "secret_indicator_candidate",
+        }
+        else "attack_surface"
+    )
     return ThreatEvent(
-        id=f"KALI-SURFACE-{abs(hash((domain, title, asset))) % 10_000_000}",
+        id=_stable_id("SURFACE", domain, title, asset, evidence_url or ""),
         title=f"{domain}: {title}",
-        category="attack_surface",
-        source="Superficie externa",
+        category=category,
+        source="Exploración externa pública",
         source_weight=0.70,
         confidence=0.68 if finding_type != "subdomain" else 0.55,
         age_days=0,
@@ -130,7 +149,11 @@ def _event_from_finding(domain: str, finding: dict[str, Any]) -> ThreatEvent:
         asset=asset,
         host=asset.removeprefix("_dmarc."),
         validation_result=validation_result,
-        technical_validation=validation,
+        technical_validation={
+            **validation,
+            "finding_type": finding_type,
+            "scope_domain": domain,
+        },
         attack_mapping_status="preventive_reference",
     )
 
@@ -139,17 +162,27 @@ def _event_from_web_asset(domain: str, asset: dict[str, Any]) -> ThreatEvent:
     url = str(asset.get("url") or "").strip()
     host = str(asset.get("host") or domain).strip()
     status_code = asset.get("status_code")
-    tech = ", ".join([str(item) for item in asset.get("technologies") or []][:5])
+    technology_values = [str(item).strip() for item in asset.get("technologies") or [] if str(item).strip()]
+    webserver = str(asset.get("webserver") or "").strip()
+    if webserver and webserver.lower() not in {item.lower() for item in technology_values}:
+        technology_values.append(webserver)
+    parsed_technologies = [
+        {"product": product, "version": version, "raw": raw}
+        for raw in technology_values
+        for product, version in [parse_observed_technology(raw)]
+        if product
+    ]
+    tech = ", ".join(technology_values[:5])
     title = f"{domain}: servicio web observado en {host}"
     if status_code:
         title += f" ({status_code})"
     if tech:
         title += f" - {tech}"
     return ThreatEvent(
-        id=f"KALI-WEB-{abs(hash((domain, url, host))) % 10_000_000}",
+        id=_stable_id("WEB", domain, url, host),
         title=title,
         category="attack_surface_web",
-        source="Superficie web externa",
+        source="Exploración web pública",
         source_weight=0.72,
         confidence=0.70,
         age_days=0,
@@ -158,10 +191,33 @@ def _event_from_web_asset(domain: str, asset: dict[str, Any]) -> ThreatEvent:
         cvss=0.0,
         actor="external_exposure",
         technique="T1595",
-        tags=["external_surface", "web_asset", f"domain:{domain}", f"host:{host}", f"status:{status_code or 'unknown'}"],
+        tags=[
+            "external_surface",
+            "web_asset",
+            "technology_observed",
+            f"domain:{domain}",
+            f"host:{host}",
+            f"status:{status_code or 'unknown'}",
+            *[
+                f"technology:{item['product']}{':' + item['version'] if item['version'] else ''}"
+                for item in parsed_technologies
+            ],
+        ],
         evidence_url=url if url.startswith("http") else None,
         observed_at=datetime.now(timezone.utc).isoformat(),
         demo=False,
+        asset=host,
+        host=host,
+        technical_validation={
+            "validation_method": "passive_http_fingerprint",
+            "validation_result": "observed",
+            "direct_relationship": True,
+            "observed_technologies": parsed_technologies,
+            "status_code": status_code,
+            "content_type": asset.get("content_type"),
+            "content_length": asset.get("content_length"),
+            "does_not_demonstrate": "software support status, vulnerability applicability or compromise without a version-to-advisory correlation",
+        },
     )
 
 
@@ -174,7 +230,7 @@ def _event_from_subdomain(domain: str, host: str) -> ThreatEvent:
         title += " (nombre sensible; validar si expone servicio)"
         tags.extend(["validation_required", "administrative_name"])
     return ThreatEvent(
-        id=f"KALI-SUBDOMAIN-{abs(hash((domain, host))) % 10_000_000}",
+        id=_stable_id("SUBDOMAIN", domain, host),
         title=title,
         category="attack_surface_dns",
         source="Inventario DNS externo",
@@ -211,3 +267,8 @@ def _technique_for_finding(finding_type: str) -> str:
     if finding_type == "subdomain":
         return "T1590"
     return "T1592"
+
+
+def _stable_id(prefix: str, *parts: str) -> str:
+    digest = hashlib.sha256("|".join(parts).lower().encode("utf-8")).hexdigest()[:16]
+    return f"SURFACE-{prefix}-{digest}"

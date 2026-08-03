@@ -1,21 +1,126 @@
-MIT License
+SDMC SOURCE-AVAILABLE NON-COMMERCIAL LICENSE
 
-Copyright (c) 2026 Edwin Penuela
+Copyright (c) 2026 Edwin Javier Peñuela Camacho.
+All rights reserved. Economic rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+CyberDecisionEngine and its implementation of P-CIDER - Peñuela Cyber
+Intelligence Decision, Evidence & Risk Model - were created by Edwin Javier
+Peñuela Camacho from his own research, methods, models, architecture and
+software design.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This repository is published as source-available material for public review,
+security analysis, academic reference, reproducibility review and licensing
+evaluation only. It is not open source and it is not freeware. Publication does
+not transfer ownership and does not grant commercial, paid, production,
+redistribution, sublicensing or derivative-use rights.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. Ownership
+
+CyberDecisionEngine, including its name, architecture, source code, model
+implementation, formulas, methodologies, documentation, prompts or analysis
+packages, dashboards, APIs, reports, templates, datasets, examples, generated
+outputs, citation metadata and derivative works, is proprietary work owned by
+Edwin Javier Peñuela Camacho.
+
+All moral rights, authorship rights, patrimonial rights, economic rights,
+commercial exploitation rights, licensing rights, reproduction rights,
+distribution rights, transformation rights, public communication rights and
+related rights are reserved by Edwin Javier Peñuela Camacho to the maximum
+extent permitted by law.
+
+2. Limited Non-Commercial Evaluation Permission
+
+You may view this repository and run the software locally only for
+non-commercial evaluation, reproducibility review, security review, academic
+citation assessment or internal personal study, provided that:
+
+- all copyright, authorship, ownership, citation and license notices remain
+  intact;
+- no copy, fork, redistribution, mirror, public deployment, derivative work,
+  client deliverable, commercial service, dataset, model, dashboard, API or paid
+  report is created or offered;
+- CyberDecisionEngine and P-CIDER are not used to obtain direct or indirect
+  economic benefit; and
+- all use remains defensive, passive, public, legitimately shared or explicitly
+  authorized cyber intelligence.
+
+3. Commercial and Economic Use Requires Paid Written Authorization
+
+Any commercial use, paid use, production use, client-facing use,
+redistribution, integration, derivative use, training use, SaaS use or use that
+creates direct or indirect economic benefit requires prior written paid
+authorization from Edwin Javier Peñuela Camacho.
+
+This requirement includes, without limitation:
+
+- consulting;
+- SaaS or hosted services;
+- reports, analyses, diagnostics, deliverables or recommendations for clients;
+- paid training, workshops, courses, certifications or educational products;
+- APIs, dashboards, portals, automations, connectors or integrations;
+- software products, managed services, internal commercial platforms or
+  embedded systems;
+- datasets, benchmarks, scoring tables, derived data products or enrichment
+  services;
+- models, derivative models, model adaptations, scoring engines, rulesets or
+  decision engines;
+- resale, sublicensing, leasing, rental, transfer, publication or distribution;
+- use by a company, consultant, contractor, institution or organization to
+  support revenue, paid operations, procurement, bids, audits, customer work or
+  any other economic advantage.
+
+En español, esta autorización escrita y pagada es obligatoria para cualquier
+uso comercial, consultoría, SaaS, reportes para clientes, capacitación pagada,
+APIs, dashboards, productos, datasets, modelos o cualquier beneficio económico,
+directo o indirecto.
+
+No unpaid, implied, oral, platform, repository, contribution, fork, download or
+access-based permission creates commercial-use rights. Commercial rights exist
+only through a separate written paid license signed or expressly issued by
+Edwin Javier Peñuela Camacho.
+
+4. Prohibited Acts Without Paid Written Authorization
+
+Without prior written paid authorization from Edwin Javier Peñuela Camacho, you
+may not:
+
+- copy, modify, merge, publish, distribute, sublicense, sell, rent, lease,
+  transfer, host, embed, rebrand or create derivative works from
+  CyberDecisionEngine or its P-CIDER implementation;
+- remove, obscure or alter creator attribution, copyright notices, ownership
+  notices, license terms, model identity or citation metadata;
+- represent CyberDecisionEngine or P-CIDER as your own work or as the work of
+  any automated tool, platform, vendor, standard body or third party;
+- use the CyberDecisionEngine or P-CIDER name, acronym or model identity as a
+  trademark, product name, service name, endorsement, affiliation,
+  certification or sponsorship claim;
+- use the software, model or documentation in unlawful, offensive, intrusive,
+  exploitative or unauthorized cyber activity.
+
+5. Third-Party Materials
+
+Third-party standards, names, marks, frameworks, software packages and
+references remain the property of their respective owners. CyberDecisionEngine
+maps to selected public standards only for interoperability and analysis. Such
+references do not imply endorsement, certification, affiliation, sponsorship,
+official equivalence or transfer of ownership by NIST, MITRE, FIRST, CISA,
+OASIS, ISO, AICPA, The Open Group, MISP or any other referenced organization.
+
+6. Defensive-Use Restriction
+
+CyberDecisionEngine and P-CIDER may be used only for defensive, passive,
+public, legitimately shared or explicitly authorized cyber intelligence.
+Unauthorized access, exploitation, brute force, credential testing, evasion,
+acquisition of stolen data, intrusive surveillance, doxxing, retaliation or any
+unlawful use is prohibited.
+
+7. Disclaimer
+
+THE SOFTWARE, MODEL, DOCUMENTATION, EXAMPLES, DATASETS, OUTPUTS AND RELATED
+MATERIALS ARE PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, COMPLETENESS,
+REGULATORY SUITABILITY OR COMMERCIAL SUITABILITY. TO THE MAXIMUM EXTENT
+PERMITTED BY LAW, EDWIN JAVIER PEÑUELA CAMACHO SHALL NOT BE LIABLE FOR ANY
+CLAIM, DAMAGE, LOSS, COST OR LIABILITY ARISING FROM ACCESS TO OR USE OF
+CYBERDECISIONENGINE OR P-CIDER.

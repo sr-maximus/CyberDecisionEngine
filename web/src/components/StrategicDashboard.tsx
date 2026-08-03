@@ -1,11 +1,11 @@
-import { Activity, CheckCircle2, GitBranch, Globe2, MessageSquareWarning, Network, Newspaper, RadioTower, ShieldAlert } from "lucide-react";
+import { Activity, CheckCircle2, GitBranch, Globe2, Layers3, MessageSquareWarning, Network, Newspaper, RadioTower, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DecisionIntelligenceSnapshot, LanguageMode, RunRecord, SourceStatus } from "../types";
 import { defaultDashboardFilters, localizedCountryLabel } from "../data/catalog";
 import { buildDashboardModel } from "../utils/dashboard";
 import type { RiskHeatRow } from "../utils/dashboard";
 import { formatDateTime, formatNumber } from "../utils/format";
-import { BarRanking, Gauge, LineChart, SectorMatrix } from "./ChartPrimitives";
+import { BarRanking, CountryContextList, Gauge, LineChart, SectorMatrix } from "./ChartPrimitives";
 import { FrameworkMapping, GraphInsight } from "./DecisionCharts";
 import { AttackPredictionPanel, PosturePanel, RiskHeatMap, RiskRadarChart, StrategicSignalHeatmap, StrategyLensChart } from "./StrategyCharts";
 import { cleanEvidenceTitle, displaySourceName, eventEvidenceUrl, publicEvidenceUrl, statusDisplayName } from "../utils/sourceLabels";
@@ -21,8 +21,9 @@ const labels = {
     currentScope: "Alcance actual",
     signals: "Registros únicos",
     maxRisk: "Riesgo máx.",
-    sourcesOk: "Fuentes productivas / consultadas",
-    countryScope: "País objetivo",
+    sourcesOk: "Ciclo de fuentes",
+    sourcesHelper: "registradas · elegibles · consultadas · exitosas · productivas",
+    countryScope: "Países del alcance",
     executiveRadar: "Radar ejecutivo de riesgo",
     executiveRadarSubtitle: "Intensidad de riesgo desde el modelo del informe actual",
     riskHeatmap: "Mapa de calor de riesgo",
@@ -32,10 +33,16 @@ const labels = {
     predictive: semanticLabel("signal_pressure_index", "es"),
     predictiveSubtitle: "Lectura no calibrada por modalidad, sector y TTP basada solo en evidencia directa o validada",
     vulnerabilityIntel: "Inteligencia de vulnerabilidades",
-    vulnerabilityIntelSubtitle: "CVE confirmadas, KEV y tecnologías observadas sin inferir falsos positivos",
-    confirmedCves: "CVE confirmadas",
+    vulnerabilityIntelSubtitle: "Aplicabilidad sustentada por activo, producto, versión y configuración afectada",
+    confirmedCves: "CVE aplicables",
+    candidateCves: "Producto coincide",
+    contextualCves: "CVE de contexto",
+    exploitReferences: "Referencias públicas",
+    cvssV4: "CVSS v4",
     observedTech: "Tecnologías",
     surfaceAssets: "Activos",
+    quantitativeRisk: "Escenarios organizacionales por capas",
+    quantitativeRiskSubtitle: "Frecuencia, consecuencia y efectividad de capas solo con valores declarados; no es una predicción de ataque",
     threatTrend: "Tendencia de amenazas desde inteligencia diaria",
     latestRun: "Última corrida",
     categories: "Categorías de amenaza",
@@ -46,10 +53,10 @@ const labels = {
     ttpImpactSubtitle: "Técnicas potencialmente relevantes; observadas solo con telemetría validada",
     attackActions: "Acciones de ataque",
     attackActionsSubtitle: "Actividad observada solo cuando existe evidencia técnica validada",
-    locationHeat: "Calor geográfico de amenazas",
-    locationHeatSubtitle: "Países, ciudades o regiones encontradas en etiquetas fuente",
+    locationHeat: "Ubicación y contexto geográfico",
+    locationHeatSubtitle: "Todos los países declarados o sustentados por evidencia de la corrida, con su estado analítico",
     sectorMatrix: "Matriz de sector económico",
-    sectorMatrixSubtitle: "Sector desde la solicitud del análisis actual",
+    sectorMatrixSubtitle: "Sectores observados en evidencia relacionada; separados del sector declarado",
     affectedScope: "Alcance afectado",
     affectedScopeSubtitle: "Dominios, activos o categorías afectadas por evidencia real",
     posture: semanticLabel("external_exposure_intelligence_index", "es"),
@@ -62,9 +69,9 @@ const labels = {
     porterSubtitle: "Fuerzas competitivas y exposición cibernética sectorial",
     graph: "Análisis de grafo de amenazas",
     graphSubtitle: "Grupos, acciones y TTP enlazados para soporte de decisión",
-    news: "Noticias y acciones de grupos",
-    newsSubtitle: "Titulares ligados a grupos y ataques observados",
-    emptyNews: "Sin titulares de grupos observados en la corrida actual.",
+    news: "Inteligencia de amenazas y campañas",
+    newsSubtitle: "Noticias con acción cibernética y atribución explícita; no confirman un incidente en la organización",
+    emptyNews: "Sin noticias atribuibles a actores o campañas en la corrida actual.",
     disarmPulse: "Pulso DISARM",
     disarmPulseSubtitle: "Señales de narrativa, influencia o confianza pública detectadas en la corrida",
     webMap: "Mapa de capas de recolección",
@@ -91,8 +98,9 @@ const labels = {
     currentScope: "Current scope",
     signals: "Unique records",
     maxRisk: "Max risk",
-    sourcesOk: "Productive / attempted sources",
-    countryScope: "Country scope",
+    sourcesOk: "Source lifecycle",
+    sourcesHelper: "registered · eligible · attempted · successful · productive",
+    countryScope: "Scope countries",
     executiveRadar: "Executive risk radar",
     executiveRadarSubtitle: "Risk intensity from the current report model",
     riskHeatmap: "Risk heatmap",
@@ -102,10 +110,16 @@ const labels = {
     predictive: semanticLabel("signal_pressure_index", "en"),
     predictiveSubtitle: "Non-calibrated reading by modality, sector and TTP using only direct or validated evidence",
     vulnerabilityIntel: "Vulnerability intelligence",
-    vulnerabilityIntelSubtitle: "Confirmed CVEs, KEV and observed technologies without false-positive inference",
-    confirmedCves: "Confirmed CVEs",
+    vulnerabilityIntelSubtitle: "Applicability supported by asset, product, version and affected configuration",
+    confirmedCves: "Applicable CVEs",
+    candidateCves: "Product matches",
+    contextualCves: "Context CVEs",
+    exploitReferences: "Public references",
+    cvssV4: "CVSS v4",
     observedTech: "Technologies",
     surfaceAssets: "Assets",
+    quantitativeRisk: "Layered organizational scenarios",
+    quantitativeRiskSubtitle: "Frequency, consequence and layered effectiveness using declared values only; not an attack prediction",
     threatTrend: "Threat trend from daily intelligence",
     latestRun: "Latest run",
     categories: "Threat categories",
@@ -116,10 +130,10 @@ const labels = {
     ttpImpactSubtitle: "Potentially relevant techniques; observed only with validated telemetry",
     attackActions: "Attack actions",
     attackActionsSubtitle: "Observed activity only when supported by validated technical evidence",
-    locationHeat: "Threat location heat",
-    locationHeatSubtitle: "Countries, cities or regions found in source tags",
+    locationHeat: "Location and geographic context",
+    locationHeatSubtitle: "All countries declared or supported by current-run evidence, with their analytical status",
     sectorMatrix: "Economic sector matrix",
-    sectorMatrixSubtitle: "Sector from the current analysis request",
+    sectorMatrixSubtitle: "Sectors observed in related evidence, kept separate from declared scope",
     affectedScope: "Affected scope",
     affectedScopeSubtitle: "Domains, assets or categories affected by real evidence",
     posture: semanticLabel("external_exposure_intelligence_index", "en"),
@@ -132,9 +146,9 @@ const labels = {
     porterSubtitle: "Competitive forces and sector cyber exposure",
     graph: "Threat graph analysis",
     graphSubtitle: "Groups, actions and TTPs linked for decision support",
-    news: "Group news and actions",
-    newsSubtitle: "Headlines tied to observed groups and attacks",
-    emptyNews: "No observed group headlines in the current run.",
+    news: "Threat and campaign intelligence",
+    newsSubtitle: "News with an explicit cyber action and attribution; it does not confirm an incident at the organization",
+    emptyNews: "No actor- or campaign-attributed news in the current run.",
     disarmPulse: "DISARM pulse",
     disarmPulseSubtitle: "Narrative, influence or public-trust signals detected in the current run",
     webMap: "Collection layer map",
@@ -167,6 +181,8 @@ const dashboardItemLabelsEs: Record<string, string> = {
   open_web: "Web abierta",
   external_exposure: "Exposición externa",
   vulnerability: "Vulnerabilidad",
+  vulnerability_candidate: "Candidato de vulnerabilidad por producto",
+  vulnerability_context: "Contexto de vulnerabilidades",
   vulnerability_probability: "Probabilidad de vulnerabilidad",
   threat_intel: "Inteligencia de amenazas",
   attack_surface_dns: "Superficie de ataque DNS",
@@ -199,20 +215,36 @@ export function StrategicDashboard({ run, language }: StrategicDashboardProps) {
   const model = buildDashboardModel(run, defaultDashboardFilters);
   const snapshot = run.summary.decision_snapshot;
   const disarmPulse = buildDisarmPulse(run, language);
-  const rawCountry = run.request.country?.trim();
-  const country = rawCountry ? localizedCountryLabel(rawCountry, language) : "-";
+  const scopeCountries = [
+    run.request.country,
+    ...(run.request.countries_of_operation ?? [])
+  ]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .map((value) => localizedCountryLabel(value, language));
+  const country = [...new Set(scopeCountries)].join(" · ") || "-";
   const uniqueRecords = snapshotMetric(snapshot, "unique_records", run.summary.kpis.unique_records ?? run.summary.kpis.new_events);
   const maxRisk = snapshotMetric(snapshot, "max_residual_risk", run.summary.kpis.max_residual_risk ?? 0);
   const productiveSources = snapshotMetric(snapshot, "productive_sources", run.summary.kpis.productive_sources ?? run.summary.kpis.healthy_sources);
   const attemptedSources = snapshotMetric(snapshot, "queried_sources", run.summary.kpis.queried_sources ?? run.summary.kpis.total_sources);
+  const registeredSources = snapshotMetric(snapshot, "registered_sources", run.summary.kpis.registered_sources ?? 0);
+  const eligibleSources = snapshotMetric(snapshot, "eligible_sources", run.summary.kpis.eligible_sources ?? run.summary.kpis.total_sources);
+  const successfulSources = snapshotMetric(snapshot, "successful_sources", run.summary.kpis.successful_sources ?? run.summary.kpis.healthy_sources);
   const riskRadarState = snapshot?.chart_eligibility?.executive_risk_radar;
   const riskHeatState = snapshot?.chart_eligibility?.risk_heatmap;
+  const quantitativeRiskAvailable = model.quantitativeRisk.layered.status === "calculated";
   return (
     <div className="view-stack">
       <section className="dashboard-kpis">
         <Metric icon={<RadioTower size={18} />} label={copy.signals} value={formatNumber(uniqueRecords)} />
         <Metric icon={<ShieldAlert size={18} />} label={copy.maxRisk} value={snapshot?.metrics.max_residual_risk?.value_status === "no_data" ? "N/D" : maxRisk.toFixed(1)} />
-        <Metric icon={<Activity size={18} />} label={copy.sourcesOk} value={attemptedSources ? `${productiveSources}/${attemptedSources}` : "N/D"} />
+        <Metric
+          icon={<Activity size={18} />}
+          label={copy.sourcesOk}
+          value={attemptedSources ? `${productiveSources}/${attemptedSources}` : "N/D"}
+          helper={`${registeredSources} · ${eligibleSources} · ${attemptedSources} · ${successfulSources} · ${productiveSources}`}
+          title={copy.sourcesHelper}
+        />
         <Metric icon={<Globe2 size={18} />} label={copy.countryScope} value={country} />
       </section>
 
@@ -252,6 +284,13 @@ export function StrategicDashboard({ run, language }: StrategicDashboardProps) {
           <VulnerabilityIntelPanel model={model.vulnerabilityIntel} language={language} />
         </article>
 
+        {quantitativeRiskAvailable ? (
+          <article className="panel chart-card span-12 premium-card">
+            <PanelHeader title={copy.quantitativeRisk} subtitle={copy.quantitativeRiskSubtitle} icon={<Layers3 size={18} />} />
+            <QuantitativeRiskPanel model={model.quantitativeRisk} language={language} />
+          </article>
+        ) : null}
+
         <div className="dashboard-section-label span-12">
           <span>02</span>
           <div>
@@ -290,10 +329,10 @@ export function StrategicDashboard({ run, language }: StrategicDashboardProps) {
           <BarRanking items={localizedDashboardItems(model.attackActions, language)} language={language} />
         </article>
 
-        <article className="panel chart-card span-4 compact-card">
+        <article className="panel chart-card span-4 compact-card geographic-context-card">
           <PanelHeader title={copy.locationHeat} subtitle={copy.locationHeatSubtitle} />
-          <BarRanking
-            items={model.regionalHeat.map((item) => ({
+          <CountryContextList
+            items={model.geographicCountries.map((item) => ({
               ...item,
               name: localizedCountryLabel(item.name, language)
             }))}
@@ -301,7 +340,7 @@ export function StrategicDashboard({ run, language }: StrategicDashboardProps) {
           />
         </article>
 
-        <article className="panel chart-card span-4 compact-card">
+        <article className="panel chart-card span-4 compact-card sector-context-card">
           <PanelHeader title={copy.sectorMatrix} subtitle={copy.sectorMatrixSubtitle} />
           <SectorMatrix items={model.sectorMatrix} language={language} />
         </article>
@@ -368,7 +407,13 @@ export function StrategicDashboard({ run, language }: StrategicDashboardProps) {
 
         <article className="panel chart-card span-8 threat-graph-card">
           <PanelHeader title={copy.graph} subtitle={copy.graphSubtitle} icon={<Network size={18} />} />
-          <GraphInsight metrics={model.graphMetrics} nodes={model.threatGraphNodes} links={model.threatGraphLinks} language={language} />
+          <GraphInsight
+            metrics={model.graphMetrics}
+            nodes={model.threatGraphNodes}
+            links={model.threatGraphLinks}
+            language={language}
+            hideConfidenceMetric
+          />
         </article>
 
         <article className="panel chart-card span-4 scroll-card threat-news-card">
@@ -381,6 +426,8 @@ export function StrategicDashboard({ run, language }: StrategicDashboardProps) {
                 <em>
                   {displaySourceName(event.source, language)}
                   {event.technique ? ` · ${event.technique}` : ""}
+                  {event.relationship_to_scope ? ` · ${event.relationship_to_scope}` : ""}
+                  {event.evidence_status ? ` · ${evidenceStatusLabel(event.evidence_status, language)}` : ""}
                   {event.observed_at ? ` · ${formatDateTime(event.observed_at)}` : ""}
                 </em>
                 {eventEvidenceUrl(event) ? <code>{eventEvidenceUrl(event)}</code> : null}
@@ -397,6 +444,22 @@ export function StrategicDashboard({ run, language }: StrategicDashboardProps) {
       </section>
     </div>
   );
+}
+
+function evidenceStatusLabel(status: string, language: LanguageMode): string {
+  const labelsByStatus: Record<string, [string, string]> = {
+    raw: ["Recolectado", "Collected"],
+    contextual: ["Contextual", "Contextual"],
+    potential: ["Potencial", "Potential"],
+    related: ["Relacionado", "Related"],
+    direct: ["Directo", "Direct"],
+    validated: ["Validado", "Validated"],
+    confirmed: ["Confirmado", "Confirmed"],
+    false_positive: ["Falso positivo", "False positive"],
+    discarded: ["Descartado", "Discarded"]
+  };
+  const labels = labelsByStatus[status] ?? [status, status];
+  return labels[language === "en" ? 1 : 0];
 }
 
 function ClaimEvidencePanel({ run, language }: { run: RunRecord; language: LanguageMode }) {
@@ -460,12 +523,13 @@ function validationMethodLabel(method: string | null | undefined, language: Lang
   return labelsByMethod[method]?.[language] ?? method.replace(/_/g, " ");
 }
 
-function Metric({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
+function Metric({ icon, label, value, helper, title }: { icon?: ReactNode; label: string; value: string; helper?: string; title?: string }) {
   return (
-    <div className={`dashboard-metric ${icon ? "" : "metric-plain"}`}>
+    <div className={`dashboard-metric ${icon ? "" : "metric-plain"}`} title={title}>
       {icon}
       <span>{label}</span>
       <strong>{value}</strong>
+      {helper ? <small>{helper}</small> : null}
     </div>
   );
 }
@@ -484,19 +548,27 @@ function PanelHeader({ title, subtitle, icon }: { title: string; subtitle: strin
 
 function SourceFreshnessPanel({ value, run, language }: { value: number; run?: RunRecord; language: LanguageMode }) {
   const sources = run?.summary.source_statuses ?? [];
-  const healthy = sources.filter((source) => source.status === "ok" || source.status === "healthy").length;
-  const degraded = Math.max(0, sources.length - healthy);
+  const coverage = asRecord(run?.summary.metrics?.source_coverage);
+  const lifecycle = asRecord(coverage.source_lifecycle);
+  const registered = numberFromUnknown(lifecycle.registered ?? run?.summary.kpis.registered_sources ?? sources.length);
+  const eligible = numberFromUnknown(lifecycle.eligible ?? run?.summary.kpis.eligible_sources ?? run?.summary.kpis.total_sources);
+  const attempted = numberFromUnknown(lifecycle.attempted ?? run?.summary.kpis.queried_sources);
+  const successful = numberFromUnknown(lifecycle.succeeded ?? run?.summary.kpis.successful_sources ?? run?.summary.kpis.healthy_sources);
+  const productive = numberFromUnknown(lifecycle.productive ?? run?.summary.kpis.productive_sources);
   const totalRecords = sources.reduce((sum, source) => sum + (source.records ?? 0), 0);
   const copy = {
-    es: { healthy: "saludables", degraded: "revisar", records: "registros", empty: "Sin fuentes registradas en la corrida." },
-    en: { healthy: "healthy", degraded: "review", records: "records", empty: "No sources registered in this run." }
+    es: { registered: "registradas", eligible: "elegibles", attempted: "consultadas", successful: "exitosas", productive: "productivas", records: "registros", empty: "Sin fuentes registradas en la corrida." },
+    en: { registered: "registered", eligible: "eligible", attempted: "attempted", successful: "successful", productive: "productive", records: "records", empty: "No sources registered in this run." }
   }[language];
   return (
     <div className="source-freshness-panel">
       <Gauge value={Math.round(value)} language={language} />
       <div className="freshness-metrics">
-        <FreshnessMetric value={String(healthy)} label={copy.healthy} tone="good" />
-        <FreshnessMetric value={String(degraded)} label={copy.degraded} tone={degraded ? "warn" : "good"} />
+        <FreshnessMetric value={String(registered)} label={copy.registered} tone="info" />
+        <FreshnessMetric value={String(eligible)} label={copy.eligible} tone="info" />
+        <FreshnessMetric value={String(attempted)} label={copy.attempted} tone={attempted < eligible ? "warn" : "good"} />
+        <FreshnessMetric value={String(successful)} label={copy.successful} tone={successful < attempted ? "warn" : "good"} />
+        <FreshnessMetric value={String(productive)} label={copy.productive} tone="good" />
         <FreshnessMetric value={formatNumber(totalRecords)} label={copy.records} tone="info" />
       </div>
       <div className="freshness-source-list">
@@ -620,8 +692,8 @@ function ChartUnavailable({ reason, language }: { reason: string; language: Lang
 
 function DecisionSnapshotOverview({ snapshot, language }: { snapshot: DecisionIntelligenceSnapshot; language: LanguageMode }) {
   const copy = language === "en"
-    ? { title: "Decision state", subtitle: "One versioned record for dashboard, reports and exports", domains: "Analysed targets", records: "records", findings: "findings", risk: "risk", funnel: "Scenario funnel", templates: "Reference templates", candidate: "Candidates", supported: "Supported", validated: "Validated", confirmed: "Confirmed", decisions: "Decision possibilities", noSignal: "No direct signal", owner: "Owner", window: "Window", act: "Act now", validate: "Validate first", refs: "Evidence" }
-    : { title: "Estado para decisión", subtitle: "Un registro versionado para tablero, informes y exportaciones", domains: "Objetivos analizados", records: "registros", findings: "hallazgos", risk: "riesgo", funnel: "Embudo de escenarios", templates: "Plantillas de referencia", candidate: "Candidatos", supported: "Soportados", validated: "Validados", confirmed: "Confirmados", decisions: "Posibilidades de decisión", noSignal: "Sin señal directa", owner: "Responsable", window: "Ventana", act: "Actuar ahora", validate: "Validar primero", refs: "Evidencia" };
+    ? { title: "Decision state", subtitle: "One versioned record for dashboard, reports and exports", domains: "Analysed targets", records: "records", findings: "findings", risk: "risk", funnel: "Scenario funnel", templates: "Reference templates", candidate: "Candidates", supported: "Supported", validated: "Validated", confirmed: "Confirmed", decisions: "Decision possibilities", noSignal: "No direct signal", noDecisions: "No publishable decisions", noDecisionsHint: "This run does not yet contain enough validated evidence to support a decision possibility.", owner: "Owner", window: "Window", act: "Act now", validate: "Validate first", refs: "Evidence" }
+    : { title: "Estado para decisión", subtitle: "Un registro versionado para tablero, informes y exportaciones", domains: "Objetivos analizados", records: "registros", findings: "hallazgos", risk: "riesgo", funnel: "Embudo de escenarios", templates: "Plantillas de referencia", candidate: "Candidatos", supported: "Soportados", validated: "Validados", confirmed: "Confirmados", decisions: "Posibilidades de decisión", noSignal: "Sin señal directa", noDecisions: "Sin decisiones publicables", noDecisionsHint: "La corrida aún no contiene evidencia validada suficiente para sostener una posibilidad de decisión.", owner: "Responsable", window: "Ventana", act: "Actuar ahora", validate: "Validar primero", refs: "Evidencia" };
   const funnel = snapshot.scenario_funnel;
   const subjectRows = snapshot.domains.length
     ? snapshot.domains.map((row) => ({
@@ -642,11 +714,13 @@ function DecisionSnapshotOverview({ snapshot, language }: { snapshot: DecisionIn
       }));
   return (
     <section className="panel decision-snapshot-panel">
-      <PanelHeader title={copy.title} subtitle={copy.subtitle} icon={<CheckCircle2 size={18} />} />
-      <div className="decision-snapshot-meta">
-        <span>v{snapshot.report_context.snapshot_version}</span>
-        <code>{snapshot.snapshot_hash.slice(0, 12)}</code>
-        <em>{snapshot.report_context.analysis_window}</em>
+      <div className="decision-snapshot-header">
+        <PanelHeader title={copy.title} subtitle={copy.subtitle} icon={<CheckCircle2 size={18} />} />
+        <div className="decision-snapshot-meta" aria-label={language === "en" ? "Snapshot metadata" : "Metadatos de la instantánea"}>
+          <span>v{snapshot.report_context.snapshot_version}</span>
+          <code>{snapshot.snapshot_hash.slice(0, 12)}</code>
+          <em>{snapshot.report_context.analysis_window}</em>
+        </div>
       </div>
       <div className="decision-snapshot-layout">
         <div className="decision-domain-panel">
@@ -684,7 +758,15 @@ function DecisionSnapshotOverview({ snapshot, language }: { snapshot: DecisionIn
                 <small>{copy.owner}: {decision.owner_role} · {copy.window}: {decision.due_window} · {copy.refs}: [{decision.evidence_ids.join(", ")}]</small>
               </details>
             ))}
-            {!snapshot.decisions.length ? <div className="muted-empty">{language === "en" ? "No evidence-supported decision." : "Sin decisión soportada por evidencia."}</div> : null}
+            {!snapshot.decisions.length ? (
+              <div className="decision-empty-state">
+                <ShieldAlert size={20} />
+                <div>
+                  <strong>{copy.noDecisions}</strong>
+                  <span>{copy.noDecisionsHint}</span>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -699,7 +781,11 @@ function VulnerabilityIntelPanel({ model, language }: { model: ReturnType<typeof
     <div className="vuln-intel-panel">
       <div className="vuln-intel-kpis">
         <Metric label={copy.confirmedCves} value={String(model.confirmedCves)} />
+        <Metric label={copy.candidateCves} value={String(model.candidateCves)} />
+        <Metric label={copy.contextualCves} value={String(model.contextualCves)} />
         <Metric label="KEV" value={String(model.kevMatches)} />
+        <Metric label={copy.exploitReferences} value={String(model.publicExploitReferences)} />
+        <Metric label={copy.cvssV4} value={String(model.cvssV4Records)} />
         <Metric label={copy.observedTech} value={String(model.observedTechnologies)} />
         <Metric label={copy.surfaceAssets} value={String(model.surfaceAssets)} />
       </div>
@@ -708,14 +794,85 @@ function VulnerabilityIntelPanel({ model, language }: { model: ReturnType<typeof
         {model.rows.map((row, index) => (
           <a key={`${row.label}-${row.asset}-${index}`} href={publicEvidenceUrl(row.evidence_url) || "#"} target="_blank" rel="noreferrer">
             <strong>{row.label}</strong>
-            <span>{row.asset}</span>
+            <span>{row.asset}{row.product ? ` · ${row.product}${row.observedVersion ? ` ${row.observedVersion}` : ""}` : ""}</span>
             <em>{row.status}</em>
+            {row.affectedRange ? <small>{language === "en" ? "Affected range" : "Rango afectado"}: {row.affectedRange}</small> : null}
+            {row.cvssScore !== null ? <small>CVSS {row.cvssVersion || ""} · {row.cvssScore.toFixed(1)}</small> : null}
+            {row.cvssVector ? <code title={row.cvssVector}>{row.cvssVector}</code> : null}
           </a>
         ))}
         {!model.rows.length ? <span className="muted-empty">{empty}</span> : null}
       </div>
     </div>
   );
+}
+
+function QuantitativeRiskPanel({ model, language }: { model: ReturnType<typeof buildDashboardModel>["quantitativeRisk"]; language: LanguageMode }) {
+  const copy = language === "en"
+    ? {
+        layered: "Layered protection scenarios",
+        frequencyDefinition: "Annual frequency is the organization-declared rate for the initiating scenario.",
+        consequenceDefinition: "Consequence is the declared financial magnitude if the scenario materializes.",
+        layersDefinition: "Layers are independent preventive or response controls with explicitly supplied effectiveness.",
+        layeredDataRule: "The model combines declared frequency, consequence and layer failure. It does not infer values from CVEs, news or public records.",
+        scenarios: "Scenarios",
+        expected: "Expected annual scenario loss",
+        frequency: "Resulting annual frequency",
+        reduction: "Relative layer reduction",
+        layers: "layers"
+      }
+    : {
+        layered: "Escenarios de protección por capas",
+        frequencyDefinition: "La frecuencia anual es la tasa declarada por la organización para el escenario iniciador.",
+        consequenceDefinition: "La consecuencia es la magnitud financiera declarada si el escenario se materializa.",
+        layersDefinition: "Las capas son controles preventivos o de respuesta independientes con efectividad suministrada explícitamente.",
+        layeredDataRule: "El modelo combina frecuencia, consecuencia y fallo de capas declarados. No infiere valores desde CVE, noticias o registros públicos.",
+        scenarios: "Escenarios",
+        expected: "Pérdida anual esperada del escenario",
+        frequency: "Frecuencia anual resultante",
+        reduction: "Reducción relativa por capas",
+        layers: "capas"
+      };
+  const layeredCalculated = model.layered.status === "calculated";
+  return (
+    <div className="quant-risk-panel single">
+      {layeredCalculated ? <section>
+        <header><Layers3 size={18} /><div><strong>{copy.layered}</strong><small>{model.layered.modelVersion}</small></div></header>
+        <div className="quant-risk-metrics compact">
+          <Metric label={copy.scenarios} value={String(model.layered.scenarioCount)} />
+          <Metric label={copy.expected} value={formatCurrency(model.layered.aggregateExpectedAnnualLoss, model.layered.currency, language)} />
+        </div>
+        <div className="quant-scenario-list">
+          {model.layered.scenarios.map((scenario) => (
+            <div key={scenario.name}>
+              <strong>{scenario.name}</strong>
+              <span>{scenario.layerCount} {copy.layers} · {copy.frequency}: {scenario.resultingFrequency.toFixed(4)}</span>
+              <em>{copy.reduction}: {(scenario.riskReduction * 100).toFixed(1)}% · {formatCurrency(scenario.expectedAnnualLoss, model.layered.currency, language)}</em>
+            </div>
+          ))}
+        </div>
+        <dl className="quant-risk-definitions">
+          <div><dt>{language === "en" ? "RATE" : "TASA"}</dt><dd>{copy.frequencyDefinition}</dd></div>
+          <div><dt>{language === "en" ? "LOSS" : "PÉRD."}</dt><dd>{copy.consequenceDefinition}</dd></div>
+          <div><dt>{language === "en" ? "LAYERS" : "CAPAS"}</dt><dd>{copy.layersDefinition}</dd></div>
+        </dl>
+        <p className="quant-risk-data-rule">{copy.layeredDataRule}</p>
+      </section> : null}
+    </div>
+  );
+}
+
+function formatCurrency(value: number | null, currency: string, language: LanguageMode): string {
+  if (value === null || !currency || currency === "MIXED") return "N/D";
+  try {
+    return new Intl.NumberFormat(language === "en" ? "en-US" : "es-CO", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0
+    }).format(value);
+  } catch {
+    return `${currency} ${formatNumber(value)}`;
+  }
 }
 
 function RiskHeatDistribution({ rows, language }: { rows: RiskHeatRow[]; language: LanguageMode }) {

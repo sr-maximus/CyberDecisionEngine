@@ -1,6 +1,6 @@
 app:
   name: CyberDecisionEngine
-  creator: Edwin Penuela
+  creator: Edwin Javier Peñuela Camacho
   cache_db: data/cyberdeck.sqlite
   reports_dir: reports
   data_dir: data

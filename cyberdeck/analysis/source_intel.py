@@ -75,12 +75,16 @@ def build_source_coverage(statuses: Iterable[SourceStatus], events: Iterable[Thr
     socmint_events = [event for event in event_list if _is_socmint_record(event)]
     darkweb_events = [event for event in event_list if _is_darkweb_record(event)]
     osint_events = [event for event in event_list if not _is_darkweb_record(event)]
+    unique_records = len({event.canonical_id or event.id for event in event_list})
     return {
+        "unique_records": unique_records,
         "coverage_score": coverage_score,
         "source_health_score": source_health_score,
         "source_completeness_score": source_completeness_score,
         "interpretation": "Cobertura usa solo conectores elegibles; salud mide ejecucion tecnica y productividad indica conectores que aportaron registros normalizados. Sin datos no equivale a ausencia de riesgo.",
         "source_lifecycle": _source_lifecycle(status_list),
+        "connector_diagnostics": _connector_diagnostics(status_list),
+        "scraping_assessment": _scraping_assessment(event_list, status_list),
         "connectors": [_status_dict(status) for status in status_list],
         "osint": {
             "records": len(osint_events),
@@ -162,6 +166,115 @@ def _source_lifecycle(statuses: List[SourceStatus]) -> Dict[str, object]:
         "success_ratio": round(succeeded / attempted, 4) if attempted else None,
         "productive_ratio": round(productive / attempted, 4) if attempted else None,
         "denominator": "eligible",
+    }
+
+
+def _connector_diagnostics(statuses: List[SourceStatus]) -> Dict[str, object]:
+    rows: List[Dict[str, object]] = []
+    causes = Counter()
+    for status in statuses:
+        if status.rate_limited:
+            issue = "rate_limited"
+            action = "Reanudar con backoff desde el último checkpoint."
+            retryable = True
+        elif status.timed_out:
+            issue = "timed_out"
+            action = "Reanudar el conector sin descartar los registros ya persistidos."
+            retryable = True
+        elif status.failed:
+            issue = "failed"
+            action = "Revisar el error del conector antes del siguiente ciclo."
+            retryable = True
+        elif status.unconfigured:
+            issue = "unconfigured"
+            action = "Configurar credenciales solo si la fuente aporta cobertura adicional."
+            retryable = False
+        elif status.empty and status.attempted:
+            issue = "empty"
+            action = "Mantener como consulta exitosa sin datos; no convertirla en cero de riesgo."
+            retryable = False
+        elif status.degraded:
+            issue = "degraded"
+            action = "Conservar resultados parciales y reanudar en el siguiente ciclo."
+            retryable = True
+        else:
+            continue
+        causes[issue] += 1
+        rows.append(
+            {
+                "connector": status.name,
+                "issue": issue,
+                "records": status.records,
+                "retryable": retryable,
+                "action": action,
+                "warning": status.warning,
+            }
+        )
+    return {
+        "issue_count": len(rows),
+        "retryable_count": sum(1 for row in rows if row["retryable"]),
+        "by_cause": dict(sorted(causes.items())),
+        "rows": rows,
+        "risk_effect": "none",
+        "interpretation": (
+            "Los fallos operativos reducen cobertura y confianza; nunca incrementan riesgo ni se interpretan "
+            "como ausencia de señales."
+        ),
+    }
+
+
+def _scraping_assessment(events: List[ThreatEvent], statuses: List[SourceStatus]) -> Dict[str, object]:
+    scraping_tokens = {
+        "busqueda publica",
+        "common crawl",
+        "indice publico",
+        "evidencia web",
+        "inventario pasivo",
+        "spiderfoot",
+        "socmint",
+    }
+    records = [
+        event
+        for event in events
+        if any(token in f"{event.source} {event.category} {' '.join(event.tags)}".lower() for token in scraping_tokens)
+    ]
+    unique_urls = {event.evidence_url for event in records if event.evidence_url}
+    validated = [
+        event
+        for event in records
+        if event.evidence_status in {EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
+    ]
+    related = [
+        event
+        for event in records
+        if event.evidence_status in {EvidenceStatus.RELATED, EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
+    ]
+    connector_names = {
+        status.name
+        for status in statuses
+        if any(token in status.name.lower() for token in scraping_tokens)
+    }
+    return {
+        "records": len(records),
+        "unique_urls": len(unique_urls),
+        "related_records": len(related),
+        "direct_or_validated_records": len(validated),
+        "connector_count": len(connector_names),
+        "validation_yield": round(len(validated) / len(records), 4) if records else None,
+        "contribution": [
+            "descubrimiento de activos y entidades",
+            "corroboración entre fuentes",
+            "contexto temporal y reputacional",
+        ],
+        "risk_effect": (
+            "supports_risk_only_when_validated_and_scope_related"
+            if validated
+            else "coverage_only"
+        ),
+        "interpretation": (
+            "El scraping amplía cobertura. Solo registros relacionados con el alcance y validados pueden sustentar "
+            "un hallazgo o un factor de riesgo."
+        ),
     }
 
 

@@ -22,7 +22,17 @@
     <article><span>{{ "Validated findings" if report_lang == "en" else "Hallazgos validados" }}</span><strong>{{ ds_metrics.validated_findings.value | int }}</strong><small>{{ status_labels.get(ds_metrics.validated_findings.value_status, ds_metrics.validated_findings.value_status) }} · {{ ds_metrics.validated_findings.period }} · {{ (ds_metrics.validated_findings.confidence * 100) | round | int }}%{% if ds_metrics.validated_findings.evidence_ids %} · [{{ ds_metrics.validated_findings.evidence_ids | join(", ") }}]{% endif %}</small></article>
     <article><span>{{ "Supported scenarios" if report_lang == "en" else "Escenarios soportados" }}</span><strong>{{ ds_metrics.supported_scenarios.value | int }}</strong><small>{{ status_labels.get(ds_metrics.supported_scenarios.value_status, ds_metrics.supported_scenarios.value_status) }} · {{ ds_metrics.supported_scenarios.period }} · {{ (ds_metrics.supported_scenarios.confidence * 100) | round | int }}%{% if ds_metrics.supported_scenarios.evidence_ids %} · [{{ ds_metrics.supported_scenarios.evidence_ids | join(", ") }}]{% endif %}</small></article>
     <article><span>{{ "Maximum residual risk" if report_lang == "en" else "Riesgo residual máximo" }}</span><strong>{% if ds_metrics.max_residual_risk.value is not none %}{{ "%.2f"|format(ds_metrics.max_residual_risk.value) }}{% else %}N/D{% endif %}</strong><small>{{ status_labels.get(ds_metrics.max_residual_risk.value_status, ds_metrics.max_residual_risk.value_status) }} · {{ ds_metrics.max_residual_risk.period }} · {{ (ds_metrics.max_residual_risk.confidence * 100) | round | int }}%{% if ds_metrics.max_residual_risk.evidence_ids %} · [{{ ds_metrics.max_residual_risk.evidence_ids | join(", ") }}]{% endif %}</small></article>
-    <article><span>{{ "Productive / attempted sources" if report_lang == "en" else "Fuentes productivas / consultadas" }}</span><strong>{{ ds_metrics.productive_sources.value | int }}/{{ ds_metrics.queried_sources.value | int }}</strong><small>{{ ds_metrics.total_sources.value | int }} {{ "eligible" if report_lang == "en" else "elegibles" }} · {{ ds_metrics.productive_sources.period }} · {{ (ds_metrics.productive_sources.confidence * 100) | round | int }}%</small></article>
+    <article>
+      <span>{{ "Source lifecycle" if report_lang == "en" else "Ciclo de fuentes" }}</span>
+      <strong>{{ ds_metrics.productive_sources.value | int }}/{{ ds_metrics.queried_sources.value | int }}</strong>
+      <small>
+        {{ ds_metrics.registered_sources.value | int }} {{ "registered" if report_lang == "en" else "registradas" }} ·
+        {{ ds_metrics.eligible_sources.value | int }} {{ "eligible" if report_lang == "en" else "elegibles" }} ·
+        {{ ds_metrics.queried_sources.value | int }} {{ "queried" if report_lang == "en" else "consultadas" }} ·
+        {{ ds_metrics.successful_sources.value | int }} {{ "successful" if report_lang == "en" else "exitosas" }} ·
+        {{ ds_metrics.productive_sources.value | int }} {{ "productive" if report_lang == "en" else "productivas" }}
+      </small>
+    </article>
     <article><span>{{ "Pending decisions" if report_lang == "en" else "Decisiones pendientes" }}</span><strong>{{ ds_metrics.pending_decisions.value | int }}</strong><small>{{ status_labels.get(ds_metrics.pending_decisions.value_status, ds_metrics.pending_decisions.value_status) }} · {{ ds_metrics.pending_decisions.period }} · {{ (ds_metrics.pending_decisions.confidence * 100) | round | int }}%{% if ds_metrics.pending_decisions.evidence_ids %} · [{{ ds_metrics.pending_decisions.evidence_ids | join(", ") }}]{% endif %}</small></article>
   </div>
   <div class="snapshot-split">
@@ -49,7 +59,6 @@
     <article class="snapshot-panel">
       <div class="snapshot-panel-head"><h3>{{ "Scenario funnel" if report_lang == "en" else "Embudo de escenarios" }}</h3><span>{{ ds.scenario_funnel.supported }} {{ "supported" if report_lang == "en" else "soportados" }}</span></div>
       <div class="scenario-funnel">
-        <div><span>{{ "Reference templates" if report_lang == "en" else "Plantillas de referencia" }}</span><strong>{{ ds.scenario_funnel.reference_templates }}</strong></div>
         <div><span>{{ "Candidates" if report_lang == "en" else "Candidatos" }}</span><strong>{{ ds.scenario_funnel.candidate }}</strong></div>
         <div><span>{{ "Supported" if report_lang == "en" else "Soportados" }}</span><strong>{{ ds.scenario_funnel.supported }}</strong></div>
         <div><span>{{ "Validated" if report_lang == "en" else "Validados" }}</span><strong>{{ ds.scenario_funnel.validated }}</strong></div>

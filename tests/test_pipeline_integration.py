@@ -128,4 +128,5 @@ def test_pipeline_preserves_timeout_no_api_and_no_result_states_without_inventin
     assert context.risk_findings == []
     assert context.processing_summary["validated_findings"] == 0
     assert context.processing_summary["confirmed_findings"] == 0
-    assert context.metrics["forecast"]["7"]["signal_pressure_index"] == 0.0139
+    assert context.metrics["forecast"]["7"]["signal_pressure_index"] is None
+    assert context.metrics["prospective_attack_risk"]["status"] == "insufficient_evidence"

@@ -39,16 +39,23 @@ class WebSearchCollector(Collector):
         provider_query_limits: Optional[dict] = None,
     ):
         self.queries = [query for query in queries if query]
-        self.max_records = max(1, int(max_records))
+        # Zero means no fixed result cap. The finite query list, provider
+        # backoff and optional collection window still bound each execution.
+        self.max_records = max(0, int(max_records))
         self.enabled = enabled
         self.providers = _normalize_providers(providers)
-        self.max_queries = max(1, int(max_queries))
+        self.max_queries = max(0, int(max_queries))
         self.request_delay_seconds = max(0.0, float(request_delay_seconds))
         self.google_cse_api_key = google_cse_api_key or os.getenv(google_cse_api_key_env or "GOOGLE_CSE_API_KEY")
         self.google_cse_cx = google_cse_cx or os.getenv(google_cse_cx_env or "GOOGLE_CSE_CX")
         self.brave_api_key = brave_api_key or os.getenv(brave_api_key_env or "BRAVE_SEARCH_API_KEY")
         self.timeout_seconds = max(3.0, float(timeout_seconds))
-        self.collection_timeout_seconds = max(self.timeout_seconds + 5.0, float(collection_timeout_seconds))
+        requested_collection_timeout = float(collection_timeout_seconds)
+        self.collection_timeout_seconds = (
+            None
+            if requested_collection_timeout <= 0
+            else max(self.timeout_seconds + 5.0, requested_collection_timeout)
+        )
         self.provider_query_limits = _provider_query_limits(self.max_queries, provider_query_limits)
 
     async def collect(self) -> CollectionResult:
@@ -64,26 +71,28 @@ class WebSearchCollector(Collector):
         provider_counts: dict[str, int] = {}
         disabled_providers: set[str] = set()
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + self.collection_timeout_seconds
+        deadline = loop.time() + self.collection_timeout_seconds if self.collection_timeout_seconds is not None else None
         budget_exhausted = False
         async with httpx.AsyncClient(timeout=self.timeout_seconds, follow_redirects=True, headers={"User-Agent": "CyberDecisionEngine/1.0"}) as client:
-            for query in self.queries[: self.max_queries]:
-                if len(events) >= self.max_records:
+            queries = self.queries if self.max_queries <= 0 else self.queries[: self.max_queries]
+            for query in queries:
+                if self.max_records > 0 and len(events) >= self.max_records:
                     break
-                if loop.time() >= deadline:
+                if deadline is not None and loop.time() >= deadline:
                     budget_exhausted = True
                     break
                 for provider in self.providers:
-                    if len(events) >= self.max_records:
+                    if self.max_records > 0 and len(events) >= self.max_records:
                         break
-                    if loop.time() >= deadline:
+                    if deadline is not None and loop.time() >= deadline:
                         budget_exhausted = True
                         break
                     if provider in disabled_providers:
                         continue
-                    if provider_counts.get(provider, 0) >= self.provider_query_limits.get(provider, self.max_queries):
+                    provider_limit = self.provider_query_limits.get(provider, self.max_queries)
+                    if provider_limit > 0 and provider_counts.get(provider, 0) >= provider_limit:
                         continue
-                    remaining = self.max_records - len(events)
+                    remaining = self.max_records - len(events) if self.max_records > 0 else 50
                     made_request = False
                     try:
                         if provider == "google_news_rss":
@@ -167,13 +176,16 @@ class WebSearchCollector(Collector):
                     if made_request:
                         provider_counts[provider] = provider_counts.get(provider, 0) + 1
                         if self.request_delay_seconds:
-                            remaining_budget = deadline - loop.time()
-                            if remaining_budget <= 0:
-                                budget_exhausted = True
-                                break
-                            await asyncio.sleep(min(self.request_delay_seconds, remaining_budget))
+                            if deadline is None:
+                                await asyncio.sleep(self.request_delay_seconds)
+                            else:
+                                remaining_budget = deadline - loop.time()
+                                if remaining_budget <= 0:
+                                    budget_exhausted = True
+                                    break
+                                await asyncio.sleep(min(self.request_delay_seconds, remaining_budget))
         if budget_exhausted:
-            warnings.append(f"Search budget reached after {int(self.collection_timeout_seconds)} seconds; partial public results were returned.")
+            warnings.append(f"Search budget reached after {int(self.collection_timeout_seconds or 0)} seconds; partial public results were returned.")
         status = "ok" if events and not warnings else "partial" if events else "skipped"
         return CollectionResult(
             SourceStatus(name=self.name, status=status, records=len(events), mode="real", warning="; ".join([*warnings, *notes]) or None),
@@ -202,7 +214,7 @@ def _parse_google_news(query: str, xml_text: str, limit: int) -> List[ThreatEven
                 severity=0.50 if category == "web_search" else 0.62,
                 epss=0.03,
                 cvss=0.0,
-                actor="open_web",
+                actor="unattributed",
                 technique=technique,
                 tags=["internet_search", "google_news_rss", *tags],
                 evidence_url=link,
@@ -236,7 +248,7 @@ def _parse_hacker_news(query: str, payload: dict, limit: int) -> List[ThreatEven
                 severity=0.46 if category == "web_search" else 0.58,
                 epss=0.02,
                 cvss=0.0,
-                actor="open_web",
+                actor="unattributed",
                 technique=technique,
                 tags=["internet_search", "hacker_news_public", *tags],
                 evidence_url=link,
@@ -405,6 +417,7 @@ def _search_event(
     published: Optional[str],
 ) -> ThreatEvent:
     category, tags, technique = _classify_search_result(title, query, link, snippet)
+    public_entity_tags, public_entities = _public_entity_candidates(title, link, snippet)
     return ThreatEvent(
         id=f"{prefix}-{abs(hash((query, title, link, index))) % 10_000_000}",
         title=title,
@@ -416,14 +429,58 @@ def _search_event(
         severity=_search_severity(category, tags),
         epss=0.03,
         cvss=0.0,
-        actor="open_web",
+        actor="unattributed",
         technique=technique,
-        tags=["internet_search", provider_tag, *tags],
+        tags=["internet_search", provider_tag, *tags, *public_entity_tags],
         evidence_url=link,
         observed_at=_date_or_now(published),
         demo=False,
-        technical_validation={"summary": snippet, "query": query, "provider": provider_tag},
+        technical_validation={
+            "summary": snippet,
+            "query": query,
+            "provider": provider_tag,
+            "public_entity_candidates": public_entities,
+            "does_not_demonstrate": (
+                "a public profile or contact mention does not prove current employment, ownership or identity "
+                "without official-source corroboration"
+            ),
+        },
     )
+
+
+def _public_entity_candidates(title: str, link: Optional[str], snippet: str) -> tuple[list[str], list[dict[str, str]]]:
+    text = f"{title} {snippet}"
+    tags: list[str] = []
+    entities: list[dict[str, str]] = []
+    for email in sorted(set(re.findall(r"\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b", text, re.IGNORECASE)))[:12]:
+        normalized = email.lower()
+        tags.append(f"email:{normalized}")
+        entities.append({"type": "email", "value": normalized, "status": "public_contact_candidate"})
+    for phone in _public_phone_candidates(text)[:8]:
+        tags.append(f"phone:{phone}")
+        entities.append({"type": "phone", "value": phone, "status": "public_contact_candidate"})
+    if link and re.search(r"https?://(?:[a-z]{2,3}\.)?linkedin\.com/in/", link, re.IGNORECASE):
+        candidate = re.split(r"\s[-|·]\s", title, maxsplit=1)[0].strip()
+        if 2 <= len(candidate.split()) <= 6 and not re.search(
+            r"\b(linkedin|profile|perfiles|jobs|empleos|company)\b", candidate, re.IGNORECASE
+        ):
+            tags.extend(["public_profile", "profile_platform:linkedin", f"person_candidate:{candidate}"])
+            entities.append({"type": "person", "value": candidate, "status": "public_profile_candidate"})
+    return _unique_tags(tags), entities
+
+
+def _public_phone_candidates(text: str) -> list[str]:
+    values = []
+    for match in re.findall(r"(?<!\w)(?:\+\d{1,3}[\s().-]*)?(?:\d[\s().-]*){7,14}(?!\w)", text):
+        digits = re.sub(r"\D", "", match)
+        if not 7 <= len(digits) <= 15:
+            continue
+        if re.fullmatch(r"(?:19|20)\d{6,12}", digits):
+            continue
+        normalized = f"+{digits}" if match.strip().startswith("+") else digits
+        if normalized not in values:
+            values.append(normalized)
+    return values
 
 
 def _extend_unique(events: List[ThreatEvent], candidates: List[ThreatEvent], seen: set[str], max_records: int) -> None:
@@ -433,7 +490,7 @@ def _extend_unique(events: List[ThreatEvent], candidates: List[ThreatEvent], see
             continue
         seen.add(key)
         events.append(event)
-        if len(events) >= max_records:
+        if max_records > 0 and len(events) >= max_records:
             break
 
 
@@ -449,6 +506,28 @@ def _classify_search_result(title: str, query: str, url: Optional[str] = None, s
     if _is_reputation_checker(url, text):
         return "brand_reputation", _unique_tags([*tags, "brand_protection", "reputation_checker", "validation_required"]), None
 
+    recruitment_terms = [
+        "empleo",
+        "oferta laboral",
+        "oferta de trabajo",
+        "vacante",
+        "reclutamiento",
+        "recruitment",
+        "job offer",
+        "job vacancy",
+        "hiring",
+    ]
+    deception_terms = [
+        "falso",
+        "falsa",
+        "fake",
+        "fraude",
+        "fraud",
+        "estafa",
+        "scam",
+        "suplant",
+        "impersonat",
+    ]
     fraud_terms = [
         "phishing",
         "smishing",
@@ -467,6 +546,12 @@ def _classify_search_result(title: str, query: str, url: Optional[str] = None, s
     ]
     reputation_terms = ["queja", "reclamo", "denuncia", "mala atencion", "falla", "caido", "indisponible"]
     leak_terms = ["data breach", "filtracion", "filtracion", "fuga de datos", "credential", "credencial", "leak", "dark web", "breach forum", ".onion"]
+    if any(term in text for term in recruitment_terms) and any(term in text for term in deception_terms):
+        return (
+            "fake_recruitment",
+            _unique_tags([*tags, "fraud", "brand_impersonation", "fake_recruitment", "brand_protection"]),
+            "T1566",
+        )
     if any(term in text for term in fraud_terms):
         return "phishing", _unique_tags([*tags, "fraud", "brand_impersonation", "brand_protection"]), "T1566"
     if any(term in text for term in reputation_terms):
@@ -523,14 +608,24 @@ def _normalize_providers(providers: object) -> List[str]:
 
 
 def _provider_query_limits(max_queries: int, configured: Optional[dict]) -> dict[str, int]:
-    limits = {
-        "duckduckgo_lite": min(max_queries, 12),
-        "google_news_rss": min(max_queries, 8),
-        "gdelt": min(max_queries, 5),
-        "hacker_news": min(max_queries, 5),
-        "google_cse": min(max_queries, 25),
-        "brave": min(max_queries, 25),
-    }
+    if max_queries <= 0:
+        limits = {
+            "duckduckgo_lite": 0,
+            "google_news_rss": 0,
+            "gdelt": 0,
+            "hacker_news": 0,
+            "google_cse": 0,
+            "brave": 0,
+        }
+    else:
+        limits = {
+            "duckduckgo_lite": min(max_queries, 12),
+            "google_news_rss": min(max_queries, 8),
+            "gdelt": min(max_queries, 5),
+            "hacker_news": min(max_queries, 5),
+            "google_cse": min(max_queries, 25),
+            "brave": min(max_queries, 25),
+        }
     if isinstance(configured, dict):
         for key, value in configured.items():
             try:

@@ -38,7 +38,12 @@ def fraud_pressure_index(events: Iterable[ThreatEvent]) -> float:
         }
         for event in events
         if event.evidence_status in {EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
-        and ("fraud" in event.tags or event.category in {"fraud", "phishing", "account_takeover"})
+        and (
+            {"fraud", "brand_impersonation", "fake_domain", "fake_recruitment", "disinformation"}.intersection(
+                {tag.lower() for tag in event.tags}
+            )
+            or event.category in {"fraud", "phishing", "account_takeover", "brand_impersonation", "fake_domain", "fake_recruitment"}
+        )
     ]
     return threat_activity_score(fraud_events)
 
@@ -49,7 +54,22 @@ def build_fraud_findings(events: List[ThreatEvent], fraud_maturity: Dict[str, fl
         for event in events
         if not event.demo
         and event.evidence_status in {EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
-        and ("fraud" in event.tags or event.category in {"fraud", "phishing", "account_takeover", "transaction_fraud", "business_email_compromise"})
+        and (
+            {"fraud", "brand_impersonation", "fake_domain", "fake_recruitment", "disinformation"}.intersection(
+                {tag.lower() for tag in event.tags}
+            )
+            or event.category
+            in {
+                "fraud",
+                "phishing",
+                "account_takeover",
+                "transaction_fraud",
+                "business_email_compromise",
+                "brand_impersonation",
+                "fake_domain",
+                "fake_recruitment",
+            }
+        )
     ]
     if not fraud_source_events:
         return []
@@ -94,6 +114,17 @@ def build_fraud_findings(events: List[ThreatEvent], fraud_maturity: Dict[str, fl
             ["Verificacion fuera de banda de cambios de cuenta", "Controles duales para pagos criticos", "Monitoreo de reglas sospechosas de correo"],
             "Tesoreria/Fraude",
         ),
+        (
+            "Suplantación de marca, dominios similares y ofertas laborales falsas",
+            "brand_reputation_fraud",
+            0.64,
+            [
+                "Validar y documentar perfiles, anuncios y dominios que suplanten a la organización",
+                "Publicar canales oficiales de contratación y comunicación",
+                "Coordinar preservación de evidencia y solicitudes de retiro con legal y plataformas",
+            ],
+            "Marca/Comunicaciones/Legal",
+        ),
     ]
     for title, category, base_exposure, recommendations, owner in scenarios:
         category_terms = {
@@ -101,6 +132,13 @@ def build_fraud_findings(events: List[ThreatEvent], fraud_maturity: Dict[str, fl
             "account_takeover": {"account_takeover", "credential_exposure"},
             "transaction_fraud": {"transaction_fraud", "mule_account"},
             "business_email_compromise": {"business_email_compromise", "bec"},
+            "brand_reputation_fraud": {
+                "brand_impersonation",
+                "fake_domain",
+                "fake_recruitment",
+                "disinformation",
+                "fraud",
+            },
         }[category]
         related_events = [
             event
@@ -118,9 +156,8 @@ def build_fraud_findings(events: List[ThreatEvent], fraud_maturity: Dict[str, fl
             T=pressure,
             S=0.85,
             G=0.55,
-            C=maturity,
-            D=control_maturity.get("attack_detection_coverage", 0.52),
-            R=control_maturity.get("incident_response_maturity", 0.65),
+            data_sufficiency=max(event.confidence_score for event in related_events),
+            base_rate=0.10,
         )
         impact = business_impact(
             financial=0.86,
@@ -154,6 +191,7 @@ def build_fraud_findings(events: List[ThreatEvent], fraud_maturity: Dict[str, fl
                     "activity": min(1.0, 0.35 + 0.1 * len(related_events)),
                     "exposure": base_exposure,
                     "signal_pressure": pressure,
+                    "data_sufficiency": max(event.confidence_score for event in related_events),
                 },
                 impact_inputs={"financial": 0.86, "operational": 0.62, "reputational": 0.84},
                 control_inputs={"declared_control_effectiveness": ce},

@@ -3,7 +3,7 @@
 | Componente | Implementacion | Responsabilidad | Persistencia o limite |
 |---|---|---|---|
 | Web | React 18, TypeScript, Vite, Nginx | navegacion, dashboards, administracion e informes | puerto 8080; consume `/api` |
-| API | FastAPI, Pydantic | autenticacion local, ejecuciones, reportes, licencias, IA y monitoreo | puerto 8000 |
+| API | FastAPI, Pydantic | autenticacion local, ejecuciones, reportes, licencias, asistencia opcional y monitoreo | puerto 8000 |
 | Motor | `cyberdeck` | recoleccion, normalizacion, deduplicacion, analisis y reportes | biblioteca Python |
 | Ejecuciones | `cyberdeck_api.jobs.RunStore` | ciclo de vida, progreso, contexto e informe bajo demanda | PostgreSQL y `data/web_runs/<runId>` |
 | Scheduler | `MonitoringStore` | perfiles periodicos, alertas deduplicadas y logs | `data/monitoring_state.json` |

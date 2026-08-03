@@ -13,6 +13,7 @@ def utcnow_iso() -> str:
 
 AnalysisWindow = Literal["1h", "24h", "7d", "30d", "180d", "365d"]
 SubjectType = Literal["organization", "person"]
+EvidenceReviewStatus = Literal["pending", "validated", "false_positive"]
 
 ANALYSIS_WINDOW_HOURS: Dict[str, int] = {
     "1h": 1,
@@ -51,6 +52,8 @@ class DomainAnalysisRequest(BaseModel):
     declared_competitors: List[str] = Field(default_factory=list, max_length=100)
     countries_of_operation: List[str] = Field(default_factory=list, max_length=100)
     entity_aliases: List[Dict[str, object]] = Field(default_factory=list, max_length=200)
+    financial_risk_inputs: Dict[str, object] = Field(default_factory=dict)
+    scenario_risk_inputs: Dict[str, object] = Field(default_factory=dict)
     author: str = "CyberDecisionEngine Web"
     language: Literal["es", "en"] = "es"
     mode: Literal["snapshot", "deep"] = "deep"
@@ -117,6 +120,12 @@ class ReportSummary(BaseModel):
     final: bool = True
 
 
+class EvidenceReviewRequest(BaseModel):
+    status: EvidenceReviewStatus
+    reviewer: str = Field(default="authorized_user", min_length=2, max_length=120)
+    reason: str = Field(default="", max_length=1000)
+
+
 class ReportCatalogItem(BaseModel):
     name: str
     path: str
@@ -163,9 +172,15 @@ class KpiSummary(BaseModel):
     avg_residual_risk: Optional[float] = None
     healthy_sources: int = 0
     total_sources: int = 0
+    eligible_sources: int = 0
     queried_sources: int = 0
+    successful_sources: int = 0
     productive_sources: int = 0
     registered_sources: int = 0
+    empty_sources: int = 0
+    degraded_sources: int = 0
+    failed_sources: int = 0
+    skipped_sources: int = 0
 
 
 class DomainSignal(BaseModel):
@@ -318,6 +333,21 @@ class MonitoringOverview(BaseModel):
 
 
 AIProvider = Literal["openai", "azure_openai", "anthropic", "gemini", "mistral", "local_openai_compatible", "openclaw_gateway"]
+AIChatScope = Literal[
+    "overview",
+    "evidence",
+    "risk",
+    "scenarios",
+    "frameworks",
+    "osint",
+    "socmint",
+    "darkweb",
+    "attack_surface",
+    "brand_fraud",
+    "disinformation",
+    "geography",
+    "vulnerabilities",
+]
 
 
 class AIAnalysisRequest(BaseModel):
@@ -359,6 +389,48 @@ class AIAnalysisPackage(BaseModel):
     output_schema: Dict[str, Any]
     provider_payloads: List[AIProviderPayload]
     approval_question: str
+
+
+class AIExecutionRequest(BaseModel):
+    run_id: str
+    approved: Literal[True]
+    language: Literal["es", "en"] = "es"
+    system_prompt: str = Field(min_length=20, max_length=30000)
+    user_prompt: str = Field(min_length=20, max_length=120000)
+    output_schema: Dict[str, Any] = Field(default_factory=dict)
+    output_token_budget: int = Field(default=4000, ge=500, le=8000)
+
+
+class AIChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class AIChatRequest(BaseModel):
+    run_id: str
+    message: str = Field(min_length=2, max_length=4000)
+    language: Literal["es", "en"] = "es"
+    audience: Literal["executive", "technical", "board", "incident", "fraud"] = "executive"
+    scopes: List[AIChatScope] = Field(default_factory=lambda: ["overview"], min_length=1, max_length=13)
+    history: List[AIChatTurn] = Field(default_factory=list, max_length=12)
+    output_token_budget: int = Field(default=800, ge=500, le=1200)
+    analysis_mode: Literal["interactive", "deep"] = "interactive"
+
+
+class AIExecutionResult(BaseModel):
+    id: str
+    run_id: str
+    status: Literal["completed", "completed_with_limitations", "failed"]
+    provider: str = "OpenClaw + Ollama"
+    model: str
+    prompt_version: str
+    generated_at: str = Field(default_factory=utcnow_iso)
+    analysis: Dict[str, Any] = Field(default_factory=dict)
+    raw_text: Optional[str] = None
+    evidence_validation: Dict[str, Any] = Field(default_factory=dict)
+    agent_trace: List[Dict[str, Any]] = Field(default_factory=list)
+    usage: Dict[str, Any] = Field(default_factory=dict)
+    limitations: List[str] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):

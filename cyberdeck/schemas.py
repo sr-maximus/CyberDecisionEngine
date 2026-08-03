@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -49,6 +50,17 @@ class RecordKind(str, Enum):
     CONFIRMED_INCIDENT = "confirmed_incident"
     FALSE_POSITIVE = "false_positive"
     SOURCE_LIMITATION = "source_limitation"
+
+
+class EvidenceType(str, Enum):
+    DOCUMENT = "document"
+    WEB_PAGE = "web_page"
+    NEWS = "news"
+    SOCIAL_MEDIA = "social_media"
+    TECHNOLOGY_INFRASTRUCTURE = "technology_infrastructure"
+    OFFICIAL_RECORD = "official_record"
+    AUTHORIZED_DARK_WEB = "authorized_dark_web"
+    OTHER = "other"
 
 
 class ScenarioStatus(str, Enum):
@@ -199,13 +211,14 @@ class ThreatEvent(BaseModel):
     confidence: float = 0.5
     age_days: int = 0
     severity: float = 0.5
-    epss: float = 0.05
-    cvss: float = 5.0
+    epss: float = 0.0
+    cvss: float = 0.0
     cve: Optional[str] = None
     actor: Optional[str] = None
     technique: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     evidence_url: Optional[str] = None
+    evidence_type: EvidenceType = EvidenceType.OTHER
     observed_at: str = Field(default_factory=utcnow_iso)
     demo: bool = False
     canonical_id: Optional[str] = None
@@ -250,7 +263,71 @@ class ThreatEvent(BaseModel):
             self.confidence_level = ConfidenceLevel.VERY_HIGH
         if not self.source_refs:
             self.source_refs = [self.source]
+        self.evidence_type = classify_evidence_type(
+            title=self.title,
+            category=self.category,
+            source=self.source,
+            tags=self.tags,
+            evidence_url=self.evidence_url or "",
+        )
         return self
+
+
+def classify_evidence_type(
+    *,
+    title: str,
+    category: str,
+    source: str,
+    tags: List[str],
+    evidence_url: str,
+) -> EvidenceType:
+    text = " ".join([title, category, source, " ".join(tags), evidence_url]).lower()
+    provenance_text = " ".join([category, source, " ".join(tags)]).lower()
+    normalized_tags = {str(tag).strip().lower() for tag in tags}
+    hostname = (urlparse(evidence_url).hostname or "").lower()
+    path = evidence_url.lower().split("?", 1)[0].split("#", 1)[0]
+    if path.endswith((".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".txt", ".rtf", ".zip")) or any(
+        token in text for token in ("filetype:", "exposed document", "documento expuesto", "metadata document")
+    ):
+        return EvidenceType.DOCUMENT
+    if any(token in text for token in ("darkweb", "dark web", ".onion", "tor index", "ransomware.live", "leak site")):
+        return EvidenceType.AUTHORIZED_DARK_WEB
+    if any(tag == "rss" or tag.endswith("_rss") or tag.startswith("rss_") for tag in normalized_tags):
+        return EvidenceType.NEWS
+    if any(token in provenance_text for token in ("socmint", "social_media", "facebook", "instagram", "linkedin", "tiktok", "twitter", "x.com", "reddit", "hashtag")) or any(
+        hostname == domain or hostname.endswith(f".{domain}")
+        for domain in ("facebook.com", "instagram.com", "linkedin.com", "tiktok.com", "twitter.com", "x.com", "reddit.com")
+    ):
+        return EvidenceType.SOCIAL_MEDIA
+    if any(token in text for token in ("strategic_news", "threat_intel", "news article", "noticia", "press release")):
+        return EvidenceType.NEWS
+    if any(token in text for token in ("cisa kev", "nvd", "epss", "github advisories", "regulator", "official record", "registro oficial")):
+        return EvidenceType.OFFICIAL_RECORD
+    if any(
+        token in provenance_text
+        for token in (
+            "spiderfoot",
+            "external surface",
+            "superficie externa",
+            "dns",
+            "whois",
+            "ssl",
+            "certificate",
+            "certificado",
+            "subdomain",
+            "subdominio",
+            "port",
+            "technology",
+            "tecnologia",
+            "vulnerability",
+            "vulnerabilidad",
+            "urlscan",
+        )
+    ) or hostname == "urlscan.io" or hostname.endswith(".urlscan.io"):
+        return EvidenceType.TECHNOLOGY_INFRASTRUCTURE
+    if evidence_url.startswith(("http://", "https://")):
+        return EvidenceType.WEB_PAGE
+    return EvidenceType.OTHER
 
 
 class RiskFinding(BaseModel):
@@ -314,6 +391,8 @@ class OrganizationProfile(BaseModel):
     crown_jewels: List[str] = Field(default_factory=list)
     technologies: List[str] = Field(default_factory=list)
     risk_appetite: Dict[str, float] = Field(default_factory=dict)
+    financial_risk_inputs: Dict[str, Any] = Field(default_factory=dict)
+    scenario_risk_inputs: Dict[str, Any] = Field(default_factory=dict)
     control_maturity: Dict[str, float] = Field(default_factory=dict)
     fraud_maturity: Dict[str, float] = Field(default_factory=dict)
 

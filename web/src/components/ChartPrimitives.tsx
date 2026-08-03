@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { localizedSectorLabel } from "../data/catalog";
 import type { LanguageMode } from "../types";
-import type { RankedItem, SocmintLink, SocmintNode, TrendPoint } from "../utils/dashboard";
+import type { GeographicCountryItem, RankedItem, SocmintLink, SocmintNode, TrendPoint } from "../utils/dashboard";
 
 interface LineChartProps {
   points: TrendPoint[];
@@ -83,6 +83,54 @@ export function BarRanking({ items, language = "en" }: { items: RankedItem[]; la
             <i className={item.tone ?? ""} style={{ width: `${Math.max(6, (item.value / max) * 100)}%` }} />
           </div>
           <strong>{item.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function CountryContextList({
+  items,
+  language = "en"
+}: {
+  items: GeographicCountryItem[];
+  language?: LanguageMode;
+}) {
+  if (!items.length) {
+    return <div className="chart-empty">{language === "en" ? "No geographic context available." : "Sin contexto geográfico disponible."}</div>;
+  }
+  const max = Math.max(...items.map((item) => item.records), 1);
+  const statusLabels = {
+    en: {
+      declared_scope: "Declared scope",
+      declared_and_mentioned: "Declared + mentioned",
+      mention_only: "Related mention",
+      supported_operational_context: "Supported context",
+      records: "records",
+      noRecords: "Scope"
+    },
+    es: {
+      declared_scope: "Alcance declarado",
+      declared_and_mentioned: "Declarado + mencionado",
+      mention_only: "Mención relacionada",
+      supported_operational_context: "Contexto sustentado",
+      records: "registros",
+      noRecords: "Alcance"
+    }
+  } as const;
+  const copy = statusLabels[language];
+  return (
+    <div className="country-context-list">
+      {items.map((item) => (
+        <div className={`country-context-row ${item.status}`} key={`${item.code}-${item.name}`}>
+          <div className="country-context-heading">
+            <strong>{item.name}</strong>
+            <span>{copy[item.status]}</span>
+          </div>
+          <b>{item.records ? `${item.records} ${copy.records}` : copy.noRecords}</b>
+          <div className="country-context-track" aria-hidden="true">
+            <i style={{ width: item.records ? `${Math.max(8, (item.records / max) * 100)}%` : "0%" }} />
+          </div>
         </div>
       ))}
     </div>
