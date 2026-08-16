@@ -66,9 +66,11 @@ def test_legacy_screenshot_fields_do_not_become_visual_evidence():
     event = {
         "id": "legacy",
         "title": "Legacy preview",
-        "evidence_url": "https://urlscan.io/result/019ed40b-2269-7628-9d53-4f8400647c66/",
-        "screenshot_url": "https://urlscan.io/screenshots/019ed40b-2269-7628-9d53-4f8400647c66.png",
-        "technical_validation": {"screenshot_url": "https://urlscan.io/screenshots/019ed40b-2269-7628-9d53-4f8400647c66.png"},
+        "evidence_url": "https://urlscan.io/result/synthetic-record/",
+        "screenshot_url": "https://urlscan.io/screenshots/synthetic-record.png",
+        "technical_validation": {
+            "screenshot_url": "https://urlscan.io/screenshots/synthetic-record.png"
+        },
     }
     assert _evidence_preview_gallery([event], "es") == []
 

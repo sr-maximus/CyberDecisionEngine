@@ -690,7 +690,7 @@ class LicensingStore:
                 cur.execute(
                     """
                     INSERT INTO license_companies (id, name, slug, status, country, sector)
-                    VALUES ('company-cde-root', 'CyberDecisionEngine - Edwin Penuela', 'cyberdecisionengine-root', 'active', 'CO', 'Cyberintelligence')
+                    VALUES ('company-cde-root', 'CyberDecisionEngine Control Plane', 'cyberdecisionengine-root', 'active', '', 'Cyberintelligence')
                     ON CONFLICT (id) DO NOTHING
                     """
                 )
@@ -701,16 +701,6 @@ class LicensingStore:
                     ON CONFLICT (id) DO NOTHING
                     """
                 )
-                cur.execute(
-                    """
-                    INSERT INTO license_control_users (id, company_id, username, full_name, role, plan_code, status, modules, created_by)
-                    VALUES
-                        ('control-superadmin-edwin', 'company-cde-root', 'superadmin', 'Edwin Penuela - Super Admin', 'super_admin', 'sovereign', 'active', '[]'::jsonb, 'system'),
-                        ('control-admin-edwin', 'company-cde-root', 'admin', 'Edwin Penuela', 'admin', 'sovereign', 'active', '[]'::jsonb, 'superadmin')
-                    ON CONFLICT (username) DO NOTHING
-                    """
-                )
-                cur.execute("UPDATE license_control_users SET plan_code = 'sovereign' WHERE username IN ('superadmin', 'admin') AND plan_code IS NULL")
                 cur.execute(
                     """
                     INSERT INTO license_audit_log (id, actor, action, target_type, target_id, company_id, detail)
@@ -1058,7 +1048,7 @@ def _seed_state(state: Dict[str, list[dict[str, Any]]]) -> Dict[str, list[dict[s
         state["companies"].append(
             LicenseCompany(
                 id="company-cde-root",
-                name="CyberDecisionEngine - Edwin Penuela",
+                name="CyberDecisionEngine Control Plane",
                 slug="cyberdecisionengine-root",
                 country="",
                 sector="Cyberintelligence",
@@ -1071,30 +1061,6 @@ def _seed_state(state: Dict[str, list[dict[str, Any]]]) -> Dict[str, list[dict[s
                 company_id="company-cde-root",
                 plan_code="sovereign",
                 seats=25,
-            ).model_dump(mode="json")
-        )
-    if not any(item["username"] == "superadmin" for item in state["users"]):
-        state["users"].append(
-            LicenseControlUser(
-                id="control-superadmin-edwin",
-                company_id="company-cde-root",
-                username="superadmin",
-                full_name="Edwin Penuela - Super Admin",
-                role="super_admin",
-                plan_code="sovereign",
-                created_by="system",
-            ).model_dump(mode="json")
-        )
-    if not any(item["username"] == "admin" for item in state["users"]):
-        state["users"].append(
-            LicenseControlUser(
-                id="control-admin-edwin",
-                company_id="company-cde-root",
-                username="admin",
-                full_name="Edwin Penuela",
-                role="admin",
-                plan_code="sovereign",
-                created_by="superadmin",
             ).model_dump(mode="json")
         )
     if not any(item["id"] == "audit-bootstrap-control-plane" for item in state["audit_log"]):

@@ -2881,6 +2881,19 @@ td {
   font-weight: 720;
 }
 
+.access-request-note {
+  display: grid;
+  gap: 8px;
+}
+
+.access-request-note a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  color: inherit;
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }

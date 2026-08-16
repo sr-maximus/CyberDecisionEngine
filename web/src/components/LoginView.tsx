@@ -1,4 +1,4 @@
-import { AlertTriangle, KeyRound, LockKeyhole, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
+import { AlertTriangle, KeyRound, LockKeyhole, Mail, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { authenticateUser, hashPassword, lockoutMinutes, verifyMfaCode } from "../data/auth";
@@ -46,6 +46,8 @@ const copy = {
     governance: "Permisos locales, usuarios y gobierno de conectores API.",
     guidance: "Guía de acceso",
     why: "Qué falta y por qué",
+    accessNotice: "No hay cuentas ni contraseñas predeterminadas. Solicita tus credenciales directamente al propietario del proyecto.",
+    requestAccess: "Solicitar credenciales por correo",
     languageTitle: "Idioma",
     themeTitle: "Tema"
   },
@@ -79,12 +81,17 @@ const copy = {
     governance: "Local permissions, users and API connector governance.",
     guidance: "Access guidance",
     why: "What is missing and why",
+    accessNotice: "No default accounts or passwords are published. Request credentials directly from the project owner.",
+    requestAccess: "Request credentials by email",
     languageTitle: "Language",
     themeTitle: "Theme"
   }
 };
 
 type FieldErrors = Partial<Record<"username" | "password" | "mfa", string>>;
+
+const ACCESS_REQUEST_EMAIL = "edwinjavpenuela@gmail.com";
+const ACCESS_REQUEST_URL = `mailto:${ACCESS_REQUEST_EMAIL}?subject=${encodeURIComponent("CyberDecisionEngine access request")}`;
 
 export function LoginView({
   users,
@@ -96,7 +103,7 @@ export function LoginView({
   onUsersChange,
   sessionMessage
 }: LoginViewProps) {
-  const [username, setUsername] = useState("admin");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   const [pendingUser, setPendingUser] = useState<LocalUser | null>(null);
@@ -261,6 +268,13 @@ export function LoginView({
           <div>
             <h2>{labels.eyebrow}</h2>
             <p>{language === "es" ? "Sesión local segura para entorno de laboratorio." : "Secure local session for lab operations."}</p>
+          </div>
+          <div className="session-note access-request-note">
+            <span>{labels.accessNotice}</span>
+            <a href={ACCESS_REQUEST_URL}>
+              <Mail size={16} />
+              {labels.requestAccess}
+            </a>
           </div>
           {sessionMessage ? <div className="session-note">{sessionMessage}</div> : null}
           <label className="field-control">

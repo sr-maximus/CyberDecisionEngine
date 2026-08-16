@@ -11,7 +11,7 @@ def _organization() -> OrganizationProfile:
         author="test",
         language="es",
         authorized_scope=True,
-        primary_domains=["example.ca"],
+        primary_domains=["energy.example.invalid"],
     )
 
 
@@ -21,11 +21,11 @@ def test_geography_separates_declared_scope_from_supported_and_contextual_mentio
         title="Example Energy operations in Colombia",
         category="official_record",
         source="Corporate filing",
-        evidence_url="https://example.ca/annual-report.pdf",
+        evidence_url="https://energy.example.invalid/annual-report.pdf",
         relationship_to_scope="direct",
         evidence_status=EvidenceStatus.VALIDATED,
         validation_result="validated",
-        tags=["domain:example.ca", "annual_report", "official_source"],
+        tags=["domain:energy.example.invalid", "annual_report", "official_source"],
     )
     contextual = ThreatEvent(
         id="context-mexico",
@@ -62,7 +62,7 @@ def test_country_mention_does_not_become_operation_without_assured_official_evid
         source="Public search",
         evidence_url="https://search.example/result",
         relationship_to_scope="related",
-        tags=["domain:example.ca"],
+        tags=["domain:energy.example.invalid"],
     )
 
     result = build_geographic_intelligence([mention], _organization())
@@ -89,9 +89,9 @@ def test_country_code_top_level_domain_is_not_a_country_mention():
         title="Indexed corporate page",
         category="web_search",
         source="Public search",
-        evidence_url="https://example.ca/contact",
+        evidence_url="https://energy.example.invalid/contact",
         relationship_to_scope="related",
-        tags=["domain:example.ca"],
+        tags=["domain:energy.example.invalid"],
     )
 
     result = build_geographic_intelligence([event], _organization())
@@ -106,7 +106,7 @@ def test_country_inventory_includes_every_declared_and_related_country_once():
         title="Example Energy reports operations in Ecuador",
         category="official_record",
         source="Corporate filing",
-        evidence_url="https://example.ca/ecuador.pdf",
+        evidence_url="https://energy.example.invalid/ecuador.pdf",
         relationship_to_scope="direct",
         evidence_status=EvidenceStatus.VALIDATED,
         tags=["annual_report", "official_source"],

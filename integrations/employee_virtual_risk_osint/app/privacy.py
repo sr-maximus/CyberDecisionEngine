@@ -40,6 +40,8 @@ def hash_identifier(identifier: Any, salt: str) -> str:
     raw = str(identifier or "").strip()
     if not raw:
         return ""
+    if not salt.strip():
+        raise ValueError("HASH_SALT must be configured before hashing identifiers")
     payload = f"{salt}:{raw}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 

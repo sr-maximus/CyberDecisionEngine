@@ -99,7 +99,13 @@ def test_subject_specific_query_does_not_make_unrelated_result_a_claim():
 
 
 def test_short_domain_label_does_not_match_inside_unrelated_word():
-    organization = OrganizationProfile(name="ODL", primary_domains=["odl.com.co"], sector="Energy", country="CO", author="QA")
+    organization = OrganizationProfile(
+        name="ABC",
+        primary_domains=["abc.example.invalid"],
+        sector="Energy",
+        country="ZZ",
+        author="QA",
+    )
     event = _event("substring-1", "Buscamos tecnólogos para formación", ["brand_impersonation"])
     event.relationship_to_scope = "related"
 

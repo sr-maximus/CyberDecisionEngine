@@ -17,7 +17,7 @@ def _event(
         source=source,
         evidence_status=status,
         relationship_to_scope="direct",
-        evidence_url=f"https://example.test/{event_id}",
+        evidence_url=f"https://evidence.example.invalid/{event_id}",
         technical_validation={
             "unstructured_artifacts": [{"type": artifact_type, "value": value}]
         },
@@ -27,8 +27,8 @@ def _event(
 def test_pivot_requires_corroboration_for_decision_relevance():
     result = build_pivot_intelligence(
         [
-            _event("one", "source-a", "email", "security@example.com"),
-            _event("two", "source-b", "email", "security@example.com"),
+            _event("one", "source-a", "email", "security@example.invalid"),
+            _event("two", "source-b", "email", "security@example.invalid"),
         ]
     )
 
@@ -41,7 +41,7 @@ def test_pivot_requires_corroboration_for_decision_relevance():
 
 def test_single_raw_artifact_remains_context_only():
     result = build_pivot_intelligence(
-        [_event("raw", "source-a", "phone", "+57 601 555 0101", status=EvidenceStatus.RAW)]
+        [_event("raw", "source-a", "phone", "+12025550101", status=EvidenceStatus.RAW)]
     )
 
     row = result["entities"][0]
@@ -57,4 +57,3 @@ def test_secret_indicators_are_not_exposed_as_pivots():
 
     assert result["total_entities"] == 0
     assert result["entities"] == []
-

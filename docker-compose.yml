@@ -7,8 +7,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${CDE_POSTGRES_DB:-cyberdecisionengine}
-      POSTGRES_USER: ${CDE_POSTGRES_USER:-cde}
-      POSTGRES_PASSWORD: ${CDE_POSTGRES_PASSWORD:-cde_local_password}
+      POSTGRES_USER: ${CDE_POSTGRES_USER:?Set CDE_POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${CDE_POSTGRES_PASSWORD:?Set CDE_POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -28,7 +28,7 @@ services:
         condition: service_healthy
     environment:
       MPLCONFIGDIR: /tmp/cyberdecisionengine-matplotlib
-      DATABASE_URL: postgresql://${CDE_POSTGRES_USER:-cde}:${CDE_POSTGRES_PASSWORD:-cde_local_password}@postgres:5432/${CDE_POSTGRES_DB:-cyberdecisionengine}
+      DATABASE_URL: postgresql://${CDE_POSTGRES_USER:?Set CDE_POSTGRES_USER in .env}:${CDE_POSTGRES_PASSWORD:?Set CDE_POSTGRES_PASSWORD in .env}@postgres:5432/${CDE_POSTGRES_DB:-cyberdecisionengine}
       NVD_API_KEY: ${NVD_API_KEY:-}
       GOOGLE_CSE_API_KEY: ${GOOGLE_CSE_API_KEY:-}
       GOOGLE_CSE_CX: ${GOOGLE_CSE_CX:-}
@@ -127,7 +127,7 @@ services:
       OPENCLAW_GATEWAY_TOKEN_FILE: /run/openclaw/gateway-token
       OPENCLAW_DISABLE_BONJOUR: "1"
       OPENCLAW_LOAD_SHELL_ENV: "0"
-      OLLAMA_API_KEY: ollama-local
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
       OLLAMA_HOST: http://ollama:11434
     volumes:
       - openclaw_state:/home/node/.openclaw

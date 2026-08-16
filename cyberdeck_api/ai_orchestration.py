@@ -210,11 +210,13 @@ def ai_orchestration_config() -> dict[str, Any]:
 async def ollama_runtime_status(model_env: str = "OLLAMA_MODEL") -> dict[str, Any]:
     default_model = "cyberdecision-cti-chat" if model_env == "OLLAMA_CHAT_MODEL" else "cyberdecision-cti"
     configured_model = os.getenv(model_env, default_model).strip()
+    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=2.0)) as client:
             response = await client.get(
                 f"{_ollama_base_url()}/api/tags",
-                headers={"Authorization": "Bearer ollama-local"},
+                headers=headers,
             )
             response.raise_for_status()
         model_names = _ollama_model_names(response)

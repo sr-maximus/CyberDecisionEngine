@@ -436,7 +436,13 @@ OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto
 
 ## 22. Administración
 
-`superadmin` gestiona empresas, licencias, usuarios, módulos y auditoría. `admin` gestiona usuarios de su empresa. Roles operativos consumen módulos permitidos. Antes de producción, el control de acceso debe aplicarse server-side con JWT/refresh o SSO, MFA, revocación y hashing robusto.
+El rol de superadministración gestiona empresas, licencias, usuarios, módulos y
+auditoría. El rol de administración gestiona usuarios de su empresa. No existen
+cuentas ni contraseñas predeterminadas en el repositorio. Las credenciales deben
+solicitarse al propietario en
+[edwinjavpenuela@gmail.com](mailto:edwinjavpenuela@gmail.com) y entregarse por un
+canal seguro. Antes de producción, el control de acceso debe aplicarse
+server-side con JWT/refresh o SSO, MFA, revocación y hashing robusto.
 
 ## 23. Solución de problemas
 
@@ -494,5 +500,5 @@ OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto
 - `docs/auditoria/00-diagnostico-inicial.md`
 - `docs/auditoria/01-optimizacion-geografica.md`
 - `docs/auditoria/02-matriz-referencias.md`
-- `docs/auditoria/03-ejecuciones-grupo-aval-frontera.md`
+- `docs/auditoria/03-ejecuciones-sinteticas.md`
 - `docs/roadmap/Mejoras_Recomendadas.md`

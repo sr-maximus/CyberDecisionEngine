@@ -4,25 +4,25 @@ from cyberdeck.reporting.html_report import _search_groups
 
 def test_public_entity_candidates_extract_contacts_and_linkedin_profile_without_asserting_employment():
     tags, entities = _public_entity_candidates(
-        "Jane Doe - Security Director | LinkedIn",
-        "https://www.linkedin.com/in/jane-doe-security/",
-        "Contact: jane.doe@example.com +57 300 123 4567",
+        "Synthetic Person - Security Director | Public profile",
+        "https://www.linkedin.com/in/synthetic-person/",
+        "Contact: synthetic-person@example.invalid +1 202 555 0100",
     )
 
-    assert "email:jane.doe@example.com" in tags
-    assert "phone:+573001234567" in tags
-    assert "person_candidate:Jane Doe" in tags
+    assert "email:synthetic-person@example.invalid" in tags
+    assert "phone:+12025550100" in tags
+    assert "person_candidate:Synthetic Person" in tags
     assert {item["status"] for item in entities} == {"public_contact_candidate", "public_profile_candidate"}
 
 
 def test_social_urls_found_by_web_search_are_routed_to_socmint():
     events = _parse_google_cse(
-        "grupoaval.com facebook instagram",
+        "organization.example.invalid public profile",
         {
             "items": [
                 {
-                    "title": "Grupo Aval en Instagram",
-                    "link": "https://www.instagram.com/grupoaval/",
+                    "title": "Authorized Organization public profile",
+                    "link": "https://www.linkedin.com/company/synthetic-organization/",
                     "snippet": "Perfil publico oficial y menciones de marca.",
                 }
             ]
@@ -33,7 +33,7 @@ def test_social_urls_found_by_web_search_are_routed_to_socmint():
     assert events
     assert events[0].category == "social_signal"
     assert "socmint_public" in events[0].tags
-    assert "platform_instagram" in events[0].tags
+    assert "platform_linkedin" in events[0].tags
 
     groups = _search_groups([events[0].model_dump()])
     assert groups["socmint"]["count"] == 1
@@ -42,9 +42,9 @@ def test_social_urls_found_by_web_search_are_routed_to_socmint():
 
 def test_brand_fraud_terms_are_classified_as_actionable_brand_protection():
     category, tags, technique = _classify_search_result(
-        "Avvillas farsa y soporte falso",
-        "avvillas farsa",
-        "https://x.com/example/status/123",
+        "Synthetic Brand farsa y soporte falso",
+        "synthetic brand farsa",
+        "https://x.com/synthetic-brand/status/123",
         "Usuarios reportan posible estafa y suplantacion de marca.",
     )
 
@@ -55,9 +55,9 @@ def test_brand_fraud_terms_are_classified_as_actionable_brand_protection():
 
 def test_reputation_checker_result_is_validation_context_not_phishing():
     category, tags, technique = _classify_search_result(
-        "Check if odl.com.co is legit or a scam - EmailVeritas",
-        '"odl.com.co"',
-        "https://www.emailveritas.com/url-checker/odl-com-co",
+        "Check if organization.example.invalid is legit or a scam - Reputation Checker",
+        '"organization.example.invalid"',
+        "https://checker.example.invalid/url-checker/organization",
         "Free URL checker reputation page.",
     )
 

@@ -48,8 +48,15 @@ def _dimension(result: dict, model: str, key: str) -> dict:
 
 
 def test_ambiguous_short_alias_is_rejected_without_context():
-    organization = _organization(name="ODL", legal_name=None, primary_domains=["odl.com.co"])
-    event = _news("odl-other", "ODL launches a developer library", "https://technology.example/odl-library", tags=["event_type:technology_adoption"])
+    organization = _organization(
+        name="ABC", legal_name=None, primary_domains=["abc.example.invalid"]
+    )
+    event = _news(
+        "abc-other",
+        "ABC launches a developer library",
+        "https://technology.example.invalid/abc-library",
+        tags=["event_type:technology_adoption"],
+    )
 
     result = build_strategic_intelligence([event], organization)
 

@@ -1,4 +1,4 @@
 employee_id,full_name,personal_email,corporate_email,identification_document,role,department,organization,country,city,access_level,access_category,consent_status,consent_date,authorized_personal_email
-AUTH-001,Leidy Lorena Bayona,,,,,,,,,1,publico,approved,2026-07-09,false
-AUTH-002,Eduard Arenas,,,,,,,,,1,publico,approved,2026-07-09,false
-AUTH-003,Juan Carlos Cortés Malagón,,,,,,,,,1,publico,approved,2026-07-09,false
+SYN-001,Synthetic Person 001,,,,,,,,,1,publico,approved,2026-01-01,false
+SYN-002,Synthetic Person 002,,,,,,,,,1,publico,approved,2026-01-01,false
+SYN-003,Synthetic Person 003,,,,,,,,,1,publico,approved,2026-01-01,false

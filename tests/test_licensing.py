@@ -10,7 +10,7 @@ from cyberdeck_api.licensing import (
 )
 
 
-def test_licensing_store_seeds_plans_users_and_audit(monkeypatch, tmp_path):
+def test_licensing_store_seeds_plans_without_publishing_users(monkeypatch, tmp_path):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     store = LicensingStore(tmp_path / "licensing.json")
 
@@ -18,11 +18,15 @@ def test_licensing_store_seeds_plans_users_and_audit(monkeypatch, tmp_path):
         await store.load()
         overview = await store.overview()
         assert {plan.code for plan in overview.plans} == {"starter", "professional", "enterprise", "sovereign"}
-        assert any(user.username == "superadmin" and user.role == "super_admin" for user in overview.users)
+        assert overview.users == []
         assert any(entry.action == "system.bootstrap" for entry in overview.audit_log)
 
-        overview = await store.create_company(CreateCompanyRequest(name="Acme Bank", country="CO", sector="Financial"))
-        company = next(company for company in overview.companies if company.name == "Acme Bank")
+        overview = await store.create_company(
+            CreateCompanyRequest(name="Synthetic Organization", country="ZZ", sector="Test")
+        )
+        company = next(
+            company for company in overview.companies if company.name == "Synthetic Organization"
+        )
 
         overview = await store.create_license(
             CreateLicenseRequest(company_id=company.id, plan_code="starter", seats=3)
@@ -33,18 +37,21 @@ def test_licensing_store_seeds_plans_users_and_audit(monkeypatch, tmp_path):
         overview = await store.create_user(
             CreateLicenseUserRequest(
                 company_id=company.id,
-                username="acme.admin",
-                full_name="Acme Admin",
+                username="synthetic-operator",
+                full_name="Synthetic Operator",
                 role="admin",
                 plan_code="starter",
-                created_by="superadmin",
+                created_by="test-harness",
             )
         )
-        user = next(item for item in overview.users if item.username == "acme.admin")
+        user = next(item for item in overview.users if item.username == "synthetic-operator")
         assert user.plan_code == "starter"
         assert "settings" in user.effective_modules
         assert "brand" in user.effective_modules
         assert "socmint" not in user.effective_modules
-        assert any(entry.action == "user.create" and entry.actor == "superadmin" for entry in overview.audit_log)
+        assert any(
+            entry.action == "user.create" and entry.actor == "test-harness"
+            for entry in overview.audit_log
+        )
 
     asyncio.run(scenario())

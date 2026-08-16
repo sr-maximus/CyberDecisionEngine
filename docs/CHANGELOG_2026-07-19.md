@@ -9,7 +9,8 @@
 - alcance organizacional separado del flujo individual de riesgo virtual de empleados;
 - regeneración trazable de informes para filesystem y PostgreSQL;
 - manual integral y guía de despliegue publicados en HTML navegable desde Uso y modelo;
-- paquetes de Grupo Aval, NTT DATA y corridas multidominio regenerados y aprobados.
+- paquetes sintéticos y corridas multidominio regenerados y aprobados sin
+  publicar datos del alcance autorizado.
 
 ## Datos, semántica e informes
 
@@ -29,11 +30,13 @@
 - país del tablero estratégico localizado mediante el catálogo central;
 - manual integral navegable, documentos semánticos y guía de lectura;
 - documentos de arquitectura/seguridad OpenClaw y evaluación OpenCTI;
-- bitácora reproducible de Grupo Aval y NTT DATA.
+- bitácora reproducible con marcadores sintéticos y resultados conservados
+  localmente.
 
 ## Pruebas y ejecuciones
 
 - 120 pruebas aprobadas para semántica, OpenCTI opcional, OpenClaw en modo propuesta e informes;
-- dos corridas públicas independientes con `runId`, salidas y logs segregados;
+- dos corridas autorizadas independientes con `runId`, salidas y logs
+  segregados fuera del repositorio;
 - validación visual de manual e informes ejecutivo/técnico;
 - servicios Docker conservados en redes internas y sin alterar aplicaciones externas al proyecto.

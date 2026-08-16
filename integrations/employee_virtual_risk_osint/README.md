@@ -51,7 +51,7 @@ BING_SEARCH_ENDPOINT=https://api.bing.microsoft.com/v7.0/search
 GOOGLE_CSE_API_KEY=
 GOOGLE_CSE_ID=
 REPORT_PASSWORD=
-HASH_SALT=change-me-in-production
+HASH_SALT=
 MIN_CONFIDENCE=0.35
 ```
 
@@ -67,7 +67,7 @@ También puedes usar CSV. Ejemplo mínimo:
 
 ```csv
 employee_id,full_name,personal_email,corporate_email,identification_document,role,department,organization,country,city,access_level,access_category,consent_status,consent_date,authorized_personal_email
-E001,Ana María Torres,ana.personal@example.com,ana.torres@empresa.com,123456789,Analista SOC,Ciberseguridad,Empresa Demo,Colombia,Bogotá,4,confidencial,approved,2026-07-01,true
+SYN-001,Synthetic Employee 001,employee-001@example.invalid,employee-001@organization.example.invalid,,Security Analyst,Security,Authorized Organization,,,4,confidential,approved,2026-01-01,true
 ```
 
 ## Validar consentimiento
@@ -205,7 +205,9 @@ employee_virtual_risk_osint/
 - Gráficas optimizadas para evitar traslape de etiquetas: barras horizontales, radar, matriz probabilidad-impacto, heatmap por dimensión/dato de búsqueda y gráfico de hallazgos por vector de búsqueda.
 - Muestra trazabilidad de qué dato originó el hallazgo (nombre, nombre+organización, correo corporativo, nombre+dominio, correo personal autorizado).
 - Incluye branding: `Proceso de análisis diseñado por Edwin Peñuela`.
-- Incluye dataset de demostración `sample_employees_demo_grupo_aval.csv` con personas ficticias para pruebas.
+- Incluye `sample_employees.csv` únicamente con identificadores sintéticos y
+  dominios reservados `.invalid`; sustituye esos campos localmente solo con
+  autorización y nunca publiques el archivo resultante.
 
 
 ## Ejecución en macOS
@@ -228,7 +230,7 @@ pip install -r requirements.txt
 
 # 5. Ejecutar demo local sin internet real
 python -m app.main analyze \
-  --input data/input/sample_employees_demo_grupo_aval.csv \
+  --input data/input/sample_employees.csv \
   --output data/output_demo \
   --search-client mock \
   --formats html,json,csv \
@@ -287,7 +289,7 @@ La versión v3 incorpora:
 La versión anterior podía devolver cero resultados por dos razones:
 
 1. **Problema de conectividad o bloqueo**: si el entorno no podía resolver `html.duckduckgo.com` o `www.bing.com`, el reporte quedaba con cero evidencias. En V4, si todas las búsquedas fallan, el informe marca el empleado como **búsqueda no completada**, no como “sin hallazgos”.
-2. **Problema lógico de consulta**: antes se buscaba principalmente `"nombre" + keyword`, por ejemplo `"Juan Carlos Cortés Malagón" "password"`. Si en Google hay resultados con solo `"Juan Carlos Cortés Malagón"`, esos resultados podían no aparecer. En V4 se agregó una etapa inicial de **descubrimiento de identidad digital**:
+2. **Problema lógico de consulta**: antes se buscaba principalmente `"nombre" + keyword`, por ejemplo `"<nombre-autorizado>" "password"`. Si en Google hay resultados con solo `"<nombre-autorizado>"`, esos resultados podían no aparecer. En V4 se agregó una etapa inicial de **descubrimiento de identidad digital**:
    - `"Nombre completo"`
    - `"Nombre completo" site:linkedin.com`
    - `"Nombre completo" site:github.com`
@@ -330,7 +332,7 @@ Formato mínimo de `manual_results_google.csv`:
 
 ```csv
 employee_id,url,title,snippet,query,source
-AUTH-003,https://sitio.com/perfil,Perfil público,Texto visible en Google,"Juan Carlos Cortés Malagón",google_manual
+SYN-003,https://profile.example.invalid/person,Perfil público,Texto visible en el buscador,"<nombre-autorizado>",manual_import
 ```
 
 Este modo evita bloqueos porque no automatiza Google: usa resultados recolectados manualmente por un analista autorizado.

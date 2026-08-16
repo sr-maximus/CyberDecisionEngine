@@ -55,6 +55,6 @@
   fixture sintético identificado explícitamente como prueba;
 - el historial operativo anterior se limpió sin eliminar usuarios, licencias ni
   configuración;
-- se ejecutan y validan corridas públicas autorizadas e independientes de Grupo
-  Aval y Frontera Energy; sus identificadores, métricas y artefactos quedan en
-  `docs/auditoria/04-validacion-paso-a-paso-dominios.md`.
+- las corridas autorizadas se validan de forma independiente; sus nombres,
+  dominios, identificadores, métricas y artefactos permanecen fuera de Git y el
+  procedimiento queda en `docs/auditoria/04-validacion-paso-a-paso-dominios.md`.

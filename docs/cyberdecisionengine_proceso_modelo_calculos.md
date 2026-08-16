@@ -232,4 +232,6 @@ curl -fsS http://localhost:8000/api/health
 curl -fsS http://localhost:8080/
 ```
 
-Los resultados se conservan en `artifacts/validation_results.json`, `artifacts/test_results.txt` y `artifacts/before_after_summary.md`.
+Los resultados de validación se generan localmente en `artifacts/` y no se
+publican. Antes de compartirlos deben sustituirse nombres, dominios,
+identificadores, cuentas y resultados operativos por marcadores sintéticos.

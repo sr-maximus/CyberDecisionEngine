@@ -86,13 +86,13 @@ def test_openclaw_search_planning_payload_is_safe_and_structured():
         status="completed",
         stage="Informe generado",
         request=DomainAnalysisRequest(
-            domains=["puertobahia.com.co", "odl.com.co"],
-            organization_name="Energia Colombia",
+            domains=["organization.example.invalid", "secondary.example.invalid"],
+            organization_name="Authorized Organization",
             sector="Energy",
             country="Colombia",
             authorized_scope=True,
         ),
-        domains=["puertobahia.com.co", "odl.com.co"],
+        domains=["organization.example.invalid", "secondary.example.invalid"],
         summary=AnalysisSummary(
             kpis=KpiSummary(active_domains=2, new_events=3, max_residual_risk=0.64),
             source_statuses=[

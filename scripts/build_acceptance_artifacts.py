@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -11,15 +12,19 @@ from cyberdeck.settings import PROJECT_ROOT
 from cyberdeck_api.jobs import summarize_context
 
 
-RUN_ID = "a9dad6033577"
-REPORT_STEM = f"{RUN_ID}-puertobahia-com-co-odl-com-co-fronteraenergy-ca"
+RUN_ID = os.getenv("CDE_ACCEPTANCE_RUN_ID", "").strip()
+REPORT_STEM = os.getenv("CDE_ACCEPTANCE_REPORT_STEM", "").strip()
 CONTEXT_PATH = PROJECT_ROOT / "data" / "web_runs" / RUN_ID / "context.json"
 REPORT_DIR = PROJECT_ROOT / "reports" / "web"
 ARTIFACT_DIR = PROJECT_ROOT / "artifacts"
-DOCS_DIR = PROJECT_ROOT / "docs"
+DOCS_DIR = ARTIFACT_DIR / "docs"
 
 
 def main() -> None:
+    if not RUN_ID or not REPORT_STEM:
+        raise RuntimeError(
+            "Set CDE_ACCEPTANCE_RUN_ID and CDE_ACCEPTANCE_REPORT_STEM locally."
+        )
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     context = RunContext.model_validate_json(CONTEXT_PATH.read_text(encoding="utf-8"))
@@ -151,31 +156,17 @@ def _metrics_inventory() -> dict[str, Any]:
 
 def _baseline_dashboard() -> dict[str, Any]:
     return {
-        "captured_before_change": True,
+        "captured_before_change": False,
         "run_id": RUN_ID,
-        "active_domains": 5,
-        "unique_records": 593,
-        "validated_findings": 2,
-        "healthy_sources": 10,
-        "queried_sources": 15,
-        "total_sources": 23,
-        "max_residual_risk": 2.94,
-        "risk_radar": {"rendered": True, "fraud_score": 0.038, "identity_score": 0.038, "evidence_count": 0},
-        "pestel": None,
-        "porter": None,
+        "note": "Capture the baseline locally; do not commit organization-specific values.",
     }
 
 
 def _baseline_report() -> dict[str, Any]:
     return {
-        "captured_before_change": True,
+        "captured_before_change": False,
         "run_id": RUN_ID,
-        "domains_visible_in_scope_section": 5,
-        "source_health_display": "15/23",
-        "source_health_semantics": "queried sources mislabeled as healthy sources",
-        "risk_radar_rendered_without_minimum_evidence": True,
-        "decision_snapshot_present": False,
-        "shared_json_csv_contract": False,
+        "note": "Capture the baseline locally; do not commit organization-specific values.",
     }
 
 
@@ -252,7 +243,7 @@ Corrida `{RUN_ID}` con {len(snapshot['analyzed_domains'])} dominios. Se inspecci
 
 1. `buildDashboardModel` recalculaba indicadores compartidos en TypeScript.
 2. `prepare_context_for_report` y funciones auxiliares recomponían cifras durante el render.
-3. El informe mostraba `15/23` como salud, mientras el dashboard mostraba `10/23`; el primer valor era cobertura consultada.
+3. El informe y el dashboard mezclaban fuentes saludables y consultadas.
 4. Radar y calor reutilizaban riesgo residual aunque la categoría tuviera `evidence_count=0`.
 5. Escenarios, decisiones y referencias no tenían un contrato único exportable.
 
@@ -289,7 +280,7 @@ def _report_design() -> str:
 - Identidad dinámica desde `ReportContext`; no se infiere un grupo sin validación del alcance.
 - El registro de decisión aparece en ejecutivo y técnico desde el mismo snapshot.
 - Ejecutivo: referencias compactas y decisiones; técnico: referencias completas y URLs.
-- Los cinco dominios permanecen visibles aunque no tengan hallazgos.
+- Todos los dominios declarados permanecen visibles aunque no tengan hallazgos.
 - `null` no se presenta como cero y una gráfica inelegible se reemplaza por explicación.
 - Los alias canónicos siguen `{group_slug}_{period}_{run_id}_{type}.html`.
 
@@ -397,7 +388,7 @@ def _before_after(snapshot: dict[str, Any], consistency: dict[str, Any]) -> str:
 
 | Aspecto | Antes | Después |
 |---|---|---|
-| Salud de fuentes | 10/23 dashboard; 15/23 informe | {snapshot['source_health']['healthy']}/23 saludables y {snapshot['source_health']['queried']}/23 consultadas, etiquetas separadas |
+| Salud de fuentes | denominadores mezclados | {snapshot['source_health']['healthy']}/{snapshot['source_health']['total']} saludables y {snapshot['source_health']['queried']}/{snapshot['source_health']['total']} consultadas, etiquetas separadas |
 | Radar/calor | Se renderizaba con 0 evidencias de categoría | `insufficient_evidence`, no se dibuja |
 | Escenarios de correo | Rutas de cálculo independientes | {snapshot['scenario_funnel']['supported']} instancia SPF/DMARC deduplicada |
 | PESTEL/Porter | Riesgo de valores heredados | N/D sin clusters noticiosos trazables |

@@ -57,64 +57,9 @@ export const roleLabelsByLanguage: Record<LanguageMode, Record<UserRole, string>
   }
 };
 
-export const seededUsers: LocalUser[] = [
-  {
-    id: "seed-superadmin-edwin",
-    username: "superadmin",
-    passwordHash: "c51ed7e1b32f16733bdcaf4097905a90b06088a269651f4c022a677e1c89391b",
-    fullName: "Edwin Peñuela - Super Admin",
-    role: "super_admin",
-    permissions: ["platform:superadmin", "license:manage", "company:manage", "users:manage", "settings:write", "analysis:run", "reports:view", "surface:view"],
-    companyId: "company-cde-root",
-    companyName: "CyberDecisionEngine - Edwin Peñuela",
-    createdAt: "2026-07-08T00:00:00-05:00"
-  },
-  {
-    id: "seed-admin-edwin",
-    username: "admin",
-    passwordHash: "9ccdcb44e01741c4ab7deabe0d4d56b5a37e127c50b434c8d88632e4e06e1580",
-    fullName: "Edwin Peñuela",
-    role: "admin",
-    permissions: ["users:manage", "settings:write", "analysis:run", "reports:view", "surface:view"],
-    companyId: "company-cde-root",
-    companyName: "CyberDecisionEngine - Edwin Peñuela",
-    createdAt: "2026-07-08T00:00:00-05:00"
-  },
-  {
-    id: "seed-analyst",
-    username: "analista",
-    passwordHash: "6f81551519adb3d849ecd63430c32b3a81f6895b5577d7595722379ffaa8c97a",
-    fullName: "Analista CyberDecision",
-    role: "analyst",
-    permissions: ["analysis:run", "reports:view", "surface:view", "sources:view"],
-    companyId: "company-cde-root",
-    companyName: "CyberDecisionEngine - Edwin Peñuela",
-    createdAt: "2026-07-08T00:00:00-05:00"
-  },
-  {
-    id: "seed-executive",
-    username: "directivo",
-    passwordHash: "c3c41cf2c5638b085c06d81023721dfabead7e995b157695dd49770a568e5320",
-    fullName: "Directivo Ejecutivo",
-    role: "executive",
-    permissions: ["dashboards:view", "reports:view", "surface:view"],
-    companyId: "company-cde-root",
-    companyName: "CyberDecisionEngine - Edwin Peñuela",
-    createdAt: "2026-07-08T00:00:00-05:00"
-  }
-];
-
 export function loadUsers(): LocalUser[] {
   const saved = typeof window === "undefined" ? null : window.localStorage.getItem(USERS_STORAGE_KEY);
-  const parsed = safeParseUsers(saved);
-  const byUsername = new Map<string, LocalUser>();
-  seededUsers.forEach((user) => byUsername.set(user.username.toLowerCase(), normalizeUser(user)));
-  parsed.forEach((user) => {
-    const key = user.username.toLowerCase();
-    const seed = byUsername.get(key);
-    byUsername.set(key, normalizeUser({ ...(seed ?? user), ...sanitizeUser(user) }));
-  });
-  const users = Array.from(byUsername.values());
+  const users = safeParseUsers(saved).map((user) => normalizeUser(sanitizeUser(user)));
   saveUsers(users);
   return users;
 }

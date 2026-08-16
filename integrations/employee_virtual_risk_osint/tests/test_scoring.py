@@ -5,8 +5,8 @@ from app.scoring import score_result
 def test_score_result_basic():
     employee = Employee(
         employee_id="E001",
-        full_name="Ana María Torres",
-        corporate_email="ana.torres@empresa.com",
+        full_name="Synthetic Employee 001",
+        corporate_email="employee-001@organization.example.invalid",
         organization="Empresa Demo",
         city="Bogotá",
         country="Colombia",
@@ -14,7 +14,7 @@ def test_score_result_basic():
         consent_status="approved",
     )
     spec = QuerySpec(
-        query='"Ana María Torres" "GitHub"',
+        query='"Synthetic Employee 001" "GitHub"',
         employee_id="E001",
         dimension_key="technical_exposure",
         dimension_label="Exposición técnica",
@@ -24,8 +24,8 @@ def test_score_result_basic():
     result = SearchResult(
         query=spec.query,
         url="https://github.com/mock/ana",
-        title="Ana María Torres GitHub",
-        snippet="Ana María Torres de Empresa Demo usa GitHub para laboratorios.",
+        title="Synthetic Employee 001 GitHub",
+        snippet="Synthetic Employee 001 uses GitHub in a controlled laboratory.",
         source="mock",
     )
     risk_config = {"dimensions": {"technical_exposure": {"severity": 5}}}

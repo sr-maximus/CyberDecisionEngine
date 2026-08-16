@@ -11,11 +11,14 @@ def test_osint_tools_payload_to_events():
         {
             "results": [
                 {
-                    "url": "https://x.com/grupoaval",
-                    "target": "grupoaval",
-                    "platform": "x.com",
+                    "url": "https://social.example.invalid/authorized-organization",
+                    "target": "authorized-organization",
+                    "platform": "social.example.invalid",
                     "confidence": 0.7,
-                    "metadata": {"username": "grupoaval", "links": ["https://grupoaval.com"]},
+                    "metadata": {
+                        "username": "synthetic-handle",
+                        "links": ["https://organization.example.invalid"],
+                    },
                 }
             ]
         },
@@ -24,7 +27,7 @@ def test_osint_tools_payload_to_events():
 
     assert events[0].source == "Evidencia publica de perfil"
     assert events[0].category == "social_signal"
-    assert events[0].evidence_url == "https://x.com/grupoaval"
+    assert events[0].evidence_url == "https://social.example.invalid/authorized-organization"
     assert "profile_enriched" in events[0].tags
 
 
@@ -70,8 +73,8 @@ def test_dns_only_admin_subdomain_requires_validation_and_has_no_fake_url():
         {
             "domains": [
                 {
-                    "domain": "puertobahia.com.co",
-                    "subdomains": ["admin.mastest.puertobahia.com.co"],
+                    "domain": "organization.example.invalid",
+                    "subdomains": ["admin.qa.organization.example.invalid"],
                     "web_assets": [],
                     "findings": [],
                 }

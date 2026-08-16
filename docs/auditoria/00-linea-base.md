@@ -39,12 +39,12 @@ evidencia por una imagen inferida.
 | Baja | El host no expone Node en `PATH` por defecto | runtime encapsulado o Docker | el build local requiere ruta del runtime o Docker | documentado |
 | Informativa | La copia no contiene `.git` | entrega sin metadatos Git | no es posible crear rama o commits | limitacion del workspace |
 
-## Casos reales disponibles
+## Casos de validación
 
-| Organizacion | runId | Registros brutos | Unicos | Duplicados | Hallazgos validados |
-|---|---|---:|---:|---:|---:|
-| Grupo Aval | `2691ce2216b4` | 472 | 376 | 96 | 0 |
-| NTT DATA | `d071615257a0` | 489 | 387 | 102 | 0 |
+Los nombres, dominios, identificadores y resultados de corridas autorizadas no
+se publican. Registra localmente `<organization>`, `<run-id>`,
+`<raw-records>`, `<unique-records>` y `<validated-findings>` durante cada
+validación.
 
 La ausencia de hallazgos validados no se interpreta como ausencia de riesgo. El
 resultado significa que la cobertura disponible no supero el umbral de

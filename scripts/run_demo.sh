@@ -14,11 +14,11 @@ fi
 
 $CYBERDECK frameworks sync --all --verbose
 $CYBERDECK run \
-  --org config/orgs/grupo_aval.yml \
+  --org config/orgs/example_organization.yml \
   --mode snapshot \
   --lookback-days 30 \
-  --html reports/grupo_aval_executive.html \
+  --html reports/example_organization_executive.html \
   --real-only \
   --verbose
 
-echo "Demo report generated: reports/grupo_aval_executive.html"
+echo "Demo report generated: reports/example_organization_executive.html"

@@ -14,7 +14,7 @@ class Settings:
     bing_search_endpoint: str = "https://api.bing.microsoft.com/v7.0/search"
     google_cse_api_key: str = ""
     google_cse_id: str = ""
-    hash_salt: str = "change-me-in-production"
+    hash_salt: str = ""
     report_password: str = ""
     min_confidence: float = 0.35
     request_timeout_seconds: int = 15
@@ -30,7 +30,7 @@ def load_settings() -> Settings:
         bing_search_endpoint=os.getenv("BING_SEARCH_ENDPOINT", "https://api.bing.microsoft.com/v7.0/search").strip(),
         google_cse_api_key=os.getenv("GOOGLE_CSE_API_KEY", "").strip(),
         google_cse_id=os.getenv("GOOGLE_CSE_ID", "").strip(),
-        hash_salt=os.getenv("HASH_SALT", "change-me-in-production"),
+        hash_salt=os.getenv("HASH_SALT", ""),
         report_password=os.getenv("REPORT_PASSWORD", ""),
         min_confidence=float(os.getenv("MIN_CONFIDENCE", "0.35")),
         request_timeout_seconds=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "15")),

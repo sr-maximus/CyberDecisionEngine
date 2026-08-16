@@ -28,7 +28,7 @@ def test_build_source_config_injects_domain_queries():
         {"web_search": {"enabled": False}},
         ["example.com"],
         "Example Holding",
-        ["competitor.com"],
+        ["competitor.example.invalid"],
         country="Colombia",
         sector="Energy",
         strategic_context={
@@ -41,7 +41,7 @@ def test_build_source_config_injects_domain_queries():
 
     assert config["web_search"]["enabled"] is True
     assert '"example.com" phishing' in config["web_search"]["queries"]
-    assert '"competitor.com" phishing' in config["web_search"]["queries"]
+    assert '"competitor.example.invalid" phishing' in config["web_search"]["queries"]
     assert '"Example Holding" fraude OR phishing OR suplantacion' in config["web_search"]["queries"]
     assert '"Example Holding" "Energy" ciberseguridad OR riesgo digital' in config["web_search"]["queries"]
     assert '"Example Holding" "Market Rival" competencia digital OR mercado OR tecnologia OR ciberseguridad' in config["web_search"]["queries"]
@@ -49,7 +49,10 @@ def test_build_source_config_injects_domain_queries():
     assert '"Example Holding" "Digital Platform" mercado OR clientes OR sustituto OR riesgo digital' in config["web_search"]["queries"]
     assert any("site:example.com" in query for query in config["web_search"]["queries"])
     assert any("credential" in query for query in config["web_search"]["queries"])
-    assert config["osint_public"]["domains"] == ["example.com", "competitor.com"]
+    assert config["osint_public"]["domains"] == [
+        "example.com",
+        "competitor.example.invalid",
+    ]
     assert config["osint_public"]["enabled"] is True
     assert config["osint_tools"]["enabled"] is True
     assert {"example", "competitor", "exampleholding"}.issubset(set(config["osint_tools"]["targets"]))
@@ -60,10 +63,22 @@ def test_build_source_config_injects_domain_queries():
     assert config["spiderfoot"]["domains"] == ["example.com"]
     assert config["spiderfoot"]["depth"] == "deep"
     assert config["spiderfoot"]["include_raw"] is False
-    assert {"example.com", "competitor.com", "Example Holding", "example", "competitor"}.issubset(set(config["urlscan"]["terms"]))
-    assert config["otx"]["domains"] == ["example.com", "competitor.com"]
+    assert {
+        "example.com",
+        "competitor.example.invalid",
+        "Example Holding",
+        "example",
+        "competitor",
+    }.issubset(set(config["urlscan"]["terms"]))
+    assert config["otx"]["domains"] == ["example.com", "competitor.example.invalid"]
     assert "Example Holding" in config["socmint_public"]["keywords"]
-    assert {"example.com", "competitor.com", "Example Holding", "example", "competitor"}.issubset(set(config["socmint_public"]["keywords"]))
+    assert {
+        "example.com",
+        "competitor.example.invalid",
+        "Example Holding",
+        "example",
+        "competitor",
+    }.issubset(set(config["socmint_public"]["keywords"]))
 
 
 def test_build_source_config_honors_scan_time_budget():
@@ -89,14 +104,20 @@ def test_default_collection_waits_for_configured_plan_completion():
 
 
 def test_build_source_config_injects_colombia_public_queries():
-    config = build_source_config({"web_search": {"enabled": False}}, ["grupoaval.com"], "Grupo Aval", [], "CO")
+    config = build_source_config(
+        {"web_search": {"enabled": False}},
+        ["organization.example.invalid"],
+        "Authorized Organization",
+        [],
+        "CO",
+    )
 
     queries = config["web_search"]["queries"]
-    assert '"Grupo Aval" site:colcert.gov.co' in queries
-    assert '"Grupo Aval" site:cc-csirt.policia.gov.co' in queries
-    assert '"Grupo Aval" site:csirtsalud.gov.co' in queries
-    assert '"Grupo Aval" site:superfinanciera.gov.co' in queries
-    assert '"grupoaval.com" Colombia phishing OR fraude OR suplantacion' in queries
+    assert '"Authorized Organization" site:colcert.gov.co' in queries
+    assert '"Authorized Organization" site:cc-csirt.policia.gov.co' in queries
+    assert '"Authorized Organization" site:csirtsalud.gov.co' in queries
+    assert '"Authorized Organization" site:superfinanciera.gov.co' in queries
+    assert '"organization.example.invalid" Colombia phishing OR fraude OR suplantacion' in queries
 
 
 def test_actionable_queries_precede_broad_strategic_context():
@@ -136,11 +157,16 @@ def test_build_source_config_does_not_truncate_many_domains():
 
 
 def test_build_source_config_supports_brand_only_scope():
-    config = build_source_config({"web_search": {"enabled": False}}, [], "Grupo Aval", [], "CO")
+    config = build_source_config(
+        {"web_search": {"enabled": False}}, [], "Authorized Organization", [], "CO"
+    )
 
-    assert '"Grupo Aval" fraude OR phishing OR suplantacion' in config["web_search"]["queries"]
-    assert "Grupo Aval" in config["socmint_public"]["keywords"]
-    assert "grupoaval" in config["osint_tools"]["targets"]
+    assert (
+        '"Authorized Organization" fraude OR phishing OR suplantacion'
+        in config["web_search"]["queries"]
+    )
+    assert "Authorized Organization" in config["socmint_public"]["keywords"]
+    assert "authorizedorganization" in config["osint_tools"]["targets"]
     assert config["kali_surface"]["domains"] == []
     assert config["spiderfoot"]["domains"] == []
 
@@ -205,12 +231,12 @@ def test_report_display_date_rejects_invalid_datetime():
 def test_domain_analysis_request_accepts_organization_without_domains():
     request = DomainAnalysisRequest(
         domains=[],
-        organization_name="Grupo Aval",
+        organization_name="Authorized Organization",
         authorized_scope=True,
     )
 
     assert request.domains == []
-    assert request.organization_name == "Grupo Aval"
+    assert request.organization_name == "Authorized Organization"
 
 
 def test_person_scope_is_first_class_and_uses_person_queries():
@@ -254,13 +280,9 @@ def test_request_infers_person_scope_for_api_clients_that_send_person_name():
     assert request.subject_name == "Grace Example"
 
 
-def test_unrelated_multidomain_scope_has_no_fixture_specific_targets():
-    domains = ["example.org", "iana.org", "example.net"]
+def test_unrelated_multidomain_scope_contains_only_declared_targets():
+    domains = ["example.org", "scope.example.invalid", "example.net"]
     config = build_source_config({"web_search": {"enabled": False}}, domains, "Independent Research Group")
-    serialized = str(config).lower()
-
     assert all(domain in config["osint_public"]["domains"] for domain in domains)
     assert all(f'"{domain}" phishing' in config["web_search"]["queries"] for domain in domains)
-    assert "puertobahia" not in serialized
-    assert "fronteraenergy" not in serialized
-    assert "parexresources" not in serialized
+    assert set(config["osint_public"]["domains"]) == set(domains)

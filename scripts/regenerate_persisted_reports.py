@@ -26,23 +26,6 @@ class ReportTarget:
     output_directory: str | None = None
 
 
-TARGETS = {
-    target.run_id: target
-    for target in (
-        ReportTarget("2691ce2216b4", "2691ce2216b4-grupoaval-com", "outputs/grupo-aval/2691ce2216b4"),
-        ReportTarget("d071615257a0", "d071615257a0-nttdata-com", "outputs/ntt-data/d071615257a0"),
-        ReportTarget(
-            "a9dad6033577",
-            "a9dad6033577-puertobahia-com-co-odl-com-co-fronteraenergy-ca",
-        ),
-        ReportTarget(
-            "32390824904c",
-            "32390824904c-puertobahia-com-co-odl-com-co-fronteraenergy-ca",
-        ),
-    )
-}
-
-
 def regenerate(target: ReportTarget) -> dict[str, object]:
     context_path = PROJECT_ROOT / "data" / "web_runs" / target.run_id / "context.json"
     if not context_path.is_file():
@@ -216,13 +199,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Regenerate validated report bundles from persisted run contexts."
     )
-    parser.add_argument("run_ids", nargs="*")
+    parser.add_argument(
+        "run_ids",
+        nargs="+",
+        help="Persisted run IDs supplied locally; no IDs are embedded in the repository.",
+    )
+    parser.add_argument(
+        "--output-root",
+        help="Optional local output root. Each run is written beneath its own ID.",
+    )
     args = parser.parse_args()
-    selected_run_ids = args.run_ids or list(TARGETS)
-    unknown = sorted(set(selected_run_ids) - set(TARGETS))
-    if unknown:
-        parser.error(f"unknown run id(s): {', '.join(unknown)}")
-    targets = [TARGETS[run_id] for run_id in selected_run_ids]
+    targets = [
+        ReportTarget(
+            run_id=run_id,
+            stem=run_id,
+            output_directory=(f"{args.output_root.rstrip('/')}/{run_id}" if args.output_root else None),
+        )
+        for run_id in args.run_ids
+    ]
     if os.getenv("DATABASE_URL"):
         results = asyncio.run(regenerate_database_targets(targets))
     else:

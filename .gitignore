@@ -25,3 +25,9 @@ outputs/
 reports/web/
 reports/employee-risk/
 screenshots/
+artifacts/*
+!artifacts/README.md
+docs/design/*.png
+docs/auditoria/00-evidencia-visual/*.png
+reports/*.docx
+docs/manual/*.docx

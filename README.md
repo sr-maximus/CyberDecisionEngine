@@ -83,8 +83,8 @@ El instalador verifica arquitectura `x86_64`, Xcode Command Line Tools, Homebrew
 ```bash
 source .venv/bin/activate
 cyberdeck frameworks sync --all --verbose
-cyberdeck run --org config/orgs/grupo_aval.yml --mode snapshot --lookback-days 30 --html reports/grupo_aval_executive.html --verbose
-open reports/grupo_aval_executive.html
+cyberdeck run --org config/orgs/example_organization.yml --mode snapshot --lookback-days 30 --html reports/example_organization_executive.html --verbose
+open reports/example_organization_executive.html
 ```
 
 Tambien puedes usar:
@@ -151,10 +151,10 @@ scripts/kali_surface.sh test
 Comandos utiles:
 
 ```bash
-scripts/osint_tools.sh search grupoaval
-scripts/kali_surface.sh scan grupoaval.com
+scripts/osint_tools.sh search authorized-organization
+scripts/kali_surface.sh scan organization.example.invalid
 scripts/spiderfoot_sidecar.sh start
-scripts/spiderfoot_sidecar.sh scan grupoaval.com
+scripts/spiderfoot_sidecar.sh scan organization.example.invalid
 ```
 
 Estos contenedores no publican APIs al host; la API consume `OSINT_TOOLS_URL=http://osint-tools:7001`, `KALI_SURFACE_URL=http://kali-surface:7010` y `SPIDERFOOT_URL=http://spiderfoot:7020` por redes Docker internas. Si un sidecar no esta activo, la fuente se marca como `skipped` y el analisis continua sin inventar datos.
@@ -224,8 +224,10 @@ La app incluye una capa de gobierno preparada para evolucionar a SaaS/licenciami
 - Bitacora: registra arranque del control plane y cambios de empresa, licencia, usuario, estado y acceso.
 
 Las credenciales locales de laboratorio no se publican en el repositorio. Deben
-entregarse al operador por un canal seguro y cargarse como variables temporales o
-mediante el mecanismo de aprovisionamiento administrado.
+solicitarse al propietario en
+[edwinjavpenuela@gmail.com](mailto:edwinjavpenuela@gmail.com) y entregarse por un
+canal seguro. El repositorio y la interfaz no incluyen usuarios, contraseñas ni
+hashes predeterminados.
 
 Nota de produccion: el login local actual conserva compatibilidad de laboratorio
 y no constituye una frontera de seguridad server-side. Para venta comercial se
@@ -236,11 +238,11 @@ Argon2/bcrypt, MFA y enforcement de licencia en la API ademas del menu.
 
 ```bash
 cyberdeck doctor --verbose
-cyberdeck init-org --name "Grupo Aval" --sector financial --country CO --author "Edwin Javier Peñuela Camacho" --out config/orgs/grupo_aval.yml
+cyberdeck init-org --name "Organization Under Assessment" --sector authorized_test_sector --country ZZ --author "authorized_operator" --out config/orgs/example_organization.yml
 cyberdeck frameworks sync --all --verbose
-cyberdeck run --org config/orgs/grupo_aval.yml --mode snapshot --lookback-days 30 --html reports/grupo_aval_executive.html --verbose
-cyberdeck run --org config/orgs/grupo_aval.yml --mode deep --lookback-days 90 --html reports/grupo_aval_deep.html --verbose
-cyberdeck monitor --org config/orgs/grupo_aval.yml --duration 24h --interval 30m --html reports/grupo_aval_24h.html --verbose
+cyberdeck run --org config/orgs/example_organization.yml --mode snapshot --lookback-days 30 --html reports/example_organization_executive.html --verbose
+cyberdeck run --org config/orgs/example_organization.yml --mode deep --lookback-days 90 --html reports/example_organization_deep.html --verbose
+cyberdeck monitor --org config/orgs/example_organization.yml --duration 24h --interval 30m --html reports/example_organization_24h.html --verbose
 cyberdeck report open --latest
 ```
 
@@ -270,7 +272,7 @@ config/
   app.yml
   sources.yml
   frameworks.yml
-  orgs/grupo_aval.yml
+  orgs/example_organization.yml
 tests/
 scripts/
 reports/
@@ -286,7 +288,7 @@ scripts/healthcheck.sh
 
 Los tests cubren el modelo matematico P-CIDER, matriz 4x4, mappings y generacion de reporte. El demo genera un HTML valido sin servidor local.
 
-La aceptación vigente comprende 120 pruebas Python, lint, build TypeScript/Vite,
+La aceptación vigente comprende 225 pruebas Python, lint, build TypeScript/Vite,
 validación de informes y paridad entre API, snapshot de decisión, HTML, JSON y CSV.
 
 ## Fuentes metodologicas

@@ -17,13 +17,13 @@ from cyberdeck.schemas import OrganizationProfile, RiskFinding, RunContext, Sour
 
 def test_report_generation(tmp_path):
     org = OrganizationProfile(
-        name="Demo Bank",
+        name="Synthetic Organization",
         sector="Financial and insurance activities",
         country="CO",
         author="Edwin Javier Peñuela Camacho",
         authorized_scope=True,
-        primary_domains=["demo-bank.com"],
-        comparison_domains=["benchmark-bank.com"],
+        primary_domains=["primary.example.invalid"],
+        comparison_domains=["benchmark.example.invalid"],
         financial_risk_inputs={
             "asset_value": 1_000_000,
             "exposure_factor": 0.25,
@@ -101,10 +101,10 @@ def test_report_generation(tmp_path):
                     {
                         "type": "confirmed",
                         "label": "CVE-2026-1234",
-                        "asset": "demo-bank.com",
+                        "asset": "primary.example.invalid",
                         "status": "CVE observada",
                         "decision": "Validar aplicabilidad.",
-                        "evidence_url": "https://urlscan.io/api/v1/result/019ed40b-2269-7628-9d53-4f8400647c66/",
+                        "evidence_url": "https://urlscan.io/api/v1/result/synthetic-record/",
                     }
                 ],
             },
@@ -146,8 +146,8 @@ def test_report_generation(tmp_path):
     assert "Arquitectura de decisión" in html
     assert "Alcance y base de comparación" in html
     assert "Alcance sectorial declarado" in html
-    assert "demo-bank.com" in html
-    assert "benchmark-bank.com" in html
+    assert "primary.example.invalid" in html
+    assert "benchmark.example.invalid" in html
     assert "Opciones de decisión sustentadas por escenarios" in html
     assert "Plan de trabajo de mitigación y revisión de escenarios" not in html
     assert "Sin plan de acción sustentado" in html
@@ -180,7 +180,7 @@ def test_report_generation(tmp_path):
     english_html = Path(english_out).read_text(encoding="utf-8")
     technical_html = Path(tmp_path / "report-en-technical.html").read_text(encoding="utf-8")
     assert '<html lang="en">' in english_html
-    assert "Strategic cyber intelligence report — Demo Bank" in english_html
+    assert "Strategic cyber intelligence report — Synthetic Organization" in english_html
     assert "Executive Summary" in english_html
     assert "Decision Architecture" in english_html
     assert "Scope and Comparison Basis" in english_html
@@ -211,8 +211,8 @@ def test_report_generation(tmp_path):
     assert "ALE · before controls" not in technical_html
     assert "Declared financial inputs" not in technical_html
     assert "SLE / ALE / ROSI" not in technical_html
-    assert "https://urlscan.io/result/019ed40b-2269-7628-9d53-4f8400647c66/" not in technical_html
-    assert "https://urlscan.io/screenshots/019ed40b-2269-7628-9d53-4f8400647c66.png" not in technical_html
+    assert "https://urlscan.io/result/synthetic-record/" not in technical_html
+    assert "https://urlscan.io/screenshots/synthetic-record.png" not in technical_html
     assert "Narrative intelligence, disinformation and reputational risk" in technical_html
     assert "Evidence-Activated Multi-Framework Scenarios" in technical_html
     assert "Resumen Ejecutivo" not in english_html

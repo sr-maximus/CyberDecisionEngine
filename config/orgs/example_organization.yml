@@ -1,43 +1,20 @@
+# Public template only. Copy it to a local ignored file before use.
+# Replace the descriptive placeholders with an expressly authorized scope.
+# Do not commit organization names, domains, accounts, contacts or results.
 organization:
-  name: "Grupo Aval"
-  sector: "multi_sector_financial_holding"
-  country: "CO"
-  author: "Edwin Javier Peñuela Camacho"
+  name: "Organization Under Assessment"
+  sector: "authorized_test_sector"
+  country: "ZZ"
+  author: "authorized_operator"
   authorized_scope: true
   business_units:
-    - banking
-    - pensions
-    - fiduciary
-    - investment_banking
-    - merchant_banking
-    - brokerage
-    - leasing
-    - low_value_payments
-    - infrastructure
-    - energy_gas
-    - hotels
-    - agribusiness
+    - primary_business_unit
+    - supporting_business_unit
   crown_jewels:
-    - digital_banking
-    - mobile_apps
-    - internet_banking
-    - payments
-    - cards
-    - swift
+    - customer_portal
+    - critical_api
     - identity
-    - active_directory
-    - cloud
-    - apis
-    - fraud_platforms
-    - pension_fund_platforms
-    - fiduciary_operations
-    - brokerage_platforms
-    - merchant_banking_portfolio
-    - infrastructure_operations
-    - energy_gas_operations
-    - hotel_operations
-    - agribusiness_operations
-    - third_party_integrations
+    - data_platform
   technologies:
     - cloud
     - iam
@@ -46,6 +23,8 @@ organization:
     - edr
     - waf
     - mobile
+  # Add primary_domains only in the private local copy when external-surface
+  # analysis has been authorized.
   risk_appetite:
     operational: 0.25
     financial: 0.25

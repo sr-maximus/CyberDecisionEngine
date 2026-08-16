@@ -101,14 +101,13 @@ filtrado por su semántica. Un estado sin datos no dibuja nodos ni inventa valor
 
 ## Pruebas y limitaciones
 
-- 127 pruebas Python aprobadas en la regresión final del 20 de julio;
-- lint Python aprobado;
-- TypeScript y build Vite aprobados;
-- los informes finales de Grupo Aval y Frontera se validan desde la misma fuente de verdad y sustituyen el historial operativo anterior;
-- el login interactivo de esta última revisión no se repitió porque no se recibió
-  `CYBERDECISION_PASSWORD` en el entorno; no se leyó ni expuso ninguna credencial;
-- la evidencia visual autenticada previa permanece en
-  `docs/auditoria/00-evidencia-visual/`;
+- la regresión Python, el lint y el build web deben aprobarse antes de publicar;
+- los informes sintéticos se validan desde la misma fuente de verdad;
+- los nombres, dominios, cuentas y resultados operativos permanecen fuera del
+  repositorio;
+- el acceso autenticado se valida únicamente en un entorno local autorizado y
+  sin registrar credenciales;
+- la evidencia visual se genera localmente y no se publica;
 - `GET /api/runs` requiere paginación antes de escalar el historial.
 
 ## Estado final

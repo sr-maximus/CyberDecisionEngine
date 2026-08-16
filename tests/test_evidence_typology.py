@@ -63,7 +63,7 @@ def test_reports_count_all_evidence_and_keep_executive_sample_representative():
 def test_report_scope_includes_declared_brand_news_without_global_noise():
     relevant = event(
         id="NEWS-1",
-        title="Frontera Energy reportó cambios en inversión",
+        title="Authorized Organization reported an investment change",
         tags=["google_news_rss"],
         evidence_url="https://news.google.com/rss/articles/relevant",
     ).model_dump(mode="json")
@@ -74,10 +74,10 @@ def test_report_scope_includes_declared_brand_news_without_global_noise():
         evidence_url="https://news.google.com/rss/articles/unrelated",
     ).model_dump(mode="json")
     payload = {
-        "report_scope": {"primary_domains": ["fronteraenergy.ca"]},
+        "report_scope": {"primary_domains": ["organization.example.invalid"]},
         "organization": {
-            "name": "Frontera Energy Corporation",
-            "brands": ["Frontera Energy", "ODL"],
+            "name": "Authorized Organization",
+            "brands": ["Primary Brand", "Service Brand"],
         },
         "raw_events": [relevant, unrelated],
     }

@@ -178,7 +178,7 @@ export function EmployeeRiskView({ language, onReportReady }: { language: Langua
         "E001",
         "Nombre Apellido",
         "",
-        "nombre.apellido@empresa.com",
+        "employee@organization.example.invalid",
         "",
         "Cargo",
         "Área",
