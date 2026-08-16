@@ -1,0 +1,52 @@
+# Public template only. Copy it to a local ignored file before use.
+# Replace the descriptive placeholders with an expressly authorized scope.
+# Do not commit organization names, domains, accounts, contacts or results.
+organization:
+  name: "Organization Under Assessment"
+  sector: "authorized_test_sector"
+  country: "ZZ"
+  author: "authorized_operator"
+  authorized_scope: true
+  business_units:
+    - primary_business_unit
+    - supporting_business_unit
+  crown_jewels:
+    - customer_portal
+    - critical_api
+    - identity
+    - data_platform
+  technologies:
+    - cloud
+    - iam
+    - api_gateway
+    - siem
+    - edr
+    - waf
+    - mobile
+  # Add primary_domains only in the private local copy when external-surface
+  # analysis has been authorized.
+  risk_appetite:
+    operational: 0.25
+    financial: 0.25
+    reputational: 0.20
+    regulatory: 0.20
+    innovation: 0.10
+  control_maturity:
+    iso27001_score: 0.62
+    nist_csf_score: 0.66
+    soc2_score: 0.55
+    d3fend_coverage: 0.58
+    attack_detection_coverage: 0.52
+    incident_response_maturity: 0.68
+  fraud_maturity:
+    identity_proofing: 0.58
+    transaction_monitoring: 0.62
+    device_intelligence: 0.54
+    mule_detection: 0.48
+    case_management: 0.61
+    customer_awareness: 0.56
+sources:
+  allow_passive_external_exposure: false
+  allow_socmint_public: true
+  allow_darkweb_authorized_import: true
+  allow_tor: false
