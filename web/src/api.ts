@@ -9,6 +9,7 @@ import type {
   DisinformationFrameworkResponse,
   DomainAnalysisRequest,
   EmployeeRiskRunResponse,
+  EvidenceReviewMode,
   LicensingOverview,
   MethodologyRegistryResponse,
   MitreGroup,
@@ -17,7 +18,14 @@ import type {
   MonitoringProfileRequest,
   ReportCatalogItem,
   RunRecord,
+  ThreatEvent,
   ScenarioLibraryResponse,
+  AnalysisDomain,
+  TechnologyDomain,
+  CTIFrameworkCatalog,
+  CTIFrameworkFamily,
+  CTIKnowledgeManifest,
+  CTIKnowledgeOperationResult,
   ViewKey
 } from "./types";
 
@@ -43,7 +51,11 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export function listRuns(): Promise<RunRecord[]> {
-  return apiFetch<RunRecord[]>("/api/runs");
+  return apiFetch<RunRecord[]>("/api/runs/status");
+}
+
+export function getRun(runId: string): Promise<RunRecord> {
+  return apiFetch<RunRecord>(`/api/runs/${encodeURIComponent(runId)}?view=dashboard`);
 }
 
 export function listReports(): Promise<ReportCatalogItem[]> {
@@ -59,6 +71,34 @@ export function listMitreGroups(): Promise<MitreGroup[]> {
   return apiFetch<MitreGroup[]>("/api/mitre/groups");
 }
 
+export function getCTIFrameworkCatalog(): Promise<CTIFrameworkCatalog> {
+  return apiFetch<CTIFrameworkCatalog>("/api/cti/framework-catalog");
+}
+
+export function getCTIFrameworkFamily(familyId: string): Promise<CTIFrameworkFamily> {
+  return apiFetch<CTIFrameworkFamily>(`/api/cti/framework-catalog/${encodeURIComponent(familyId)}`);
+}
+
+export function getCTIKnowledgeManifest(): Promise<CTIKnowledgeManifest> {
+  return apiFetch<CTIKnowledgeManifest>("/api/cti/knowledge");
+}
+
+export function syncCTIKnowledge(sourceIds: string[], adminKey: string): Promise<CTIKnowledgeOperationResult> {
+  return apiFetch<CTIKnowledgeOperationResult>("/api/admin/cti/knowledge/sync", {
+    method: "POST",
+    headers: { "X-Admin-Key": adminKey },
+    body: JSON.stringify({ source_ids: sourceIds })
+  });
+}
+
+export function rollbackCTIKnowledge(sourceIds: string[], adminKey: string): Promise<CTIKnowledgeOperationResult> {
+  return apiFetch<CTIKnowledgeOperationResult>("/api/admin/cti/knowledge/rollback", {
+    method: "POST",
+    headers: { "X-Admin-Key": adminKey },
+    body: JSON.stringify({ source_ids: sourceIds })
+  });
+}
+
 export function createAnalysis(request: DomainAnalysisRequest): Promise<RunRecord> {
   return apiFetch<RunRecord>("/api/analysis", {
     method: "POST",
@@ -70,8 +110,23 @@ export function rerunAnalysis(runId: string): Promise<RunRecord> {
   return apiFetch<RunRecord>(`/api/runs/${runId}/rerun`, { method: "POST" });
 }
 
-export function generateRunReport(runId: string): Promise<RunRecord> {
-  return apiFetch<RunRecord>(`/api/runs/${runId}/report`, { method: "POST" });
+export function generateRunReport(
+  runId: string,
+  language: "es" | "en",
+  technologyDomains: TechnologyDomain[] = [],
+  analysisDomains: AnalysisDomain[] = [],
+  reviewMode: EvidenceReviewMode = "manual"
+): Promise<RunRecord> {
+  return apiFetch<RunRecord>(`/api/runs/${runId}/report`, {
+    method: "POST",
+    body: JSON.stringify({
+      language,
+      technology_domains: technologyDomains,
+      analysis_domains: analysisDomains,
+      review_mode: reviewMode,
+      force: true
+    })
+  });
 }
 
 export function reviewRunEvidence(
@@ -85,6 +140,20 @@ export function reviewRunEvidence(
     method: "PATCH",
     body: JSON.stringify({ status, reviewer, reason })
   });
+}
+
+export type EvidenceReviewStatus = "pending" | "validated" | "false_positive";
+export type EvidenceReviewChange = { evidence_id: string; status: EvidenceReviewStatus };
+
+export function reviewRunEvidenceBatch(runId: string, reviews: EvidenceReviewChange[]): Promise<RunRecord> {
+  return apiFetch<RunRecord>(`/api/runs/${encodeURIComponent(runId)}/evidence`, {
+    method: "PATCH",
+    body: JSON.stringify({ reviews })
+  });
+}
+
+export function getRunEvidence(runId: string): Promise<{ events: ThreatEvent[]; total: number }> {
+  return apiFetch(`/api/runs/${encodeURIComponent(runId)}/evidence`);
 }
 
 export function getMonitoringOverview(): Promise<MonitoringOverview> {

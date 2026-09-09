@@ -6,6 +6,8 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from cyberdeck.analysis.multidomain import SCENARIO_TEMPLATES
+
 
 ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORK_DIR = ROOT / "data" / "frameworks"
@@ -61,7 +63,9 @@ def load_disarm() -> dict[str, Any]:
         "tactics": list(tactics.values()),
         "techniques": techniques,
     }
-    (FRAMEWORK_DIR / "disarm_observable.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (FRAMEWORK_DIR / "disarm_observable.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return payload
 
 
@@ -70,14 +74,22 @@ def load_attack() -> list[dict[str, Any]]:
     bundle = json.loads(path.read_text(encoding="utf-8"))
     rows = []
     for obj in bundle.get("objects", []):
-        if obj.get("type") != "attack-pattern" or obj.get("revoked") or obj.get("x_mitre_deprecated"):
+        if (
+            obj.get("type") != "attack-pattern"
+            or obj.get("revoked")
+            or obj.get("x_mitre_deprecated")
+        ):
             continue
         external_id = ""
         for ref in obj.get("external_references", []):
             if ref.get("source_name") == "mitre-attack":
                 external_id = ref.get("external_id", "")
                 break
-        tactics = [phase.get("phase_name", "") for phase in obj.get("kill_chain_phases", []) if phase.get("phase_name")]
+        tactics = [
+            phase.get("phase_name", "")
+            for phase in obj.get("kill_chain_phases", [])
+            if phase.get("phase_name")
+        ]
         rows.append(
             {
                 "id": external_id or obj.get("id", ""),
@@ -115,8 +127,16 @@ def scenario_record(
         "title_es": f"{attack['name']} con narrativa DISARM: {disarm['name']}",
         "title_en": f"{attack['name']} with DISARM narrative: {disarm['name']}",
         "frameworks": {
-            "attack": {"id": attack["id"], "name": attack["name"], "tactics": attack.get("tactics", [])[:3]},
-            "disarm": {"id": disarm["id"], "name": disarm["name"], "tactic": disarm.get("tactic", "")},
+            "attack": {
+                "id": attack["id"],
+                "name": attack["name"],
+                "tactics": attack.get("tactics", [])[:3],
+            },
+            "disarm": {
+                "id": disarm["id"],
+                "name": disarm["name"],
+                "tactic": disarm.get("tactic", ""),
+            },
             "d3fend": d3fend,
             "atlas": atlas,
             "f3": f3,
@@ -315,13 +335,112 @@ def framework_scenario_record(
     }
 
 
+def multidomain_scenario_record(template: dict[str, Any]) -> dict[str, Any]:
+    framework_names = list(template.get("frameworks", ()))
+    technology_domains = list(template.get("technology", ()))
+    analysis_domains = list(template.get("analysis", ())) or (
+        ["fraud"] if template.get("fraud") else ["cyber"]
+    )
+    empty = {"id": "", "name": ""}
+    attack_name = next((name for name in framework_names if "ATT&CK" in name), "")
+    return {
+        "id": template["id"],
+        "version": "1.0.0",
+        "status": "preventive_template",
+        "sector": "all",
+        "title_es": template["title_es"],
+        "title_en": template["title_en"],
+        "technology_domains": technology_domains,
+        "analysis_domains": analysis_domains,
+        "required_entity_types": ["public_observation"],
+        "minimum_attribution_confidence": 0.35,
+        "public_only_compatible": True,
+        "public_evidence_gate": ["direct", "validated", "confirmed"],
+        "independent_source_gate": 1,
+        "corroboration_gate": 1,
+        "activation_rules": ["current_run_assured_evidence", "explicit_scope_relationship"],
+        "deactivation_rules": [
+            "false_positive",
+            "stale_without_current_support",
+            "critical_contradiction",
+        ],
+        "cross_domain_transitions": ["shared_observed_entity"]
+        if template.get("cross_domain")
+        else [],
+        "framework_mappings": [
+            {"framework": name, "id": "", "status": "preventive_reference"}
+            for name in framework_names
+        ],
+        "fraud_mappings": list(template.get("fraud", ())),
+        "impact_dimensions": [
+            "confidentiality",
+            "integrity",
+            "availability",
+            "safety",
+            "fraud",
+            "reputation",
+        ],
+        "limitations": [
+            "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+        ],
+        "frameworks": {
+            "attack": {"id": "", "name": attack_name, "tactics": []},
+            "disarm": empty,
+            "d3fend": next(
+                ({"id": "", "name": name} for name in framework_names if "D3FEND" in name), empty
+            ),
+            "atlas": next(
+                ({"id": "", "name": name} for name in framework_names if "ATLAS" in name), empty
+            ),
+            "f3": next(
+                (
+                    {"id": "", "name": name, "tactics": [], "isAttack": False}
+                    for name in framework_names
+                    if "F3" in name
+                ),
+                {"id": "", "name": "", "tactics": [], "isAttack": False},
+            ),
+        },
+        "scores": {
+            "likelihood": 0.0,
+            "impact": 0.0,
+            "inherent_risk": 0.0,
+            "control_effectiveness": 0.0,
+            "residual_risk": 0.0,
+            "geographic_relevance": 0.0,
+        },
+        "math": {
+            "z": 0.0,
+            "formula": "not_calculated_until_current_run_evidence_is_validated",
+            "variables": {},
+        },
+        "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+        "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+        "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+        "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+        "test_matrix": [
+            "positive",
+            "negative",
+            "boundary",
+            "missing_data",
+            "duplicate",
+            "stale_evidence",
+            "contradiction",
+            "source_failure",
+            "tenant_isolation",
+        ],
+    }
+
+
 def build_scenarios() -> dict[str, Any]:
     disarm = load_disarm()
     attack = load_attack()
     d3fend = load_simple_json(FRAMEWORK_DIR / "mitre_d3fend_minimal.json")
     atlas = load_simple_json(FRAMEWORK_DIR / "mitre_atlas_minimal.json")
     f3 = load_f3()
-    usable_disarm = [item for item in disarm["techniques"] if item["usable"]] or disarm["techniques"]
+    usable_disarm = [item for item in disarm["techniques"] if item["usable"]] or disarm[
+        "techniques"
+    ]
     records: list[dict[str, Any]] = []
     index = 1
     f3_by_attack_id = {
@@ -336,9 +455,14 @@ def build_scenarios() -> dict[str, Any]:
         ("f3", f3),
     ):
         for technique in techniques:
-            overlap = f3_by_attack_id.get(str(technique.get("id") or "")) if framework == "attack" else None
+            overlap = (
+                f3_by_attack_id.get(str(technique.get("id") or ""))
+                if framework == "attack"
+                else None
+            )
             records.append(framework_scenario_record(index, framework, technique, overlap))
             index += 1
+    records.extend(multidomain_scenario_record(dict(template)) for template in SCENARIO_TEMPLATES)
     payload = scenario_payload(
         records,
         catalog_counts={
@@ -347,6 +471,7 @@ def build_scenarios() -> dict[str, Any]:
             "MITRE ATLAS": len(atlas),
             "MITRE F3": len(f3),
             "MITRE D3FEND controls": len(d3fend),
+            "CyberDecisionEngine multidomain evidence-gated templates": len(SCENARIO_TEMPLATES),
         },
     )
     write_scenarios(payload)
@@ -359,7 +484,7 @@ def scenario_payload(
 ) -> dict[str, Any]:
     return {
         "generated_by": "CyberDecisionEngine",
-        "version": "2026.07.evidence-gated-framework-derived-v2",
+        "version": "2026.08.evidence-gated-multidomain-v3",
         "scenario_count": len(records),
         "catalog_counts": catalog_counts or {},
         "sources": [
@@ -368,10 +493,17 @@ def scenario_payload(
             "MITRE ATLAS minimal local mapping",
             "DISARM Foundation DISARM 2.0 Observations Framework",
             "MITRE Fight Fraud Framework (F3) v1.1",
+            "MITRE ATT&CK ICS",
+            "MITRE ATT&CK Mobile",
+            "MITRE EMB3D 2.0.2",
+            "MITRE AADAPT",
+            "MITRE CAPEC",
+            "MITRE CWE",
+            "MITRE INFORM",
         ],
         "math_model": {
-            "es": "La biblioteca deriva una plantilla por técnica o conducta publicada en ATT&CK, ATLAS, DISARM y F3, sin combinaciones aleatorias ni riesgo precalculado. D3FEND y los marcos de gobierno se cruzan como controles de referencia. La corrida solo activa una plantilla cuando evidencia directa, validada o confirmada satisface el criterio explícito.",
-            "en": "The library derives one template per published ATT&CK, ATLAS, DISARM and F3 technique or behavior, without random combinations or precomputed risk. D3FEND and governance frameworks are cross-referenced as control references. A run activates a template only when direct, validated or confirmed evidence satisfies the explicit criterion.",
+            "es": "La biblioteca deriva plantillas de ATT&CK Enterprise, Mobile e ICS, ATLAS, DISARM, F3 y AADAPT, y cruza D3FEND, EMB3D, CAPEC, CWE e INFORM como contexto técnico, defensivo o de madurez. No crea combinaciones aleatorias ni riesgo precalculado. La corrida solo activa una plantilla cuando evidencia directa, validada o confirmada satisface el criterio explícito.",
+            "en": "The library derives templates from ATT&CK Enterprise, Mobile and ICS, ATLAS, DISARM, F3 and AADAPT, and cross-references D3FEND, EMB3D, CAPEC, CWE and INFORM as technical, defensive or maturity context. It creates neither random combinations nor precomputed risk. A run activates a template only when direct, validated or confirmed evidence satisfies the explicit criterion.",
             "formula": "scenario_support = assured_current_run_evidence_only",
         },
         "scenarios": records,
@@ -380,7 +512,9 @@ def scenario_payload(
 
 def write_scenarios(payload: dict[str, Any]) -> None:
     SCENARIO_DIR.mkdir(parents=True, exist_ok=True)
-    (SCENARIO_DIR / "cyber_scenario_library.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (SCENARIO_DIR / "cyber_scenario_library.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":

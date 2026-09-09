@@ -1,13 +1,19 @@
 export type RunStatus = "queued" | "running" | "completed" | "failed";
 export type AnalysisMode = "snapshot" | "deep";
 export type SubjectType = "organization" | "person";
-export type AnalysisWindow = "1h" | "24h" | "7d" | "30d" | "180d" | "365d";
+export type AnalysisWindow = "1h" | "24h" | "7d" | "30d" | "180d" | "365d" | "custom";
 export type UserRole = "super_admin" | "admin" | "analyst" | "executive" | "viewer";
 export type ThemeMode = "light" | "dark";
 export type LanguageMode = "es" | "en";
+export type EvidenceReviewMode = "manual" | "ai_assisted";
+export type TechnologyDomain = "it" | "iot" | "iiot" | "ot" | "unknown";
+export type AnalysisDomain = "cyber" | "fraud" | "brand" | "disinformation" | "ai_security";
+export type PublicAttributionStatus = "unattributed" | "possible" | "related" | "observed_public" | "corroborated_public" | "disputed" | "false_positive";
 export type ViewKey =
   | "overview"
   | "dashboards"
+  | "cti"
+  | "evidence"
   | "scenarios"
   | "brand"
   | "attackSurface"
@@ -48,6 +54,8 @@ export interface DomainAnalysisRequest {
   language?: LanguageMode;
   mode: AnalysisMode;
   analysis_window: AnalysisWindow;
+  analysis_start_date?: string;
+  analysis_end_date?: string;
   lookback_hours: number;
   lookback_days: number;
   real_only: boolean;
@@ -172,6 +180,16 @@ export interface ReportSummary {
   technical_url?: string | null;
   technical_download_url?: string | null;
   generated_at: string;
+  language?: LanguageMode;
+  technology_domains?: TechnologyDomain[];
+  analysis_domains?: AnalysisDomain[];
+  source_snapshot_hash?: string | null;
+  report_snapshot_hash?: string | null;
+  generator_version?: string | null;
+  validation_status?: "approved" | "approved_with_observations" | "rejected" | string;
+  validation_path?: string | null;
+  final?: boolean;
+  review_mode?: EvidenceReviewMode;
 }
 
 export interface ReportCatalogItem {
@@ -270,6 +288,18 @@ export interface Finding {
   linked_evidence_ids?: string[];
   incident_confirmed?: boolean;
   vulnerability_status?: string;
+  primary_technology_domain?: TechnologyDomain;
+  technology_domains?: TechnologyDomain[];
+  technology_domain_confidence?: number;
+  technology_domain_basis?: string[];
+  analysis_domains?: AnalysisDomain[];
+  asset_class?: string | null;
+  framework_refs?: string[];
+  technique_refs?: string[];
+  scenario_refs?: string[];
+  fraud_refs?: string[];
+  limitations?: string[];
+  residual_risk_status?: string;
 }
 
 export interface ThreatEvent {
@@ -304,6 +334,159 @@ export interface ThreatEvent {
   incident_confirmed?: boolean;
   human_reviewed?: boolean;
   contradiction_count?: number;
+  primary_technology_domain?: TechnologyDomain;
+  technology_domains?: TechnologyDomain[];
+  technology_domain_confidence?: number;
+  technology_domain_basis?: string[];
+  analysis_domains?: AnalysisDomain[];
+  asset_class?: string | null;
+  vendor?: string | null;
+  product?: string | null;
+  model?: string | null;
+  firmware?: string | null;
+  version?: string | null;
+  cpe?: string | null;
+  protocols?: string[];
+  public_observation_type?: string;
+  public_attribution_status?: PublicAttributionStatus;
+  attribution_score?: number;
+  attribution_basis?: string[];
+  first_seen?: string | null;
+  last_seen?: string | null;
+  freshness_status?: string;
+  framework_refs?: string[];
+  technique_refs?: string[];
+  scenario_refs?: string[];
+  fraud_refs?: string[];
+  limitations?: string[];
+  public_capability_id?: string;
+  public_capability_label?: string;
+  public_source_class?: string;
+  public_evidence_id?: string | null;
+  original_publisher?: string | null;
+  original_artifact_url?: string | null;
+}
+
+export interface MultidomainMetric {
+  value: number | null;
+  value_status: DecisionValueStatus;
+  unit: string;
+  range: [number, number];
+  model_version: string;
+  calibrated_probability: false;
+}
+
+export interface TechnologyFootprintRow {
+  domain: TechnologyDomain;
+  records: number;
+  assured_records: number;
+  attributed_records: number;
+  assets: string[];
+  protocols: string[];
+  vendors: string[];
+  products: string[];
+  framework_refs: string[];
+  evidence_ids: string[];
+}
+
+export interface MultidomainIntelligence {
+  model_version: string;
+  taxonomy: Record<string, string[]>;
+  technology_footprint: {
+    status: string;
+    total_records: number;
+    assured_records: number;
+    attributed_records: number;
+    domain_counts: Partial<Record<TechnologyDomain, number>>;
+    rows: TechnologyFootprintRow[];
+  };
+  analysis_dimensions: Partial<Record<AnalysisDomain, number>>;
+  relationships: Array<Record<string, unknown>>;
+  scenario_templates: number;
+  scenario_candidates: Array<Record<string, unknown>>;
+  method_scores: Record<string, MultidomainMetric>;
+  disclaimer_es: string;
+  disclaimer_en: string;
+}
+
+export interface RelationshipThirdPartyRow {
+  name: string;
+  status: "evidence_supported_signal" | "context_only" | "declared_unobserved" | string;
+  declared: boolean;
+  attention_score: number | null;
+  record_count: number;
+  assured_record_count: number;
+  risk_signal_count: number;
+  source_count: number;
+  evidence_ids: string[];
+  urls: string[];
+  what_it_means: string;
+  what_it_does_not_mean: string;
+}
+
+export interface RelationshipDomainAbuseRow {
+  candidate_domain: string;
+  target_domain: string;
+  status: "suspicious_observed_signal" | "similar_domain_observed" | string;
+  malicious_intent_confirmed: false;
+  similarity: number;
+  edit_distance: number;
+  variation_types: string[];
+  record_count: number;
+  assured_record_count: number;
+  abuse_signal_count: number;
+  evidence_ids: string[];
+  urls: string[];
+  what_it_means: string;
+  what_it_does_not_mean: string;
+}
+
+export interface RelationshipCompetitiveRow {
+  name: string;
+  status: "evidence_represented" | "declared_no_evidence" | string;
+  record_count: number;
+  evidence_ids: string[];
+  urls: string[];
+}
+
+export interface RelationshipRiskIntelligence {
+  model_version: string;
+  third_party: {
+    status: string;
+    declared_count: number;
+    observed_count: number;
+    assessed_count: number;
+    rows: RelationshipThirdPartyRow[];
+  };
+  domain_abuse: {
+    status: string;
+    candidate_count: number;
+    suspicious_signal_count: number;
+    rows: RelationshipDomainAbuseRow[];
+    generation_policy: string;
+  };
+  competitive_context: {
+    status: string;
+    declared_count: number;
+    represented_count: number;
+    rows: RelationshipCompetitiveRow[];
+    policy: string;
+  };
+  limitations: string[];
+}
+
+export interface EvidenceReviewSummary {
+  model_version: string;
+  mode: EvidenceReviewMode;
+  provider: string;
+  automatic_validation: false;
+  reviewable_count: number;
+  human_reviewed_count: number;
+  assured_count: number;
+  pending_human_decision_count: number;
+  recommendation_counts: Record<string, number>;
+  proposals: Array<Record<string, unknown>>;
+  policy: string;
 }
 
 export interface AnalysisSummary {
@@ -324,6 +507,7 @@ export interface AnalysisSummary {
   decisions?: ClaimDecisionSummary[];
   semantic_registry_version?: string;
   claim_evidence_model_version?: string;
+  multidomain_intelligence?: MultidomainIntelligence;
 }
 
 export interface ClaimSummary {
@@ -469,6 +653,10 @@ export interface DecisionIntelligenceSnapshot {
   reference_integrity: Record<string, unknown>;
   formula_versions: Record<string, string>;
   snapshot_hash: string;
+  multidomain_intelligence?: MultidomainIntelligence;
+  public_technology_footprint?: MultidomainIntelligence["technology_footprint"];
+  cti_snapshot?: Record<string, unknown>;
+  knowledge_versions?: Record<string, unknown>;
 }
 
 export interface RunRecord {
@@ -483,6 +671,13 @@ export interface RunRecord {
   estimated_seconds?: number;
   error?: string | null;
   report?: ReportSummary | null;
+  report_status?: "not_requested" | "queued" | "generating" | "ready" | "failed";
+  report_error?: string | null;
+  report_requested_at?: string | null;
+  report_auto_due_at?: string | null;
+  report_review_mode?: EvidenceReviewMode;
+  evidence_review_status?: "not_started" | "prepared" | "completed";
+  evidence_review_summary?: EvidenceReviewSummary;
   summary: AnalysisSummary;
 }
 
@@ -566,7 +761,7 @@ export interface MonitoringOverview {
   support_tickets: SupportTicket[];
 }
 
-export type AIProvider = "openai" | "azure_openai" | "anthropic" | "gemini" | "mistral" | "local_openai_compatible" | "openclaw_gateway";
+export type AIProvider = string;
 
 export interface AIProviderDescriptor {
   key: AIProvider;
@@ -584,12 +779,11 @@ export interface AIProviderDescriptor {
 export interface AIOrchestrationConfig {
   prompt_version: string;
   chat_prompt_version?: string;
-  provider_catalog: AIProviderDescriptor[];
+  provider_catalog?: AIProviderDescriptor[];
   token_policy: Record<string, unknown>;
   approval_required: boolean;
   automation_default: string;
-  openclaw_gateway?: Record<string, unknown>;
-  ollama_chat?: Record<string, unknown>;
+  analysis_runtime?: Record<string, unknown>;
   agent_architecture?: Record<string, unknown>;
   assistant_capabilities?: string[];
 }
@@ -873,6 +1067,9 @@ export interface ScenarioLibraryResponse {
     atlas_tactics: number;
     disarm_techniques: number;
     f3_techniques: number;
+    attack_ics_templates?: number;
+    emb3d_templates?: number;
+    multidomain_templates?: number;
   };
   scenarios: DisinformationScenario[];
 }
@@ -910,4 +1107,122 @@ export interface MethodologyRegistryResponse {
   registryVersion: string;
   effectiveFrom: string;
   methods: MethodologyRecord[];
+}
+
+export type CTIFrameworkViewType = "matrix" | "defensive_matrix" | "relationship_model" | "hierarchy" | "maturity";
+
+export interface CTIFrameworkCounts {
+  tactics: number;
+  techniques: number;
+  entities: number;
+  relationships: number;
+  items: number;
+}
+
+export interface CTIFrameworkFamilySummary {
+  id: string;
+  name: string;
+  short_name: string;
+  view_type: CTIFrameworkViewType;
+  source_url: string;
+  description: string;
+  status: "active" | "missing" | "invalid";
+  version?: string | null;
+  counts: CTIFrameworkCounts;
+}
+
+export interface CTIFrameworkEntityRef {
+  entity_id: string;
+  name: string;
+  entity_type: string;
+}
+
+export interface CTIFrameworkTechnique {
+  technique_id?: string;
+  id?: string;
+  name: string;
+  description?: string;
+  tactics?: string[];
+  platforms?: string[];
+  data_sources?: string[];
+  parent_technique_id?: string | null;
+  url?: string;
+  entities?: CTIFrameworkEntityRef[];
+  related_attack_techniques?: string[];
+  artifacts?: string[];
+  category?: string;
+  abstraction?: string;
+  status?: string;
+  related?: Array<{ id: string; relation: string }>;
+  cwes?: string[];
+  cves?: string[];
+}
+
+export interface CTIFrameworkEntity extends CTIFrameworkEntityRef {
+  aliases?: string[];
+  description?: string;
+  url?: string;
+  technique_ids: string[];
+}
+
+export interface CTIFrameworkTactic {
+  id: string;
+  name: string;
+  description?: string;
+  technique_count: number;
+  techniques: CTIFrameworkTechnique[];
+}
+
+export interface CTIFrameworkFamily extends CTIFrameworkFamilySummary {
+  schema_version: string;
+  tactics: CTIFrameworkTactic[];
+  techniques: CTIFrameworkTechnique[];
+  entities: CTIFrameworkEntity[];
+  relationships: Array<{ source: string; target: string; type: string }>;
+  collections: Record<string, unknown>;
+  error?: string;
+}
+
+export interface CTIFrameworkCatalog {
+  schema_version: string;
+  families: CTIFrameworkFamilySummary[];
+  interpretation: string;
+}
+
+export type CTIKnowledgeSourceStatus = "active" | "last_known_good" | "missing" | "reference";
+
+export interface CTIKnowledgeSource {
+  source_id: string;
+  name: string;
+  family: string;
+  url?: string | null;
+  path?: string | null;
+  required: boolean;
+  download: boolean;
+  status: CTIKnowledgeSourceStatus;
+  record_count: number;
+  sha256?: string | null;
+  updated_at?: string | null;
+  version?: string | null;
+  license?: string | null;
+}
+
+export interface CTIKnowledgeManifest {
+  schema_version: string;
+  generated_at: string;
+  status: "ready" | "degraded";
+  mandatory_count: number;
+  mandatory_usable_count: number;
+  sources: CTIKnowledgeSource[];
+}
+
+export interface CTIKnowledgeOperationResult {
+  results?: Array<Record<string, unknown>>;
+  manifest?: CTIKnowledgeManifest;
+  schema_version?: string;
+  generated_at?: string;
+  status?: "ready" | "degraded";
+  mandatory_count?: number;
+  mandatory_usable_count?: number;
+  sources?: CTIKnowledgeSource[];
 }

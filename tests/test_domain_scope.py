@@ -36,6 +36,7 @@ def test_build_source_config_injects_domain_queries():
             "critical_suppliers": ["Cloud Supplier"],
             "products": ["Digital Platform"],
             "countries_of_operation": ["Canada"],
+            "subsector": "Aviation | Cargo",
         },
     )
 
@@ -47,6 +48,9 @@ def test_build_source_config_injects_domain_queries():
     assert '"Example Holding" "Market Rival" competencia digital OR mercado OR tecnologia OR ciberseguridad' in config["web_search"]["queries"]
     assert '"Example Holding" "Cloud Supplier" proveedor tecnologico OR interrupcion OR dependencia OR cadena de suministro de software OR ciberseguridad' in config["web_search"]["queries"]
     assert '"Example Holding" "Digital Platform" mercado OR clientes OR sustituto OR riesgo digital' in config["web_search"]["queries"]
+    assert '"Energy Aviation | Cargo" threat actor OR grupo ransomware OR campaña cibernetica' in config["web_search"]["queries"]
+    assert '"Energy Aviation | Cargo" malware OR TTP OR MITRE ATT&CK OR intrusion set' in config["web_search"]["queries"]
+    assert '"Energy Aviation | Cargo" third party cyber risk OR supply chain attack' in config["web_search"]["queries"]
     assert any("site:example.com" in query for query in config["web_search"]["queries"])
     assert any("credential" in query for query in config["web_search"]["queries"])
     assert config["osint_public"]["domains"] == [
@@ -88,8 +92,8 @@ def test_build_source_config_honors_scan_time_budget():
     assert config["scan_budget"]["minutes"] == 30
     assert config["scan_budget"]["mode"] == "user_defined"
     assert config["web_search"]["collection_timeout_seconds"] >= 600
-    assert config["spiderfoot"]["timeout_seconds"] == 0
-    assert config["spiderfoot"]["completion_policy"] == "wait_until_configured_modules_finish"
+    assert config["spiderfoot"]["timeout_seconds"] == 86400
+    assert config["spiderfoot"]["completion_policy"] == "complete_plan_with_idle_watchdog"
     assert config["kali_surface"]["timeout_seconds"] >= 300
     assert config["osint_tools"]["timeout_seconds"] >= 180
     assert all(domain in config["spiderfoot"]["domains"] for domain in domains)
@@ -100,7 +104,7 @@ def test_default_collection_waits_for_configured_plan_completion():
 
     assert config["scan_budget"]["mode"] == "until_complete"
     assert config["web_search"]["collection_timeout_seconds"] == 0
-    assert config["spiderfoot"]["timeout_seconds"] == 0
+    assert config["spiderfoot"]["timeout_seconds"] == 86400
 
 
 def test_build_source_config_injects_colombia_public_queries():

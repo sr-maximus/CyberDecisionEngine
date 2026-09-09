@@ -139,7 +139,7 @@ const content = {
         title: "Asistente estratégico",
         focus: "Prepara análisis aumentado con contexto controlado, límites explícitos y reglas anti-alucinación.",
         boards: [
-          "Proveedor opcional: permite endpoint compatible u OpenClaw Gateway cuando exista autorización.",
+          "Motor opcional: admite análisis local o remoto autorizado sin cambiar la fuente de verdad.",
           "Presupuesto de contexto: estima entrada/salida para evitar paquetes excesivos.",
           "Paquete de análisis: conserva sistema, usuario, esquema JSON, manifiesto de evidencia y política de automatización antes de aprobar."
         ]
@@ -309,7 +309,7 @@ const content = {
       },
       {
         title: "Asistencia aumentada controlada",
-        body: "El análisis asistido usa solo el contexto comprimido de la corrida, reglas anti-alucinación, manifiesto de evidencia y aprobación humana antes de cualquier automatización externa. OpenClaw se usa como gateway de propuestas, no como ejecución libre."
+        body: "El análisis asistido usa solo el contexto comprimido de la corrida, reglas anti-alucinación, manifiesto de evidencia y aprobación humana antes de cualquier automatización externa. El motor actúa como capa de propuestas, no como ejecución libre."
       },
       {
         title: "Graph intelligence",
@@ -379,7 +379,7 @@ const content = {
       },
       {
         title: "10. Asistente estratégico y presupuesto de contexto",
-        body: "El paquete asistido usa selección por riesgo y recencia: primero hallazgos de mayor riesgo residual, luego eventos recientes y diversidad de fuente. El presupuesto estimado aproxima tokens = caracteres/4 y corta evidencia de menor prioridad antes de modificar conclusiones. OpenClaw puede recibir el mismo contexto como propuesta de análisis/agenda, sin herramientas ni comandos hasta aprobación."
+        body: "El paquete asistido usa selección por riesgo y recencia: primero hallazgos de mayor riesgo residual, luego eventos recientes y diversidad de fuente. El presupuesto estimado aproxima tokens = caracteres/4 y omite evidencia de menor prioridad antes de modificar conclusiones. El motor opcional recibe el mismo contexto como propuesta de análisis, sin herramientas ni comandos hasta aprobación."
       },
       {
         title: "11. Acceso, MFA y recuperación",
@@ -516,7 +516,7 @@ const content = {
         title: "Strategic Assistant",
         focus: "Prepares augmented analysis with controlled context, explicit limits and anti-hallucination rules.",
         boards: [
-          "Optional provider: use a compatible endpoint or OpenClaw Gateway when authorized.",
+          "Optional engine: supports authorized local or remote analysis without changing the source of truth.",
           "Context budget: estimates input/output to avoid oversized packages.",
           "Analysis package: preserves system, user, JSON schema, evidence manifest and automation policy before approval."
         ]
@@ -658,7 +658,7 @@ const content = {
       },
       {
         title: "Controlled Augmented Assistance",
-        body: "Assisted analysis uses only the compressed run context, anti-hallucination rules, an evidence manifest and human approval before any external automation. OpenClaw is used as a proposal gateway, not as unrestricted execution."
+        body: "Assisted analysis uses only the compressed run context, anti-hallucination rules, an evidence manifest and human approval before any external automation. The engine acts as a proposal layer, not as unrestricted execution."
       },
       {
         title: "Graph intelligence",
@@ -728,7 +728,7 @@ const content = {
       },
       {
         title: "10. Strategic Assistant and Context Budget",
-        body: "The assisted package selects evidence by risk and recency: highest residual-risk findings first, then recent events and source diversity. Estimated tokens approximate characters/4 and lower-priority evidence is omitted before conclusions are changed. OpenClaw can receive the same context as an analysis/scheduling proposal, without tools or commands until approval."
+        body: "The assisted package selects evidence by risk and recency: highest residual-risk findings first, then recent events and source diversity. Estimated tokens approximate characters/4 and lower-priority evidence is omitted before conclusions are changed. The optional engine receives the same context as an analysis proposal, without tools or commands until approval."
       },
       {
         title: "11. Access, MFA and recovery",

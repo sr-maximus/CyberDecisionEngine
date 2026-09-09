@@ -136,6 +136,10 @@ const analyticText: Record<LanguageMode, Record<string, string>> = {
     medium: "media",
     high: "alta",
     critical: "crítica",
+    supported: "Respaldada",
+    validated: "Validada",
+    confirmed: "Confirmada",
+    candidate: "Candidata",
     "Credential targeting / phishing": "Ataque a credenciales / phishing",
     "Public application exploitation": "Explotacion de aplicaciones publicas",
     "Ransomware / extortion pressure": "Presion ransomware / extorsion",
@@ -384,10 +388,11 @@ export function StrategicSignalHeatmap({ pestel, porter, language = "en" }: { pe
 
 export function RiskHeatMap({ rows, language = "en" }: { rows: RiskHeatRow[]; language?: LanguageMode }) {
   const copy = strategyCopy[language];
-  if (!rows.length) return <div className="chart-empty">{copy.noHeat}</div>;
+  const measuredRows = rows.filter((row): row is RiskHeatRow & { score: number } => typeof row.score === "number");
+  if (!measuredRows.length) return <div className="chart-empty">{copy.noHeat}</div>;
   return (
     <div className="risk-heat-grid">
-      {rows.map((row) => (
+      {measuredRows.map((row) => (
         <div className={`risk-heat-cell ${row.heat}`} key={`${row.index}-${row.name}`}>
           <Flame size={15} />
           <span>{row.index}. {localizeAnalyticText(row.name, language)}</span>
@@ -401,8 +406,9 @@ export function RiskHeatMap({ rows, language = "en" }: { rows: RiskHeatRow[]; la
 
 export function RiskRadarChart({ rows, language = "en" }: { rows: RiskHeatRow[]; language?: LanguageMode }) {
   const copy = strategyCopy[language];
-  if (!rows.length) return <div className="chart-empty">{copy.noRadar}</div>;
-  const visibleRows = rows.slice(0, 8);
+  const measuredRows = rows.filter((row): row is RiskHeatRow & { score: number } => typeof row.score === "number");
+  if (!measuredRows.length) return <div className="chart-empty">{copy.noRadar}</div>;
+  const visibleRows = measuredRows.slice(0, 8);
   const center = 50;
   const maxRadius = 34;
   const points = visibleRows
@@ -418,11 +424,11 @@ export function RiskRadarChart({ rows, language = "en" }: { rows: RiskHeatRow[];
       };
     });
   const polygon = points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
-  const rankedRows = [...rows].sort((left, right) => right.score - left.score);
+  const rankedRows = [...measuredRows].sort((left, right) => right.score - left.score);
   const highest = rankedRows[0];
-  const averageRisk = rows.reduce((sum, row) => sum + row.score, 0) / rows.length;
-  const criticalCount = rows.filter((row) => row.heat === "critical").length;
-  const evidenceSignals = rows.reduce((sum, row) => sum + row.evidenceCount, 0);
+  const averageRisk = measuredRows.reduce((sum, row) => sum + row.score, 0) / measuredRows.length;
+  const criticalCount = measuredRows.filter((row) => row.heat === "critical").length;
+  const evidenceSignals = measuredRows.reduce((sum, row) => sum + row.evidenceCount, 0);
   const dominantScore = highest ? Math.round(highest.score * 100) : 0;
 
   return (
@@ -509,6 +515,14 @@ export function AttackPredictionPanel({ prediction, language = "en" }: { predict
     { label: "90d", value: prediction.pressure90d }
   ];
   const trendLabel = copy[prediction.trendDirection];
+  const trendPercent = prediction.trendChangeRatio === null
+    ? null
+    : Math.round(prediction.trendChangeRatio * 100);
+  const trendDisplay = trendPercent !== null && Math.abs(trendPercent) > 999
+    ? (language === "es" ? "base inicial baja" : "low initial baseline")
+    : trendPercent !== null
+      ? `${trendPercent > 0 ? "+" : ""}${trendPercent}%`
+      : null;
   return (
     <div className="prediction-panel">
       <div className="prediction-hero">
@@ -522,15 +536,13 @@ export function AttackPredictionPanel({ prediction, language = "en" }: { predict
           <Activity size={15} />
           <span>{copy.trend}</span>
           <b>{trendLabel}</b>
-          {prediction.trendChangeRatio !== null ? (
-            <em>{prediction.trendChangeRatio > 0 ? "+" : ""}{Math.round(prediction.trendChangeRatio * 100)}%</em>
-          ) : null}
+          {trendDisplay ? <em title={trendPercent !== null ? `${trendPercent}%` : undefined}>{trendDisplay}</em> : null}
         </div>
       </div>
       <div className="prediction-probability-note">
         <span>{copy.attackProbability}</span>
         <strong>{prediction.probabilityValue === null ? copy.notCalibrated : `${Math.round(prediction.probabilityValue * 100)}%`}</strong>
-        <small>{copy.confidence}: {Math.round(prediction.evidenceConfidence)}% · {prediction.modelVersion}</small>
+        <small>{copy.confidence}: {Math.round(prediction.evidenceConfidence)}%</small>
       </div>
       <div className="prediction-horizons" aria-label={copy.horizon}>
         {horizons.map((item) => (
@@ -553,7 +565,7 @@ export function AttackPredictionPanel({ prediction, language = "en" }: { predict
         ))}
       </div>
       <div className="prediction-scenarios">
-        {prediction.scenarios.map((scenario) => (
+        {prediction.scenarios.slice(0, 2).map((scenario) => (
           <article key={scenario.id || `${scenario.modality}-${scenario.technique}`}>
             <div>
               <Activity size={15} />
@@ -565,6 +577,24 @@ export function AttackPredictionPanel({ prediction, language = "en" }: { predict
           </article>
         ))}
       </div>
+      {prediction.scenarios.length > 2 ? (
+        <details className="compact-disclosure prediction-disclosure">
+          <DisclosureSummary language={language} label={language === "es" ? `Ver ${prediction.scenarios.length - 2} escenarios adicionales` : `View ${prediction.scenarios.length - 2} additional scenarios`} />
+          <div className="prediction-scenarios compact-disclosure-content">
+            {prediction.scenarios.slice(2).map((scenario) => (
+              <article key={scenario.id || `${scenario.modality}-${scenario.technique}`}>
+                <div>
+                  <Activity size={15} />
+                  <strong>{localizeAnalyticText(scenario.modality, language)}</strong>
+                  <span>{copy.scenarioSupport}: {Math.round(scenario.supportScore * 100)}/100</span>
+                </div>
+                <p>{scenario.technique !== "N/D" ? localizeAnalyticText(scenario.technique, language) : localizeAnalyticText(scenario.status || "", language)}</p>
+                <em>{scenario.evidenceCount} {copy.signals} · {scenario.sourceCount ?? 0} fuentes. {localizeAnalyticText(scenario.decision, language)}</em>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
       <p className="prediction-method">{localizeAnalyticText(prediction.methodology, language)}</p>
     </div>
   );
@@ -593,3 +623,4 @@ export function PosturePanel({ score, points, language = "en" }: { score: number
     </div>
   );
 }
+import { DisclosureSummary } from "./DisclosureSummary";

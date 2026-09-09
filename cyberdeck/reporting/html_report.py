@@ -13,18 +13,33 @@ from urllib.parse import urlparse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from cyberdeck.analysis.cyber_radar import build_cyber_risk_radar
+from cyberdeck.analysis.f3_mapping import build_f3_profile
 from cyberdeck.analysis.fraud import fraud_pressure_index
-from cyberdeck.analysis.mitre_mapping import build_atlas_profile, build_d3fend_profile, build_mitre_profile
+from cyberdeck.analysis.mitre_mapping import (
+    build_atlas_profile,
+    build_d3fend_profile,
+    build_mitre_profile,
+)
+from cyberdeck.analysis.multidomain import (
+    enrich_multidomain_findings,
+    enrich_multidomain_intelligence,
+    sanitize_public_payload,
+)
 from cyberdeck.analysis.narratives import build_narrative_intelligence
 from cyberdeck.analysis.public_entities import build_public_entity_intelligence
 from cyberdeck.analysis.pivot_intelligence import build_pivot_intelligence
 from cyberdeck.analysis.prospective_risk import build_prospective_attack_risk
+from cyberdeck.analysis.relationship_risk import build_relationship_risk_intelligence
 from cyberdeck.analysis.sector_intelligence import build_sector_intelligence
 from cyberdeck.analysis.strategic_news import build_strategic_intelligence, export_strategic_scores
 from cyberdeck.analysis.framework_evidence import build_framework_evidence_mapping
 from cyberdeck.analysis.geographic_intelligence import build_geographic_intelligence
 from cyberdeck.analysis.threat_news import build_threat_news
-from cyberdeck.analysis.source_intel import build_actor_profile, build_pattern_profile, build_source_coverage
+from cyberdeck.analysis.source_intel import (
+    build_actor_profile,
+    build_pattern_profile,
+    build_source_coverage,
+)
 from cyberdeck.analysis.strategy import build_strategic_action_plan
 from cyberdeck.analysis.trend_detection import summarize_trends
 from cyberdeck.analysis.vulnerability import build_vulnerability_intelligence
@@ -32,36 +47,69 @@ from cyberdeck.analysis.layered_scenario_risk import calculate_layered_scenario_
 from cyberdeck.enrichment.evidence_pipeline import process_evidence_records
 from cyberdeck.enrichment.vulnerability_correlation import correlate_vulnerabilities
 from cyberdeck.decision_intelligence import build_decision_snapshot
+from cyberdeck.cti import build_cti_snapshot
 from cyberdeck.knowledge.migrations import remove_legacy_optional_collector
 from cyberdeck.methodology import load_methodology_registry
 from cyberdeck.reporting.data_export import export_evidence
 from cyberdeck.reporting.validator import validate_report_bundle
 from cyberdeck.schemas import EvidenceStatus, RunContext
-from cyberdeck.semantics import CLAIM_EVIDENCE_MODEL_VERSION, build_claim_evidence_bundle, get_term_registry
+from cyberdeck.semantics import (
+    CLAIM_EVIDENCE_MODEL_VERSION,
+    build_claim_evidence_bundle,
+    get_term_registry,
+)
 from cyberdeck.settings import PROJECT_ROOT, resolve_path
+from cyberdeck.snapshot_integrity import seal_snapshot
+
+
+REPORT_GENERATOR_VERSION = "cde-html-report-v1.10.3"
 
 
 REFERENCES = [
-    {"name": "NIST CSF 2.0", "url": "https://csrc.nist.gov/pubs/cswp/29/the-nist-cybersecurity-framework-csf-20/final"},
+    {
+        "name": "NIST CSF 2.0",
+        "url": "https://csrc.nist.gov/pubs/cswp/29/the-nist-cybersecurity-framework-csf-20/final",
+    },
     {"name": "NIST SP 800-30 Rev. 1", "url": "https://csrc.nist.gov/pubs/sp/800/30/r1/final"},
     {"name": "NIST SP 800-53 Rev. 5", "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"},
-    {"name": "NIST SP 800-63-4 Digital Identity", "url": "https://csrc.nist.gov/pubs/sp/800/63/4/final"},
-    {"name": "CISA KEV Catalog", "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"},
+    {
+        "name": "NIST SP 800-63-4 Digital Identity",
+        "url": "https://csrc.nist.gov/pubs/sp/800/63/4/final",
+    },
+    {
+        "name": "CISA KEV Catalog",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+    },
     {"name": "FIRST EPSS", "url": "https://www.first.org/epss/"},
-    {"name": "Google News RSS Search", "url": "https://news.google.com/rss/search"},
-    {"name": "Reddit public search RSS", "url": "https://www.reddit.com/search.rss"},
-    {"name": "Authorized ransomware/dark-web public index", "url": "https://api.ransomware.live/apidocs/"},
-    {"name": "Ahmia Tor Search Terms", "url": "https://ahmia.fi/terms/"},
-    {"name": "MITRE ATT&CK v19.1", "url": "https://attack.mitre.org/resources/versions/"},
-    {"name": "MITRE D3FEND v1.4.0", "url": "https://d3fend.mitre.org/version/"},
-    {"name": "MITRE ATLAS data v5.6.0", "url": "https://github.com/mitre-atlas/atlas-data/releases/tag/v5.6.0"},
+    {"name": "MITRE ATT&CK Enterprise v19.2", "url": "https://attack.mitre.org/matrices/enterprise/"},
+    {"name": "MITRE ATT&CK for ICS v19.2", "url": "https://attack.mitre.org/matrices/ics/"},
+    {"name": "MITRE ATT&CK Mobile v19.2", "url": "https://attack.mitre.org/matrices/mobile/"},
+    {"name": "MITRE EMB3D v2.0.2", "url": "https://emb3d.mitre.org/"},
+    {"name": "MITRE D3FEND v1.5.0", "url": "https://d3fend.mitre.org/"},
+    {"name": "MITRE ATLAS", "url": "https://atlas.mitre.org/"},
+    {"name": "MITRE Fight Fraud Framework (F3)", "url": "https://ctid.mitre.org/fraud/"},
     {"name": "DISARM Foundation", "url": "https://github.com/disarmfoundation"},
     {"name": "FBI IC3 Annual Reports", "url": "https://www.ic3.gov/annualreport/reports"},
-    {"name": "ENISA Threat Landscape Finance Sector", "url": "https://www.enisa.europa.eu/publications/enisa-threat-landscape-finance-sector"},
-    {"name": "ACFE Report to the Nations", "url": "https://legacy.acfe.com/report-to-the-nations/2024/"},
-    {"name": "Bolton and Hand, Statistical Fraud Detection", "url": "https://projecteuclid.org/journals/statistical-science/volume-17/issue-3/Statistical-Fraud-Detection-A-Review/10.1214/ss/1042727940.pdf"},
-    {"name": "Richards Heuer, Psychology of Intelligence Analysis", "url": "https://www.ialeia.org/docs/Psychology_of_Intelligence_Analysis.pdf"},
-    {"name": "Sherman Kent and Strategic Warning", "url": "https://tnsr.org/2018/08/beacon-and-warning-sherman-kent-scientific-hubris-and-the-cias-office-of-national-estimates/"},
+    {
+        "name": "ENISA Threat Landscape Finance Sector",
+        "url": "https://www.enisa.europa.eu/publications/enisa-threat-landscape-finance-sector",
+    },
+    {
+        "name": "ACFE Report to the Nations",
+        "url": "https://legacy.acfe.com/report-to-the-nations/2024/",
+    },
+    {
+        "name": "Bolton and Hand, Statistical Fraud Detection",
+        "url": "https://projecteuclid.org/journals/statistical-science/volume-17/issue-3/Statistical-Fraud-Detection-A-Review/10.1214/ss/1042727940.pdf",
+    },
+    {
+        "name": "Richards Heuer, Psychology of Intelligence Analysis",
+        "url": "https://www.ialeia.org/docs/Psychology_of_Intelligence_Analysis.pdf",
+    },
+    {
+        "name": "Sherman Kent and Strategic Warning",
+        "url": "https://tnsr.org/2018/08/beacon-and-warning-sherman-kent-scientific-hubris-and-the-cias-office-of-national-estimates/",
+    },
 ]
 
 SECTOR_LABELS_ES = {
@@ -116,6 +164,28 @@ TOOL_NAME_PATTERNS = [
 ]
 
 
+def _current_report_references(stored: object) -> list[dict[str, str]]:
+    """Keep run-specific sources while replacing versioned MITRE references."""
+    merged = [dict(reference) for reference in REFERENCES]
+    seen_urls = {reference["url"].casefold() for reference in merged}
+    seen_names = {reference["name"].casefold() for reference in merged}
+    if not isinstance(stored, list):
+        return merged
+    for reference in stored:
+        if not isinstance(reference, dict):
+            continue
+        name = str(reference.get("name") or "").strip()
+        url = str(reference.get("url") or "").strip()
+        if not name or not url or name.casefold().startswith("mitre "):
+            continue
+        if name.casefold() in seen_names or url.casefold() in seen_urls:
+            continue
+        merged.append({"name": name, "url": url})
+        seen_names.add(name.casefold())
+        seen_urls.add(url.casefold())
+    return merged
+
+
 def render_report(context: RunContext, output_path: str, *, prepared: bool = False) -> Path:
     out = resolve_path(output_path)
     run_id = out.stem.split("-", 1)[0]
@@ -128,14 +198,23 @@ def render_report(context: RunContext, output_path: str, *, prepared: bool = Fal
     )
     template = env.get_template("executive_report.html.j2")
     technical_template = env.get_template("technical_report.html.j2")
-    css = (PROJECT_ROOT / "cyberdeck" / "reporting" / "assets" / "style.css").read_text(encoding="utf-8")
-    payload = _model_dump(context)
+    css = (PROJECT_ROOT / "cyberdeck" / "reporting" / "assets" / "style.css").read_text(
+        encoding="utf-8"
+    )
+    context.decision_snapshot = seal_snapshot(sanitize_public_payload(context.decision_snapshot))
+    payload = sanitize_public_payload(_model_dump(context))
     payload["decision_snapshot"] = context.decision_snapshot
     report_lang = _report_language(payload)
     payload = _localize_payload(payload, report_lang)
-    payload["format_strategic_percent"] = lambda value: _format_strategic_percent(value, report_lang)
-    payload["display_sector"] = _localized_sector(payload.get("organization", {}).get("sector"), report_lang)
-    payload["display_country"] = _localized_country(payload.get("organization", {}).get("country"), report_lang)
+    payload["format_strategic_percent"] = lambda value: _format_strategic_percent(
+        value, report_lang
+    )
+    payload["display_sector"] = _localized_sector(
+        payload.get("organization", {}).get("sector"), report_lang
+    )
+    payload["display_country"] = _localized_country(
+        payload.get("organization", {}).get("country"), report_lang
+    )
     payload["display_mode"] = _localized_mode(payload.get("mode"), report_lang)
     term_registry = get_term_registry()
     payload["terms"] = term_registry.labels(language=report_lang, audience="executive")
@@ -149,13 +228,19 @@ def render_report(context: RunContext, output_path: str, *, prepared: bool = Fal
         payload["metrics"].get("vulnerability_intelligence", {}),
         report_lang,
     )
-    payload["references"] = context.references or REFERENCES
+    payload["references"] = sanitize_public_payload(
+        _current_report_references(context.references)
+    )
     payload["css"] = css
     payload["report_display"] = _report_display(payload, report_lang)
-    payload["top_findings"] = sorted(payload["risk_findings"], key=lambda item: item["residual_risk"], reverse=True)[:10]
+    payload["top_findings"] = sorted(
+        payload["risk_findings"], key=lambda item: item["residual_risk"], reverse=True
+    )[:10]
     payload["heatmap"] = _heatmap(payload["risk_findings"])
     payload["export_files"] = export_evidence(context, out)
-    payload["export_files"].update(export_strategic_scores(context.metrics.get("strategic_news", {}), out))
+    payload["export_files"].update(
+        export_strategic_scores(context.metrics.get("strategic_news", {}), out)
+    )
     payload["report_scope"] = _report_scope(payload, report_lang)
     payload["scope_events"] = _scope_filtered_events(payload, report_lang)
     payload["evidence_rows"] = _evidence_rows(payload["scope_events"], report_lang)
@@ -172,7 +257,9 @@ def render_report(context: RunContext, output_path: str, *, prepared: bool = Fal
     payload["domain_reading_rows"] = _domain_reading_rows(payload, report_lang)
     payload["attack_surface_inventory"] = _attack_surface_inventory(payload, report_lang)
     payload["executive_alerts"] = _executive_alert_rows(payload, report_lang)
-    payload["evidence_preview_gallery"] = _evidence_preview_gallery(payload["scope_events"], report_lang)
+    payload["evidence_preview_gallery"] = _evidence_preview_gallery(
+        payload["scope_events"], report_lang
+    )
     payload["disinformation_summary"] = _disinformation_summary(payload, report_lang)
     payload["intelligence_modules"] = _intelligence_modules(payload, report_lang)
     payload["brand_fraud_summary"] = _brand_fraud_summary(payload, report_lang)
@@ -180,10 +267,16 @@ def render_report(context: RunContext, output_path: str, *, prepared: bool = Fal
     payload["recommendation_catalog"] = _recommendation_catalog(payload, report_lang)
     payload["work_plan"] = _work_plan(payload, report_lang)
     payload["methodology_summary"] = _methodology_summary(payload, report_lang)
-    payload["source_statuses"] = _display_source_statuses(payload.get("source_statuses", []), report_lang)
+    payload["source_statuses"] = _display_source_statuses(
+        payload.get("source_statuses", []), report_lang
+    )
     payload["radars"] = {
-        "pestel": _radar_svg("Cyber-PESTEL · SignalScore", payload["metrics"]["pestel"].get("dimensions", [])),
-        "porter": _radar_svg("Cyber-Porter · SignalScore", payload["metrics"]["porter"].get("dimensions", [])),
+        "pestel": _radar_svg(
+            "Cyber-PESTEL · SignalScore", payload["metrics"]["pestel"].get("dimensions", [])
+        ),
+        "porter": _radar_svg(
+            "Cyber-Porter · SignalScore", payload["metrics"]["porter"].get("dimensions", [])
+        ),
         "risk_heat": _risk_heat_svg(payload["metrics"]["risk_heat_radar"].get("rows", [])),
     }
     html = template.render(**payload)
@@ -196,7 +289,9 @@ def render_report(context: RunContext, output_path: str, *, prepared: bool = Fal
 
 
 def _report_file_slug(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").lower()
+    normalized = (
+        unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").lower()
+    )
     return re.sub(r"[^a-z0-9]+", "_", normalized).strip("_") or "multi_domain"
 
 
@@ -206,7 +301,9 @@ def prepare_context_for_report(context: RunContext, run_id: str = "") -> RunCont
     remove_legacy_optional_collector(prepared)
     scope_terms = [*prepared.organization.primary_domains, prepared.organization.name]
     existing_summary = dict(prepared.processing_summary)
-    already_processed = bool(existing_summary) and int(existing_summary.get("unique_records", -1)) == len(prepared.raw_events)
+    already_processed = bool(existing_summary) and int(
+        existing_summary.get("unique_records", -1)
+    ) == len(prepared.raw_events)
     if already_processed:
         processed_records = prepared.raw_events
         processed_summary = existing_summary
@@ -219,6 +316,17 @@ def prepare_context_for_report(context: RunContext, run_id: str = "") -> RunCont
         processed_records = processed.records
         processed_summary = processed.summary
     prepared.raw_events = processed_records
+    if any((event.technical_validation or {}).get("human_review") for event in prepared.raw_events):
+        # Reuse applicability rules after review; validating a source is not an incident.
+        from cyberdeck.cli import _build_all_findings
+        prepared.risk_findings = _build_all_findings(
+            prepared.raw_events, prepared.organization, real_only=True
+        )
+    prepared.multidomain_intelligence = enrich_multidomain_intelligence(
+        prepared.raw_events,
+        prepared.organization,
+    )
+    enrich_multidomain_findings(prepared.risk_findings, prepared.raw_events)
     _ensure_claim_evidence_chain(prepared)
     validated_findings = [
         finding
@@ -242,17 +350,30 @@ def prepare_context_for_report(context: RunContext, run_id: str = "") -> RunCont
         ),
         "validated_findings": len(validated_findings),
         "confirmed_findings": sum(
-            1 for finding in prepared.risk_findings if finding.evidence_status == EvidenceStatus.CONFIRMED
+            1
+            for finding in prepared.risk_findings
+            if finding.evidence_status == EvidenceStatus.CONFIRMED
         ),
         "calculated_risks": len(prepared.risk_findings),
-        "confirmed_incidents": sum(1 for finding in prepared.risk_findings if finding.incident_confirmed),
+        "confirmed_incidents": sum(
+            1 for finding in prepared.risk_findings if finding.incident_confirmed
+        ),
     }
     coverage = build_source_coverage(prepared.source_statuses, prepared.raw_events)
     prepared.connector_coverage = coverage
     prepared.metrics["source_coverage"] = coverage
     prepared.metrics["evidence_summary"] = prepared.processing_summary
+    prepared.metrics["multidomain_intelligence"] = prepared.multidomain_intelligence
+    prepared.metrics["public_technology_footprint"] = prepared.multidomain_intelligence.get(
+        "technology_footprint",
+        {},
+    )
     _rebuild_report_metrics(prepared, coverage)
-    prepared.decision_snapshot = build_decision_snapshot(prepared, run_id=run_id).model_dump(mode="json")
+    prepared.decision_snapshot = seal_snapshot(
+        sanitize_public_payload(
+            build_decision_snapshot(prepared, run_id=run_id).model_dump(mode="json")
+        )
+    )
     prepared.incidents_confirmed = int(prepared.processing_summary["confirmed_incidents"])
     prepared.false_positive_count = int(prepared.processing_summary.get("false_positives", 0))
     return prepared
@@ -293,7 +414,9 @@ def _ensure_claim_evidence_chain(context: RunContext) -> None:
     if requires_rebuild or not context.claim_evidence_links:
         context.claim_evidence_links = [item.model_dump(mode="json") for item in bundle.links]
     if requires_rebuild or not context.contradicting_evidence:
-        context.contradicting_evidence = [item.model_dump(mode="json") for item in bundle.contradictions]
+        context.contradicting_evidence = [
+            item.model_dump(mode="json") for item in bundle.contradictions
+        ]
     if requires_rebuild or not context.interpretations:
         context.interpretations = [item.model_dump(mode="json") for item in bundle.interpretations]
     if requires_rebuild or not context.decisions:
@@ -326,7 +449,9 @@ def _remove_legacy_assumed_profile_data(context: RunContext) -> None:
     if set(context.organization.technologies) == legacy_technologies:
         context.organization.technologies = []
     defaults = {"dns", "email_security", "brand", "web_presence", "apis", "identity"}
-    context.organization.crown_jewels = [item for item in context.organization.crown_jewels if item not in defaults]
+    context.organization.crown_jewels = [
+        item for item in context.organization.crown_jewels if item not in defaults
+    ]
 
 
 def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> None:
@@ -334,21 +459,28 @@ def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> No
         [
             event
             for event in context.raw_events
-            if event.evidence_status not in {EvidenceStatus.FALSE_POSITIVE, EvidenceStatus.DISCARDED}
+            if event.evidence_status
+            not in {EvidenceStatus.FALSE_POSITIVE, EvidenceStatus.DISCARDED}
         ]
     )
     findings = context.risk_findings
     assured = [
         event
         for event in events
-        if event.evidence_status in {EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
+        if event.evidence_status
+        in {EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
     ]
     fraud_pressure = fraud_pressure_index(assured)
     evidence_assurance = len(assured) / max(1, len(events))
     source_health = float(coverage.get("source_health_score", 0.0) or 0.0)
     max_residual = max((finding.residual_risk for finding in findings), default=0.0)
     external_posture = (
-        100 * (0.4 * source_health + 0.35 * evidence_assurance + 0.25 * max(0.0, 1 - max_residual / 100))
+        100
+        * (
+            0.4 * source_health
+            + 0.35 * evidence_assurance
+            + 0.25 * max(0.0, 1 - max_residual / 100)
+        )
         if events
         else 0.0
     )
@@ -365,7 +497,17 @@ def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> No
         for key, label in key_labels.items()
         if key in context.organization.control_maturity
     }
-    strategic_news = build_strategic_intelligence(events, context.organization, created_at=context.generated_at)
+    strategic_news = build_strategic_intelligence(
+        events, context.organization, created_at=context.generated_at
+    )
+    threat_news = build_threat_news(events)
+    cti_snapshot = build_cti_snapshot(
+        events,
+        findings,
+        context.organization,
+        threat_news=threat_news,
+        generated_at=context.generated_at,
+    )
     prospective_attack_risk = build_prospective_attack_risk(
         assured,
         findings,
@@ -392,16 +534,29 @@ def _rebuild_report_metrics(context: RunContext, coverage: Dict[str, Any]) -> No
             "mitre": build_mitre_profile(events),
             "d3fend": build_d3fend_profile(events),
             "atlas": build_atlas_profile(events),
+            "f3": build_f3_profile(events),
             "vulnerability_intelligence": build_vulnerability_intelligence(events, findings),
-            "layered_scenario_risk": calculate_layered_scenario_risk(context.organization.scenario_risk_inputs),
+            "layered_scenario_risk": calculate_layered_scenario_risk(
+                context.organization.scenario_risk_inputs
+            ),
             "risk_heat_radar": build_cyber_risk_radar(events, findings),
-            "strategy": build_strategic_action_plan(findings, events, context.organization, coverage),
+            "strategy": build_strategic_action_plan(
+                findings, events, context.organization, coverage
+            ),
             "strategic_news": strategic_news,
-            "threat_news": build_threat_news(events),
-            "framework_mapping": build_framework_evidence_mapping(events, findings, context.organization),
+            "threat_news": threat_news,
+            "cti": cti_snapshot,
+            "relationship_risk_intelligence": build_relationship_risk_intelligence(
+                events, context.organization
+            ),
+            "framework_mapping": build_framework_evidence_mapping(
+                events, findings, context.organization
+            ),
             "geographic_intelligence": build_geographic_intelligence(events, context.organization),
             "sector_intelligence": build_sector_intelligence(events, context.organization),
-            "public_entity_intelligence": build_public_entity_intelligence(events, context.organization),
+            "public_entity_intelligence": build_public_entity_intelligence(
+                events, context.organization
+            ),
             "pivot_intelligence": build_pivot_intelligence(events),
             "pestel": strategic_news["pestel"],
             "porter": strategic_news["porter"],
@@ -428,11 +583,19 @@ def _model_dump(context: RunContext) -> Dict[str, Any]:
 
 
 def _claim_evidence_rows(payload: Dict[str, Any], language: str) -> list[Dict[str, Any]]:
-    evidence_by_id = {item.get("evidence_id"): item for item in payload.get("evidence_items", []) if item.get("evidence_id")}
-    interpretation_by_claim = {
-        item.get("claim_id"): item for item in payload.get("interpretations", []) if item.get("claim_id")
+    evidence_by_id = {
+        item.get("evidence_id"): item
+        for item in payload.get("evidence_items", [])
+        if item.get("evidence_id")
     }
-    decision_by_claim = {item.get("claim_id"): item for item in payload.get("decisions", []) if item.get("claim_id")}
+    interpretation_by_claim = {
+        item.get("claim_id"): item
+        for item in payload.get("interpretations", [])
+        if item.get("claim_id")
+    }
+    decision_by_claim = {
+        item.get("claim_id"): item for item in payload.get("decisions", []) if item.get("claim_id")
+    }
     contradictions_by_claim: Dict[str, list[Dict[str, Any]]] = {}
     for item in payload.get("contradicting_evidence", []):
         contradictions_by_claim.setdefault(str(item.get("claim_id") or ""), []).append(item)
@@ -459,10 +622,18 @@ def _claim_evidence_rows(payload: Dict[str, Any], language: str) -> list[Dict[st
             not_demonstrates = "It does not by itself prove exploitation, compromise, attribution or a confirmed incident."
             fallback_decision = "Review treatment with the risk owner."
             fallback_owner = "Cyber intelligence analyst"
-            fallback_closure = "Revalidate with reproducible evidence or document the discard decision."
+            fallback_closure = (
+                "Revalidate with reproducible evidence or document the discard decision."
+            )
         else:
-            demonstrates = str(interpretation.get("what_demonstrates") or "Respalda una posibilidad analítica que aún requiere validación reproducible.")
-            not_demonstrates = str(interpretation.get("what_not_demonstrates") or "No demuestra por sí sola explotación, compromiso, atribución ni incidente confirmado.")
+            demonstrates = str(
+                interpretation.get("what_demonstrates")
+                or "Respalda una posibilidad analítica que aún requiere validación reproducible."
+            )
+            not_demonstrates = str(
+                interpretation.get("what_not_demonstrates")
+                or "No demuestra por sí sola explotación, compromiso, atribución ni incidente confirmado."
+            )
             fallback_decision = "Revisar tratamiento con el responsable del riesgo."
             fallback_owner = "Analista de ciberinteligencia"
             fallback_closure = "Revalidar con evidencia reproducible o documentar el descarte."
@@ -474,7 +645,9 @@ def _claim_evidence_rows(payload: Dict[str, Any], language: str) -> list[Dict[st
                 "what_found": interpretation.get("what_found") or claim.get("statement") or "",
                 "what_demonstrates": demonstrates,
                 "what_not_demonstrates": not_demonstrates,
-                "how_validated": interpretation.get("validation_summary") or claim.get("validation_method") or ("Not validated" if language == "en" else "No validado"),
+                "how_validated": interpretation.get("validation_summary")
+                or claim.get("validation_method")
+                or ("Not validated" if language == "en" else "No validado"),
                 "evidence": evidence,
                 "evidence_count": len(evidence),
                 "confidence": round(float(claim.get("confidence") or 0.0) * 100),
@@ -514,7 +687,10 @@ def _country_label_index() -> dict[str, dict[str, str]]:
     rows = json.loads(path.read_text(encoding="utf-8"))
     index: dict[str, dict[str, str]] = {}
     for row in rows:
-        normalized = {"en": str(row.get("en") or ""), "es": str(row.get("es") or row.get("en") or "")}
+        normalized = {
+            "en": str(row.get("en") or ""),
+            "es": str(row.get("es") or row.get("en") or ""),
+        }
         for alias in (row.get("code"), row.get("en"), row.get("es")):
             if alias:
                 index[str(alias).casefold()] = normalized
@@ -562,13 +738,17 @@ def _display_source_name(source: str | None, language: str) -> str:
     value = (source or "").strip()
     if not value:
         return "Public evidence" if language == "en" else "Evidencia publica"
-    if re.search(r"kali|subfinder|amass|dnsrecon|sslscan|wafw00f|whatweb|nuclei", value, re.IGNORECASE):
+    if re.search(
+        r"kali|subfinder|amass|dnsrecon|sslscan|wafw00f|whatweb|nuclei", value, re.IGNORECASE
+    ):
         return "External surface" if language == "en" else "Superficie externa"
     if re.search(r"spiderfoot|sfp_", value, re.IGNORECASE):
         return "Passive inventory" if language == "en" else "Inventario pasivo"
     if re.search(r"internet search|google|duckduckgo|gdelt|news|rss", value, re.IGNORECASE):
         return "Public search" if language == "en" else "Busqueda publica"
-    if re.search(r"common crawl|osint public|osint tools|osint sidecar|sidecar|urlscan", value, re.IGNORECASE):
+    if re.search(
+        r"common crawl|osint public|osint tools|osint sidecar|sidecar|urlscan", value, re.IGNORECASE
+    ):
         return "Public index" if language == "en" else "Indice publico"
     if re.search(r"ransomware|dark web|tor|onion|leak", value, re.IGNORECASE):
         return "Authorized dark web index" if language == "en" else "Indice dark web autorizado"
@@ -577,8 +757,12 @@ def _display_source_name(source: str | None, language: str) -> str:
     if re.search(r"shodan|censys", value, re.IGNORECASE):
         return "Passive surface index" if language == "en" else "Indice pasivo de superficie"
     if re.search(r"cisa|kev|nvd|epss|github", value, re.IGNORECASE):
-        return "Vulnerability intelligence" if language == "en" else "Inteligencia de vulnerabilidades"
-    if re.search(r"socmint|reddit|facebook|instagram|tiktok|twitter|\bx\b|linkedin", value, re.IGNORECASE):
+        return (
+            "Vulnerability intelligence" if language == "en" else "Inteligencia de vulnerabilidades"
+        )
+    if re.search(
+        r"socmint|reddit|facebook|instagram|tiktok|twitter|\bx\b|linkedin", value, re.IGNORECASE
+    ):
         return "SOCMINT"
     return re.sub(r"\s+", " ", value)
 
@@ -588,14 +772,23 @@ def _clean_evidence_text(value: str | None, language: str = "es") -> str:
     source_label = _internal_source_label(text, language)
     if source_label:
         count_match = re.search(r":\s*(\d+)\s*$", text)
-        return f"{source_label}: {count_match.group(1)}" if count_match else f"{source_label} {'validated' if language == 'en' else 'validada'}"
+        return (
+            f"{source_label}: {count_match.group(1)}"
+            if count_match
+            else f"{source_label} {'validated' if language == 'en' else 'validada'}"
+        )
     for pattern in TOOL_NAME_PATTERNS:
         text = pattern.sub("", text)
     text = re.sub(r"\bobservo\b", "detecto", text, flags=re.IGNORECASE)
     text = re.sub(r"\bobserv[oó]\b", "detecto", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+\|\s*query:", " | busqueda:", text, flags=re.IGNORECASE)
     text = re.sub(r"\(\s*real\s*\)", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"GOOGLE_CSE_API_KEY|GOOGLE_CSE_CX|BRAVE_SEARCH_API_KEY", "credencial opcional", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"GOOGLE_CSE_API_KEY|GOOGLE_CSE_CX|BRAVE_SEARCH_API_KEY",
+        "credencial opcional",
+        text,
+        flags=re.IGNORECASE,
+    )
     text = re.sub(r"\s*,\s*,", ",", text)
     text = re.sub(r"\s{2,}", " ", text)
     text = text.lstrip(":-,; ").strip()
@@ -678,7 +871,9 @@ def _work_plan(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
         item = {
             "id": match.get("id"),
             "title": match.get("title"),
-            "timeframe": _work_plan_timeframe(score, str(match.get("primary_framework") or ""), language),
+            "timeframe": _work_plan_timeframe(
+                score, str(match.get("primary_framework") or ""), language
+            ),
             "priority": _work_plan_priority_label(score, language),
             "tone": _work_plan_tone(score),
             "owners": owners,
@@ -804,7 +999,9 @@ def _scenario_control_mappings(
                 "evidence_count": linked_count,
             }
         )
-    mappings.sort(key=lambda item: (-item["evidence_count"], str(item["framework"]), str(item["aspect"])))
+    mappings.sort(
+        key=lambda item: (-item["evidence_count"], str(item["framework"]), str(item["aspect"]))
+    )
     return mappings[:8]
 
 
@@ -815,7 +1012,18 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
                 "key": "triage",
                 "id": "WP-01",
                 "title": "Executive triage and risk acceptance",
-                "keywords": ("critical", "high", "residual", "ransomware", "kev", "fraud", "phishing", "credential", "cve", "exploit"),
+                "keywords": (
+                    "critical",
+                    "high",
+                    "residual",
+                    "ransomware",
+                    "kev",
+                    "fraud",
+                    "phishing",
+                    "credential",
+                    "cve",
+                    "exploit",
+                ),
                 "owners": ["CISO", "Risk", "SOC/CTI", "Business owner"],
                 "objective": "Confirm the decision threshold for {scope} and separate urgent mitigation, accepted risk and evidence to validate.",
                 "actions": [
@@ -829,7 +1037,23 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
                 "key": "surface",
                 "id": "WP-02",
                 "title": "External surface reduction",
-                "keywords": ("surface", "domain", "subdomain", "dns", "tls", "certificate", "whois", "port", "service", "api", "exposed", "vulnerab", "cve", "kev", "headers"),
+                "keywords": (
+                    "surface",
+                    "domain",
+                    "subdomain",
+                    "dns",
+                    "tls",
+                    "certificate",
+                    "whois",
+                    "port",
+                    "service",
+                    "api",
+                    "exposed",
+                    "vulnerab",
+                    "cve",
+                    "kev",
+                    "headers",
+                ),
                 "owners": ["Infrastructure", "EASM", "AppSec", "SOC"],
                 "objective": "Reduce externally visible exposure for {scope} with verifiable closure evidence.",
                 "actions": [
@@ -843,7 +1067,23 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
                 "key": "brand_fraud",
                 "id": "WP-03",
                 "title": "Brand, fraud and public-social response",
-                "keywords": ("brand", "fraud", "phishing", "smishing", "imperson", "lookalike", "socmint", "facebook", "instagram", "linkedin", "tiktok", "twitter", "x.com", "complaint", "reputation"),
+                "keywords": (
+                    "brand",
+                    "fraud",
+                    "phishing",
+                    "smishing",
+                    "imperson",
+                    "lookalike",
+                    "socmint",
+                    "facebook",
+                    "instagram",
+                    "linkedin",
+                    "tiktok",
+                    "twitter",
+                    "x.com",
+                    "complaint",
+                    "reputation",
+                ),
                 "owners": ["Fraud", "Digital Channels", "Legal", "Communications", "SOC"],
                 "objective": "Treat public brand and fraud signals for {scope} without overstating unvalidated mentions.",
                 "actions": [
@@ -857,7 +1097,19 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
                 "key": "darkweb_identity",
                 "id": "WP-04",
                 "title": "Authorized dark-web and identity validation",
-                "keywords": ("dark", "tor", "onion", "leak", "credential", "password", "account", "identity", "mfa", "ato", "ransomware"),
+                "keywords": (
+                    "dark",
+                    "tor",
+                    "onion",
+                    "leak",
+                    "credential",
+                    "password",
+                    "account",
+                    "identity",
+                    "mfa",
+                    "ato",
+                    "ransomware",
+                ),
                 "owners": ["CTI", "IAM", "SOC", "Legal/Privacy"],
                 "objective": "Validate authorized deep/dark-web or credential signals for {scope} with privacy and chain-of-custody controls.",
                 "actions": [
@@ -871,7 +1123,20 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
                 "key": "framework",
                 "id": "WP-05",
                 "title": "Framework mapping and declared control evidence",
-                "keywords": ("nist", "iso", "pci", "soc", "gdpr", "cobit", "cis", "d3fend", "control", "compliance", "privacy", "governance"),
+                "keywords": (
+                    "nist",
+                    "iso",
+                    "pci",
+                    "soc",
+                    "gdpr",
+                    "cobit",
+                    "cis",
+                    "d3fend",
+                    "control",
+                    "compliance",
+                    "privacy",
+                    "governance",
+                ),
                 "owners": ["GRC", "Compliance", "Legal/Privacy", "Control owners"],
                 "objective": "Map {scope} evidence to frameworks and convert gaps into control evidence or treatment actions.",
                 "actions": [
@@ -885,7 +1150,19 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
                 "key": "scenario",
                 "id": "WP-06",
                 "title": "Scenario review and executive tabletop",
-                "keywords": ("scenario", "attack", "mitre", "atlas", "disarm", "d3fend", "forecast", "prediction", "influence", "continuity", "ransomware"),
+                "keywords": (
+                    "scenario",
+                    "attack",
+                    "mitre",
+                    "atlas",
+                    "disarm",
+                    "d3fend",
+                    "forecast",
+                    "prediction",
+                    "influence",
+                    "continuity",
+                    "ransomware",
+                ),
                 "owners": ["CISO", "Operational Risk", "Continuity", "Executive committee"],
                 "objective": "Review the active scenarios for {scope} and translate them into decision options, not certainty claims.",
                 "actions": [
@@ -899,7 +1176,16 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
                 "key": "sources",
                 "id": "WP-07",
                 "title": "Source health and collection continuity",
-                "keywords": ("source", "connector", "timeout", "partial", "skipped", "api", "osint", "socmint"),
+                "keywords": (
+                    "source",
+                    "connector",
+                    "timeout",
+                    "partial",
+                    "skipped",
+                    "api",
+                    "osint",
+                    "socmint",
+                ),
                 "owners": ["Threat Intelligence", "Platform admin", "Data engineering"],
                 "objective": "Stabilize collection for {scope} so future analysis does not confuse source gaps with absence of risk.",
                 "actions": [
@@ -915,7 +1201,19 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
             "key": "triage",
             "id": "PT-01",
             "title": "Triage ejecutivo y aceptación de riesgo",
-            "keywords": ("critico", "crítico", "alto", "residual", "ransomware", "kev", "fraude", "phishing", "credencial", "cve", "exploit"),
+            "keywords": (
+                "critico",
+                "crítico",
+                "alto",
+                "residual",
+                "ransomware",
+                "kev",
+                "fraude",
+                "phishing",
+                "credencial",
+                "cve",
+                "exploit",
+            ),
             "owners": ["CISO", "Riesgo", "SOC/CTI", "Dueño de negocio"],
             "objective": "Confirmar el umbral de decisión para {scope} y separar mitigación urgente, riesgo aceptado y evidencia por validar.",
             "actions": [
@@ -929,7 +1227,26 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
             "key": "surface",
             "id": "PT-02",
             "title": "Reducción de superficie externa",
-            "keywords": ("superficie", "surface", "dominio", "domain", "subdomain", "subdominio", "dns", "tls", "certificado", "whois", "puerto", "servicio", "api", "expuesto", "vulnerab", "cve", "kev", "headers"),
+            "keywords": (
+                "superficie",
+                "surface",
+                "dominio",
+                "domain",
+                "subdomain",
+                "subdominio",
+                "dns",
+                "tls",
+                "certificado",
+                "whois",
+                "puerto",
+                "servicio",
+                "api",
+                "expuesto",
+                "vulnerab",
+                "cve",
+                "kev",
+                "headers",
+            ),
             "owners": ["Infraestructura", "EASM", "AppSec", "SOC"],
             "objective": "Reducir exposición visible en Internet para {scope} con evidencia verificable de cierre.",
             "actions": [
@@ -943,7 +1260,27 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
             "key": "brand_fraud",
             "id": "PT-03",
             "title": "Respuesta de marca, fraude y redes públicas",
-            "keywords": ("marca", "brand", "fraude", "fraud", "phishing", "smishing", "suplant", "imperson", "lookalike", "socmint", "facebook", "instagram", "linkedin", "tiktok", "twitter", "x.com", "queja", "reputacion", "reputación"),
+            "keywords": (
+                "marca",
+                "brand",
+                "fraude",
+                "fraud",
+                "phishing",
+                "smishing",
+                "suplant",
+                "imperson",
+                "lookalike",
+                "socmint",
+                "facebook",
+                "instagram",
+                "linkedin",
+                "tiktok",
+                "twitter",
+                "x.com",
+                "queja",
+                "reputacion",
+                "reputación",
+            ),
             "owners": ["Fraude", "Canales digitales", "Legal", "Comunicaciones", "SOC"],
             "objective": "Tratar señales públicas de marca y fraude para {scope} sin sobredimensionar menciones no validadas.",
             "actions": [
@@ -957,7 +1294,21 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
             "key": "darkweb_identity",
             "id": "PT-04",
             "title": "Validación autorizada de dark web e identidad",
-            "keywords": ("dark", "tor", "onion", "fuga", "leak", "credencial", "password", "cuenta", "identity", "identidad", "mfa", "ato", "ransomware"),
+            "keywords": (
+                "dark",
+                "tor",
+                "onion",
+                "fuga",
+                "leak",
+                "credencial",
+                "password",
+                "cuenta",
+                "identity",
+                "identidad",
+                "mfa",
+                "ato",
+                "ransomware",
+            ),
             "owners": ["CTI", "IAM", "SOC", "Legal/Privacidad"],
             "objective": "Validar señales autorizadas deep/dark-web o de credenciales para {scope} con privacidad y cadena de custodia.",
             "actions": [
@@ -971,7 +1322,21 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
             "key": "framework",
             "id": "PT-05",
             "title": "Mapeo de frameworks y evidencia de control declarada",
-            "keywords": ("nist", "iso", "pci", "soc", "gdpr", "cobit", "cis", "d3fend", "control", "cumplimiento", "privacy", "privacidad", "gobierno"),
+            "keywords": (
+                "nist",
+                "iso",
+                "pci",
+                "soc",
+                "gdpr",
+                "cobit",
+                "cis",
+                "d3fend",
+                "control",
+                "cumplimiento",
+                "privacy",
+                "privacidad",
+                "gobierno",
+            ),
             "owners": ["GRC", "Cumplimiento", "Legal/Privacidad", "Dueños de control"],
             "objective": "Mapear la evidencia de {scope} a frameworks y convertir brechas en evidencia de control o acciones de tratamiento.",
             "actions": [
@@ -985,7 +1350,20 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
             "key": "scenario",
             "id": "PT-06",
             "title": "Revisión de escenarios y ejercicio directivo",
-            "keywords": ("escenario", "scenario", "attack", "mitre", "atlas", "disarm", "d3fend", "forecast", "predic", "influencia", "continuidad", "ransomware"),
+            "keywords": (
+                "escenario",
+                "scenario",
+                "attack",
+                "mitre",
+                "atlas",
+                "disarm",
+                "d3fend",
+                "forecast",
+                "predic",
+                "influencia",
+                "continuidad",
+                "ransomware",
+            ),
             "owners": ["CISO", "Riesgo operacional", "Continuidad", "Comité ejecutivo"],
             "objective": "Revisar los escenarios activos para {scope} y traducirlos en opciones de decisión, no en afirmaciones de certeza.",
             "actions": [
@@ -999,7 +1377,19 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
             "key": "sources",
             "id": "PT-07",
             "title": "Cobertura operativa de conectores y continuidad de recolección",
-            "keywords": ("fuente", "source", "connector", "timeout", "partial", "parcial", "omitida", "skipped", "api", "osint", "socmint"),
+            "keywords": (
+                "fuente",
+                "source",
+                "connector",
+                "timeout",
+                "partial",
+                "parcial",
+                "omitida",
+                "skipped",
+                "api",
+                "osint",
+                "socmint",
+            ),
             "owners": ["Threat Intelligence", "Administrador de plataforma", "Ingeniería de datos"],
             "objective": "Estabilizar la recolección de {scope} para que futuros análisis no confundan brechas de fuente con ausencia de riesgo.",
             "actions": [
@@ -1012,7 +1402,9 @@ def _work_plan_catalog(language: str) -> list[Dict[str, Any]]:
     ]
 
 
-def _work_plan_matching_events(events: list[Dict[str, Any]], keywords: tuple[str, ...]) -> list[Dict[str, Any]]:
+def _work_plan_matching_events(
+    events: list[Dict[str, Any]], keywords: tuple[str, ...]
+) -> list[Dict[str, Any]]:
     return [event for event in events if _text_has_any(_event_text(event), keywords)]
 
 
@@ -1029,11 +1421,15 @@ def _finding_text(finding: Dict[str, Any]) -> str:
     )
 
 
-def _work_plan_matching_findings(findings: list[Dict[str, Any]], keywords: tuple[str, ...]) -> list[Dict[str, Any]]:
+def _work_plan_matching_findings(
+    findings: list[Dict[str, Any]], keywords: tuple[str, ...]
+) -> list[Dict[str, Any]]:
     return [finding for finding in findings if _text_has_any(_finding_text(finding), keywords)]
 
 
-def _work_plan_matching_scenarios(matches: list[Dict[str, Any]], keywords: tuple[str, ...]) -> list[Dict[str, Any]]:
+def _work_plan_matching_scenarios(
+    matches: list[Dict[str, Any]], keywords: tuple[str, ...]
+) -> list[Dict[str, Any]]:
     matched = []
     for match in matches:
         text = " ".join(
@@ -1062,10 +1458,17 @@ def _work_plan_priority_score(
 ) -> float:
     residual = max((float(item.get("residual_risk", 0) or 0) for item in findings), default=0.0)
     event_severity = max((float(item.get("severity", 0) or 0) * 30 for item in events), default=0.0)
-    scenario_confidence = max((float(item.get("confidence", 0) or 0) / 4 for item in scenarios), default=0.0)
+    scenario_confidence = max(
+        (float(item.get("confidence", 0) or 0) / 4 for item in scenarios), default=0.0
+    )
     source_gap_boost = 4 if config["key"] == "sources" and source_gaps else 0
     always_floor = 8 if config.get("always") else 0
-    return max(residual, event_severity, scenario_confidence, always_floor) + min(6, len(events) / 15) + min(4, len(scenarios)) + source_gap_boost
+    return (
+        max(residual, event_severity, scenario_confidence, always_floor)
+        + min(6, len(events) / 15)
+        + min(4, len(scenarios))
+        + source_gap_boost
+    )
 
 
 def _work_plan_timeframe(score: float, key: str, language: str) -> str:
@@ -1171,7 +1574,10 @@ def _work_plan_empty_item(scope_label: str, language: str) -> Dict[str, Any]:
             "owners": ["Platform admin", "Threat Intelligence", "Risk"],
             "provider": _work_plan_internal_provider_label(language),
             "objective": f"Confirm authorized scope and source readiness for {scope_label} before making risk decisions.",
-            "actions": ["Validate domains, brands, countries and allowed sources.", "Run collection again once missing sources are configured."],
+            "actions": [
+                "Validate domains, brands, countries and allowed sources.",
+                "Run collection again once missing sources are configured.",
+            ],
             "validation": "The next report contains evidence records or explicitly documented source limitations.",
             "basis": "0 findings · 0 evidence records · 0 scenarios",
             "evidence_urls": [],
@@ -1186,7 +1592,10 @@ def _work_plan_empty_item(scope_label: str, language: str) -> Dict[str, Any]:
         "owners": ["Administrador de plataforma", "Threat Intelligence", "Riesgo"],
         "provider": _work_plan_internal_provider_label(language),
         "objective": f"Confirmar alcance autorizado y preparación de fuentes para {scope_label} antes de tomar decisiones de riesgo.",
-        "actions": ["Validar dominios, marcas, países y fuentes permitidas.", "Reejecutar recolección cuando las fuentes faltantes estén configuradas."],
+        "actions": [
+            "Validar dominios, marcas, países y fuentes permitidas.",
+            "Reejecutar recolección cuando las fuentes faltantes estén configuradas.",
+        ],
         "validation": "El siguiente informe contiene evidencias o limitaciones de fuente explícitamente documentadas.",
         "basis": "0 hallazgos · 0 evidencias · 0 escenarios",
         "evidence_urls": [],
@@ -1228,9 +1637,7 @@ def _methodology_summary(payload: Dict[str, Any], language: str) -> Dict[str, An
                 "detail": "The executive view summarizes priority and work plan; the technical view preserves URL-level evidence, validation notes and scenario traceability.",
             },
         ]
-        percent_note = (
-            f"Decision indicators use {direct_count} direct evidence records, {validated_count} validated evidence records, {validated_finding_count} validated findings and {confirmed_finding_count} confirmed findings. CVSS/EPSS/KEV and declared controls are used only when linked to an applicable asset or finding; absent data never becomes favorable evidence."
-        )
+        percent_note = f"Decision indicators use {direct_count} direct evidence records, {validated_count} validated evidence records, {validated_finding_count} validated findings and {confirmed_finding_count} confirmed findings. CVSS/EPSS/KEV and declared controls are used only when linked to an applicable asset or finding; absent data never becomes favorable evidence."
     else:
         steps = [
             {
@@ -1254,9 +1661,7 @@ def _methodology_summary(payload: Dict[str, Any], language: str) -> Dict[str, An
                 "detail": "La vista ejecutiva resume prioridad y plan de trabajo; la técnica conserva evidencia URL por URL, notas de validación y trazabilidad de escenarios.",
             },
         ]
-        percent_note = (
-            f"Los indicadores usan {direct_count} evidencias directas, {validated_count} evidencias validadas, {validated_finding_count} hallazgos validados y {confirmed_finding_count} hallazgos confirmados. CVSS/EPSS/KEV y controles declarados solo se incorporan cuando están vinculados a un activo o hallazgo aplicable; la ausencia de datos nunca cuenta como evidencia favorable."
-        )
+        percent_note = f"Los indicadores usan {direct_count} evidencias directas, {validated_count} evidencias validadas, {validated_finding_count} hallazgos validados y {confirmed_finding_count} hallazgos confirmados. CVSS/EPSS/KEV y controles declarados solo se incorporan cuando están vinculados a un activo o hallazgo aplicable; la ausencia de datos nunca cuenta como evidencia favorable."
     return {
         "evidence_count": evidence_count,
         "source_count": source_count,
@@ -1309,10 +1714,14 @@ def _display_status_label(status: str | None, language: str) -> str:
             "error": "Failed",
         },
     }
-    return labels["en" if language == "en" else "es"].get(normalized, normalized or ("Sin datos" if language == "es" else "No data"))
+    return labels["en" if language == "en" else "es"].get(
+        normalized, normalized or ("Sin datos" if language == "es" else "No data")
+    )
 
 
-def _display_source_statuses(source_statuses: list[Dict[str, Any]], language: str) -> list[Dict[str, Any]]:
+def _display_source_statuses(
+    source_statuses: list[Dict[str, Any]], language: str
+) -> list[Dict[str, Any]]:
     rows = []
     seen = set()
     for status in source_statuses:
@@ -1338,11 +1747,13 @@ def _display_metrics_sources(metrics: Dict[str, Any], language: str) -> Dict[str
         techniques = []
         for technique in tactic_row.get("techniques", []) or []:
             technique_row = dict(technique)
-            technique_row["sources"] = sorted({
-                _display_source_name(source, language)
-                for source in technique_row.get("sources", []) or []
-                if source
-            })
+            technique_row["sources"] = sorted(
+                {
+                    _display_source_name(source, language)
+                    for source in technique_row.get("sources", []) or []
+                    if source
+                }
+            )
             examples = []
             for example in technique_row.get("examples", []) or []:
                 example_row = dict(example)
@@ -1358,7 +1769,9 @@ def _display_metrics_sources(metrics: Dict[str, Any], language: str) -> Dict[str
     return output
 
 
-def _display_vulnerability_intelligence(value: Dict[str, Any], language: str = "es") -> Dict[str, Any]:
+def _display_vulnerability_intelligence(
+    value: Dict[str, Any], language: str = "es"
+) -> Dict[str, Any]:
     output = dict(value or {})
     rows = []
     for row in output.get("rows", []) or []:
@@ -1375,7 +1788,9 @@ def _display_vulnerability_intelligence(value: Dict[str, Any], language: str = "
             1 if language == "en" else 0
         ]
         if language == "en":
-            row_data["status"] = REPORT_TRANSLATIONS_EN.get(str(row_data.get("status") or ""), row_data.get("status") or "")
+            row_data["status"] = REPORT_TRANSLATIONS_EN.get(
+                str(row_data.get("status") or ""), row_data.get("status") or ""
+            )
             row_data["decision"] = REPORT_TRANSLATIONS_EN.get(
                 str(row_data.get("decision") or ""),
                 row_data.get("decision") or "",
@@ -1601,7 +2016,16 @@ REPORT_TRANSLATIONS_EN = {
 RECOMMENDATION_LIBRARY = [
     {
         "area": "strategic",
-        "triggers": ["critical", "critico", "crítico", "residual", "kev", "ransomware", "fraude", "fraud"],
+        "triggers": [
+            "critical",
+            "critico",
+            "crítico",
+            "residual",
+            "kev",
+            "ransomware",
+            "fraude",
+            "fraud",
+        ],
         "title_es": "Umbrales ejecutivos de escalamiento",
         "title_en": "Executive escalation thresholds",
         "action_es": "Definir umbrales por riesgo residual, KEV expuesto, fraude y continuidad para activar comité ejecutivo en 24-72 horas.",
@@ -1671,7 +2095,17 @@ RECOMMENDATION_LIBRARY = [
     },
     {
         "area": "compliance",
-        "triggers": ["nist", "iso", "soc2", "pci", "gdpr", "cumplimiento", "compliance", "privacy", "privacidad"],
+        "triggers": [
+            "nist",
+            "iso",
+            "soc2",
+            "pci",
+            "gdpr",
+            "cumplimiento",
+            "compliance",
+            "privacy",
+            "privacidad",
+        ],
         "title_es": "Repositorio de evidencia regulatoria",
         "title_en": "Regulatory evidence repository",
         "action_es": "Mantener evidencias por NIST, ISO 27001, SOC 2, PCI DSS y GDPR con owner, fecha, control, fuente y decisión.",
@@ -1825,10 +2259,16 @@ def _report_scope(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
     org = payload.get("organization", {})
     primary_domains = _clean_domain_list(org.get("primary_domains") or [])
     if not primary_domains:
-        primary_domains = _clean_domain_list([item for item in org.get("crown_jewels", []) if _looks_like_domain(item)])
+        primary_domains = _clean_domain_list(
+            [item for item in org.get("crown_jewels", []) if _looks_like_domain(item)]
+        )
     comparison_domains = _clean_domain_list(org.get("comparison_domains") or [])
     source_statuses = payload.get("source_statuses", [])
-    source_names = [_display_source_name(status.get("name", ""), language) for status in source_statuses if status.get("name")]
+    source_names = [
+        _display_source_name(status.get("name", ""), language)
+        for status in source_statuses
+        if status.get("name")
+    ]
     if comparison_domains:
         comparison_basis = (
             "Comparación contra dominios benchmark declarados por el usuario; los conteos reflejan menciones/resultados recolectados, no una afirmación de compromiso."
@@ -1845,7 +2285,12 @@ def _report_scope(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
         "primary_domains": primary_domains,
         "comparison_domains": comparison_domains,
         "comparison_basis": comparison_basis,
-        "analysis_window": f"{org.get('analysis_window', payload.get('analysis_window', '30d'))} / {org.get('lookback_hours', payload.get('lookback_hours', 720))}h",
+        "analysis_window": (
+            f"{org['analysis_start_date']} a {org['analysis_end_date']} (UTC, inclusive)"
+            if org.get("analysis_start_date") and org.get("analysis_end_date")
+            else f"{org.get('analysis_window', payload.get('analysis_window', '30d'))} / {org.get('lookback_hours', payload.get('lookback_hours', 720))}h"
+        ),
+        "analysis_period": payload.get("metrics", {}).get("analysis_period", {}),
         "event_count": len(payload.get("raw_events", [])),
         "risk_count": len(payload.get("risk_findings", [])),
         "source_count": len(source_statuses),
@@ -1860,18 +2305,31 @@ def _report_scope(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
 
 def _risk_digest(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
     findings = payload.get("risk_findings", [])
-    heat_rows = payload.get("metrics", {}).get("risk_heat_radar", {}).get("rows", [])
+    heat_rows = [
+        row
+        for row in payload.get("metrics", {}).get("risk_heat_radar", {}).get("rows", [])
+        if isinstance(row.get("score"), (int, float)) and row.get("value_status") != "no_data"
+    ]
     top_finding = max(findings, key=lambda item: item.get("residual_risk", 0), default={})
     top_heat = max(heat_rows, key=lambda item: item.get("score", 0), default={})
-    critical_count = sum(1 for item in findings if str(item.get("matrix_label", "")).lower() in {"critico", "crítico", "critical"} or item.get("matrix_score", 0) >= 12)
-    healthy_sources = sum(1 for status in payload.get("source_statuses", []) if _status_is_healthy(status))
+    critical_count = sum(
+        1
+        for item in findings
+        if str(item.get("matrix_label", "")).lower() in {"critico", "crítico", "critical"}
+        or item.get("matrix_score", 0) >= 12
+    )
+    healthy_sources = sum(
+        1 for status in payload.get("source_statuses", []) if _status_is_healthy(status)
+    )
     total_sources = len(payload.get("source_statuses", []))
     forecast = _forecast_snapshot(payload.get("metrics", {}))
     max_residual = float(top_finding.get("residual_risk", 0) or 0) if top_finding else None
     return {
-        "top_title": top_finding.get("title") or ("Sin hallazgos priorizados" if language == "es" else "No prioritized findings"),
+        "top_title": top_finding.get("title")
+        or ("Sin hallazgos priorizados" if language == "es" else "No prioritized findings"),
         "max_residual": max_residual,
-        "max_label": top_finding.get("matrix_label") or ("Sin datos" if language == "es" else "No data"),
+        "max_label": top_finding.get("matrix_label")
+        or ("Sin datos" if language == "es" else "No data"),
         "top_heat": top_heat.get("name") or ("sin datos" if language == "es" else "no data"),
         "top_heat_score": float(top_heat.get("score", 0) or 0) if top_heat else None,
         "critical_count": critical_count,
@@ -1883,15 +2341,35 @@ def _risk_digest(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
 def _domain_comparison_rows(payload: Dict[str, Any], language: str) -> list[Dict[str, Any]]:
     scope = payload.get("report_scope") or _report_scope(payload, language)
     rows = []
-    for role, domains in (("own", scope.get("primary_domains", [])), ("benchmark", scope.get("comparison_domains", []))):
+    for role, domains in (
+        ("own", scope.get("primary_domains", [])),
+        ("benchmark", scope.get("comparison_domains", [])),
+    ):
         for domain in domains:
-            matches = [event for event in payload.get("raw_events", []) if _event_matches_domain(event, domain)]
+            matches = [
+                event
+                for event in payload.get("raw_events", [])
+                if _event_matches_domain(event, domain)
+            ]
             rows.append(
                 {
-                    "role": "Propio" if role == "own" and language == "es" else "Own" if role == "own" else "Benchmark",
+                    "role": "Propio"
+                    if role == "own" and language == "es"
+                    else "Own"
+                    if role == "own"
+                    else "Benchmark",
                     "domain": domain,
                     "events": len(matches),
-                    "sources": ", ".join(sorted({_display_source_name(event.get("source", ""), language) for event in matches if event.get("source")})[:4]) or ("sin evidencia directa" if language == "es" else "no direct evidence"),
+                    "sources": ", ".join(
+                        sorted(
+                            {
+                                _display_source_name(event.get("source", ""), language)
+                                for event in matches
+                                if event.get("source")
+                            }
+                        )[:4]
+                    )
+                    or ("sin evidencia directa" if language == "es" else "no direct evidence"),
                     "categories": ", ".join(
                         sorted(
                             {
@@ -2052,6 +2530,30 @@ def _framework_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]
         "adversary": ("Comportamiento adversario", "Adversary behavior"),
     }
     evidence_mapping = payload.get("metrics", {}).get("framework_mapping", {}) or {}
+    catalog = []
+    for item in evidence_mapping.get("framework_catalog", []) or []:
+        status = str(item.get("status") or "no_data")
+        catalog.append(
+            {
+                "name": item.get("name") or "Framework",
+                "version": item.get("version") or "",
+                "domain": item.get("domain") or "",
+                "status": status,
+                "status_label": (
+                    "Respaldado por evidencia"
+                    if language == "es" and status == "evidence_backed"
+                    else "Sin datos aplicables"
+                    if language == "es"
+                    else "Evidence backed"
+                    if status == "evidence_backed"
+                    else "No applicable data"
+                ),
+                "mapping_count": int(item.get("mapping_count") or 0),
+                "record_count": int(item.get("record_count") or 0),
+                "reference_url": item.get("reference_url") or "",
+                "mapping_states": list(item.get("mapping_states") or []),
+            }
+        )
     mappings = []
     for row in evidence_mapping.get("mappings", []) or []:
         axis = str(row.get("axis") or "unmapped")
@@ -2077,22 +2579,15 @@ def _framework_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]
                 "direct_count": int(row.get("direct_count") or 0),
                 "related_count": int(row.get("related_count") or 0),
                 "finding_count": int(row.get("finding_count") or 0),
+                "mapping_status": row.get("mapping_status") or "potentially_relevant",
                 "controls": list(row.get("controls") or []),
                 "domains": list(row.get("domains") or []),
-                "evidence_ids": [
-                    str(value)
-                    for value in row.get("evidence_ids", [])
-                    if value
-                ],
+                "evidence_ids": [str(value) for value in row.get("evidence_ids", []) if value],
                 "validated_evidence_ids": [
-                    str(value)
-                    for value in row.get("validated_evidence_ids", [])
-                    if value
+                    str(value) for value in row.get("validated_evidence_ids", []) if value
                 ],
                 "direct_relationship_evidence_ids": [
-                    str(value)
-                    for value in row.get("direct_relationship_evidence_ids", [])
-                    if value
+                    str(value) for value in row.get("direct_relationship_evidence_ids", []) if value
                 ],
                 "evidence": evidence_rows,
             }
@@ -2121,9 +2616,7 @@ def _framework_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]
             group["frameworks"].add(framework)
             group["controls"][framework] = list(mapping.get("controls") or [])
         group["evidence_ids"].update(mapping.get("evidence_ids") or [])
-        group["validated_evidence_ids"].update(
-            mapping.get("validated_evidence_ids") or []
-        )
+        group["validated_evidence_ids"].update(mapping.get("validated_evidence_ids") or [])
         group["direct_relationship_evidence_ids"].update(
             mapping.get("direct_relationship_evidence_ids") or []
         )
@@ -2157,8 +2650,7 @@ def _framework_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]
                 sum(
                     1
                     for evidence in evidence_rows
-                    if str(evidence.get("status") or "").lower()
-                    in {"validated", "confirmed"}
+                    if str(evidence.get("status") or "").lower() in {"validated", "confirmed"}
                 ),
                 group["fallback_validated_count"],
             )
@@ -2193,15 +2685,12 @@ def _framework_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]
             }
         )
     related_frameworks = sorted(
-        {
-            str(mapping.get("framework"))
-            for mapping in mappings
-            if mapping.get("framework")
-        }
+        {str(mapping.get("framework")) for mapping in mappings if mapping.get("framework")}
     )
     return {
         "scores": scores,
         "aspects": aspects,
+        "catalog": catalog,
         "mappings": mappings,
         "affected_axes": affected_axes,
         "related_frameworks": related_frameworks,
@@ -2281,7 +2770,15 @@ def _f3_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
 
 def _scenario_cards(payload: Dict[str, Any], language: str) -> list[Dict[str, Any]]:
     metrics = payload.get("metrics", {})
-    heat_rows = sorted(metrics.get("risk_heat_radar", {}).get("rows", []), key=lambda item: item.get("score", 0), reverse=True)
+    heat_rows = sorted(
+        (
+            row
+            for row in metrics.get("risk_heat_radar", {}).get("rows", [])
+            if isinstance(row.get("score"), (int, float)) and row.get("value_status") != "no_data"
+        ),
+        key=lambda item: item["score"],
+        reverse=True,
+    )
     forecast = _forecast_snapshot(metrics)
     cards = []
     for row in heat_rows[:5]:
@@ -2293,8 +2790,16 @@ def _scenario_cards(payload: Dict[str, Any], language: str) -> list[Dict[str, An
                 "heat": row.get("heat", "medium"),
                 "score_label": f"{float(row.get('score', 0) or 0) * 100:.0f}%",
                 "evidence": row.get("evidence_count", 0),
-                "signals": [_clean_evidence_text(str(signal), language) for signal in (row.get("signals", []) or [])[:3]],
-                "trigger": row.get("decision") or ("Revisar señales y asignar owner." if language == "es" else "Review signals and assign an owner."),
+                "signals": [
+                    _clean_evidence_text(str(signal), language)
+                    for signal in (row.get("signals", []) or [])[:3]
+                ],
+                "trigger": row.get("decision")
+                or (
+                    "Revisar señales y asignar owner."
+                    if language == "es"
+                    else "Review signals and assign an owner."
+                ),
                 "forecast": f"{forecast.get('horizon', 'n/a')}d base {forecast.get('base_label', 'n/a')} / sensibilidad superior {forecast.get('upper_label', 'n/a')}",
                 "confidence": _scenario_confidence(row, language),
             }
@@ -2324,9 +2829,13 @@ def _scenario_library_digest(payload: Dict[str, Any], language: str) -> Dict[str
     framework_counts = _framework_coverage_from_matches(matches)
     math_model = library.get("math_model", {}) or {}
     model_text = math_model.get(language) or math_model.get("es") or math_model.get("en") or ""
-    formula = math_model.get("formula") or "ResidualRisk=100*sigmoid(z)*Impact*(1-ControlEffectiveness)"
+    formula = (
+        math_model.get("formula") or "ResidualRisk=100*sigmoid(z)*Impact*(1-ControlEffectiveness)"
+    )
     return {
-        "reference_template_count": sum(1 for item in scenarios if item.get("status") == "preventive_template"),
+        "reference_template_count": sum(
+            1 for item in scenarios if item.get("status") == "preventive_template"
+        ),
         "defined_count": 0,
         "executable_count": 0,
         "tested_count": 0,
@@ -2350,8 +2859,14 @@ def _domain_reading_rows(payload: Dict[str, Any], language: str) -> list[Dict[st
     rows = []
     scenario_matches = payload.get("scenario_library", {}).get("matches", [])
     for domain in domains:
-        events = [event for event in payload.get("raw_events", []) if _event_matches_domain(event, domain)]
-        findings = [finding for finding in payload.get("risk_findings", []) if _finding_matches_domain(finding, domain)]
+        events = [
+            event for event in payload.get("raw_events", []) if _event_matches_domain(event, domain)
+        ]
+        findings = [
+            finding
+            for finding in payload.get("risk_findings", [])
+            if _finding_matches_domain(finding, domain)
+        ]
         top_finding = max(findings, key=lambda item: item.get("residual_risk", 0), default={})
         domain_matches = [match for match in scenario_matches if domain in match.get("domains", [])]
         top_event = max(events, key=lambda item: item.get("severity", 0), default={})
@@ -2360,9 +2875,21 @@ def _domain_reading_rows(payload: Dict[str, Any], language: str) -> list[Dict[st
                 "domain": domain,
                 "events": len(events),
                 "scenarios": len(domain_matches),
-                "risk": f"{float(top_finding.get('residual_risk', 0) or 0):.1f}" if top_finding else ("sin evidencia directa" if language == "es" else "no direct evidence"),
-                "signal": _clean_evidence_text(top_event.get("title")) or ("sin señal directa" if language == "es" else "no direct signal"),
-                "sources": ", ".join(sorted({_display_source_name(event.get("source", ""), language) for event in events if event.get("source")})[:4]) or ("sin fuente directa" if language == "es" else "no direct source"),
+                "risk": f"{float(top_finding.get('residual_risk', 0) or 0):.1f}"
+                if top_finding
+                else ("sin evidencia directa" if language == "es" else "no direct evidence"),
+                "signal": _clean_evidence_text(top_event.get("title"))
+                or ("sin señal directa" if language == "es" else "no direct signal"),
+                "sources": ", ".join(
+                    sorted(
+                        {
+                            _display_source_name(event.get("source", ""), language)
+                            for event in events
+                            if event.get("source")
+                        }
+                    )[:4]
+                )
+                or ("sin fuente directa" if language == "es" else "no direct source"),
             }
         )
     if not rows:
@@ -2379,7 +2906,8 @@ def _domain_reading_rows(payload: Dict[str, Any], language: str) -> list[Dict[st
                     else ("sin cálculo" if language == "es" else "not calculated")
                 ),
                 "signal": _clean_evidence_text(digest.get("top_title")),
-                "sources": ", ".join(scope.get("source_names", [])[:4]) or ("sin fuentes" if language == "es" else "no sources"),
+                "sources": ", ".join(scope.get("source_names", [])[:4])
+                or ("sin fuentes" if language == "es" else "no sources"),
             }
         )
     return rows
@@ -2398,13 +2926,19 @@ def _attack_surface_inventory(payload: Dict[str, Any], language: str) -> Dict[st
         for event in domain_events:
             category = str(event.get("category") or "")
             tags = event.get("tags") or []
-            host = _tag_value(tags, "host") or _tag_value(tags, "asset") or _host_from_url(str(event.get("evidence_url") or ""))
+            host = (
+                _tag_value(tags, "host")
+                or _tag_value(tags, "asset")
+                or _host_from_url(str(event.get("evidence_url") or ""))
+            )
             if category == "attack_surface_dns":
                 subdomains.append(
                     {
                         "host": host or _clean_evidence_text(event.get("title", ""), language),
                         "severity": _event_severity_label(event, language),
-                        "status": "Inventario DNS; validar servicio activo" if language == "es" else "DNS inventory; validate active service",
+                        "status": "Inventario DNS; validar servicio activo"
+                        if language == "es"
+                        else "DNS inventory; validate active service",
                         "note": _surface_note(event, language),
                     }
                 )
@@ -2453,7 +2987,14 @@ def _executive_alert_rows(payload: Dict[str, Any], language: str) -> list[Dict[s
     for finding in payload.get("top_findings", [])[:8]:
         evidence = [str(item) for item in finding.get("evidence", []) or []]
         urls = [_public_evidence_url(item) for item in evidence if item.startswith("http")]
-        rationale = next((item for item in evidence if "Base de criticidad" in item or "Criticality basis" in item), "")
+        rationale = next(
+            (
+                item
+                for item in evidence
+                if "Base de criticidad" in item or "Criticality basis" in item
+            ),
+            "",
+        )
         residual = float(finding.get("residual_risk", 0) or 0)
         alerts.append(
             {
@@ -2484,20 +3025,28 @@ def _evidence_preview_gallery(events: list[Dict[str, Any]], language: str) -> li
                     "url": _public_evidence_url(raw_url),
                     "preview_url": preview,
                     "relationship": _evidence_relationship(event, language),
-                    "validation": _evidence_validation(event, raw_url, _public_evidence_url(raw_url), language),
-                    "capture_timestamp": capture.get("capture_timestamp") or capture.get("captureTimestamp"),
+                    "validation": _evidence_validation(
+                        event, raw_url, _public_evidence_url(raw_url), language
+                    ),
+                    "capture_timestamp": capture.get("capture_timestamp")
+                    or capture.get("captureTimestamp"),
                     "screenshot_id": capture.get("screenshot_id") or capture.get("screenshotId"),
                     "run_id": capture.get("run_id") or capture.get("runId"),
                     "evidence_id": capture.get("evidence_id") or capture.get("evidenceId"),
                     "source_id": capture.get("source_id") or capture.get("sourceId"),
                     "image_hash": capture.get("image_hash") or capture.get("imageHash"),
-                    "image_size_bytes": capture.get("image_size_bytes") or capture.get("imageSizeBytes"),
+                    "image_size_bytes": capture.get("image_size_bytes")
+                    or capture.get("imageSizeBytes"),
                     "capture_type": capture.get("capture_type") or capture.get("captureType"),
                     "dimensions": capture.get("dimensions") or {},
                     "browser_engine": capture.get("browser_engine") or capture.get("browserEngine"),
-                    "browser_engine_version": capture.get("browser_engine_version") or capture.get("browserEngineVersion"),
-                    "validation_status": capture.get("validation_status") or capture.get("validationStatus"),
-                    "redaction_applied": bool(capture.get("redaction_applied") or capture.get("redactionApplied")),
+                    "browser_engine_version": capture.get("browser_engine_version")
+                    or capture.get("browserEngineVersion"),
+                    "validation_status": capture.get("validation_status")
+                    or capture.get("validationStatus"),
+                    "redaction_applied": bool(
+                        capture.get("redaction_applied") or capture.get("redactionApplied")
+                    ),
                 }
             )
             if len(gallery) >= 12:
@@ -2545,8 +3094,12 @@ def _disinformation_summary(payload: Dict[str, Any], language: str) -> Dict[str,
         "tactic_counts": tactic_counts,
         "active_evidence": active_count,
         "candidate_evidence": len(candidate_rows),
-        "review_evidence": sum(1 for claim in claims if claim.get("status") in {"candidate", "under_review"}),
-        "supported_evidence": sum(1 for claim in claims if claim.get("status") in {"supported", "validated", "confirmed"}),
+        "review_evidence": sum(
+            1 for claim in claims if claim.get("status") in {"candidate", "under_review"}
+        ),
+        "supported_evidence": sum(
+            1 for claim in claims if claim.get("status") in {"supported", "validated", "confirmed"}
+        ),
         "activation_status": "activated" if activated else "preventive_reference",
         "active_rows": active_rows[:10],
         "all_rows": candidate_rows[:30],
@@ -2556,15 +3109,27 @@ def _disinformation_summary(payload: Dict[str, Any], language: str) -> Dict[str,
 
 def _active_disarm_tactic_counts(rows: list[Dict[str, Any]], language: str) -> list[Dict[str, Any]]:
     labels = {
-        "narrative": "Narrative trust pressure" if language == "en" else "Presion sobre confianza narrativa",
-        "amplification": "Coordinated amplification" if language == "en" else "Amplificacion coordinada",
-        "manipulation": "Influence manipulation" if language == "en" else "Manipulacion de influencia",
+        "narrative": "Narrative trust pressure"
+        if language == "en"
+        else "Presion sobre confianza narrativa",
+        "amplification": "Coordinated amplification"
+        if language == "en"
+        else "Amplificacion coordinada",
+        "manipulation": "Influence manipulation"
+        if language == "en"
+        else "Manipulacion de influencia",
         "reputation": "Brand deception signal" if language == "en" else "Senal de engano de marca",
     }
     counts = {key: 0 for key in labels}
     for row in rows:
-        text = _normalize(" ".join([str(row.get("title", "")), str(row.get("tags", "")), str(row.get("category", ""))]))
-        if _text_has_any(text, ("desinform", "disinform", "misinform", "fake", "rumor", "narrative", "narrativa")):
+        text = _normalize(
+            " ".join(
+                [str(row.get("title", "")), str(row.get("tags", "")), str(row.get("category", ""))]
+            )
+        )
+        if _text_has_any(
+            text, ("desinform", "disinform", "misinform", "fake", "rumor", "narrative", "narrativa")
+        ):
             counts["narrative"] += 1
         if _text_has_any(text, ("bot", "coordin", "viral", "meme", "amplif")):
             counts["amplification"] += 1
@@ -2581,26 +3146,68 @@ def _intelligence_modules(payload: Dict[str, Any], language: str) -> list[Dict[s
     scope_events = payload.get("scope_events") or _scope_filtered_events(payload, language)
     osint_records = _source_record_count(source_coverage, "osint")
     socmint_records = _source_record_count(source_coverage, "socmint")
-    socmint_related = int((source_coverage.get("socmint", {}) or {}).get("related_public_records", 0) or 0)
+    socmint_related = int(
+        (source_coverage.get("socmint", {}) or {}).get("related_public_records", 0) or 0
+    )
     darkweb_records = _source_record_count(source_coverage, "darkweb")
     disinfo = payload.get("disinformation_summary") or _disinformation_summary(payload, language)
-    scenario_library = payload.get("scenario_library") or _scenario_library_digest(payload, language)
+    scenario_library = payload.get("scenario_library") or _scenario_library_digest(
+        payload, language
+    )
     surface_count = _count_events_by_keywords(
         scope_events,
-        ("whois", "rdap", "dns", "tls", "ssl", "certificate", "certificado", "dmarc", "spf", "dkim", "easm", "surface", "subdomain", "dominio"),
+        (
+            "whois",
+            "rdap",
+            "dns",
+            "tls",
+            "ssl",
+            "certificate",
+            "certificado",
+            "dmarc",
+            "spf",
+            "dkim",
+            "easm",
+            "surface",
+            "subdomain",
+            "dominio",
+        ),
     )
     brand_fraud_count = _count_events_by_keywords(
         scope_events,
-        ("fraud", "fraude", "phishing", "smishing", "suplant", "imperson", "brand", "marca", "bec", "payment", "pago"),
+        (
+            "fraud",
+            "fraude",
+            "phishing",
+            "smishing",
+            "suplant",
+            "imperson",
+            "brand",
+            "marca",
+            "bec",
+            "payment",
+            "pago",
+        ),
     )
-    framework_count = len((payload.get("framework_summary") or _framework_summary(payload, language)).get("scores", []))
+    framework_count = len(
+        (payload.get("framework_summary") or _framework_summary(payload, language)).get(
+            "scores", []
+        )
+    )
     labels = {
         "active": "Con evidencia" if language == "es" else "Evidence found",
         "quiet": "Sin evidencia activa" if language == "es" else "No active evidence",
         "reference": "Referencia de modelo" if language == "es" else "Model reference",
     }
 
-    def card(title: str, value: int | float | str, unit: str, decision: str, detail: str, tone: str = "active") -> Dict[str, Any]:
+    def card(
+        title: str,
+        value: int | float | str,
+        unit: str,
+        decision: str,
+        detail: str,
+        tone: str = "active",
+    ) -> Dict[str, Any]:
         return {
             "title": title,
             "value": value,
@@ -2613,24 +3220,136 @@ def _intelligence_modules(payload: Dict[str, Any], language: str) -> list[Dict[s
 
     if language == "en":
         return [
-            card("OSINT", osint_records, "records", "Use collected URLs, news, advisories and public indexes as the first evidence layer.", "Open-source collection is passive and traceable.", "active" if osint_records else "quiet"),
-            card("SOCMINT", socmint_records + socmint_related, "public signals", "Escalate only aggregated, authorized public mentions tied to fraud, brand or trust.", "No private social collection is assumed.", "active" if socmint_records + socmint_related else "quiet"),
-            card("Dark Web", darkweb_records, "records", "Treat as authorized metadata; rotate or hunt only when evidence is redacted, attributable and in scope.", "No direct private-market assertion is made.", "active" if darkweb_records else "quiet"),
-            card("Disinformation", disinfo["active_evidence"], "signals", "Separate narrative, channel, audience and amplification before response.", f"DISARM reference loaded: {disinfo['techniques_count']} techniques.", "active" if disinfo["active_evidence"] else "quiet"),
-            card("Attack Surface", surface_count, "signals", "Use WHOIS/DNS/TLS/email-control evidence to prioritize verifiable closure.", "Domain evidence is kept separate from benchmark domains.", "active" if surface_count else "quiet"),
-            card("Brand and Fraud", f"{metrics.get('fraud_pressure', 0):.2f}", "pressure", "Connect phishing, impersonation, complaints and transaction monitoring.", f"{brand_fraud_count} brand/fraud-related signals.", "active" if brand_fraud_count or metrics.get("fraud_pressure", 0) else "quiet"),
-            card("Framework Mapping", framework_count, "frameworks", "Map actions to NIST, ISO, SOC 2, PCI, GDPR, ATT&CK and D3FEND evidence.", "Only declared coverage can become an auditable remediation item; this is not a compliance assessment.", "reference"),
-            card("Supported possibilities", scenario_library["active_count"], "current run", "Use supported possibilities as decision options, not as confirmed incidents.", "Only evidence-supported scenarios from the current run are presented.", "active" if scenario_library["active_count"] else "reference"),
+            card(
+                "OSINT",
+                osint_records,
+                "records",
+                "Use collected URLs, news, advisories and public indexes as the first evidence layer.",
+                "Open-source collection is passive and traceable.",
+                "active" if osint_records else "quiet",
+            ),
+            card(
+                "SOCMINT",
+                socmint_records + socmint_related,
+                "public signals",
+                "Escalate only aggregated, authorized public mentions tied to fraud, brand or trust.",
+                "No private social collection is assumed.",
+                "active" if socmint_records + socmint_related else "quiet",
+            ),
+            card(
+                "Dark Web",
+                darkweb_records,
+                "records",
+                "Treat as authorized metadata; rotate or hunt only when evidence is redacted, attributable and in scope.",
+                "No direct private-market assertion is made.",
+                "active" if darkweb_records else "quiet",
+            ),
+            card(
+                "Disinformation",
+                disinfo["active_evidence"],
+                "signals",
+                "Separate narrative, channel, audience and amplification before response.",
+                f"DISARM reference loaded: {disinfo['techniques_count']} techniques.",
+                "active" if disinfo["active_evidence"] else "quiet",
+            ),
+            card(
+                "Attack Surface",
+                surface_count,
+                "signals",
+                "Use WHOIS/DNS/TLS/email-control evidence to prioritize verifiable closure.",
+                "Domain evidence is kept separate from benchmark domains.",
+                "active" if surface_count else "quiet",
+            ),
+            card(
+                "Brand and Fraud",
+                f"{metrics.get('fraud_pressure', 0):.2f}",
+                "pressure",
+                "Connect phishing, impersonation, complaints and transaction monitoring.",
+                f"{brand_fraud_count} brand/fraud-related signals.",
+                "active" if brand_fraud_count or metrics.get("fraud_pressure", 0) else "quiet",
+            ),
+            card(
+                "Framework Mapping",
+                framework_count,
+                "frameworks",
+                "Map actions to NIST, ISO, SOC 2, PCI, GDPR, ATT&CK and D3FEND evidence.",
+                "Only declared coverage can become an auditable remediation item; this is not a compliance assessment.",
+                "reference",
+            ),
+            card(
+                "Supported possibilities",
+                scenario_library["active_count"],
+                "current run",
+                "Use supported possibilities as decision options, not as confirmed incidents.",
+                "Only evidence-supported scenarios from the current run are presented.",
+                "active" if scenario_library["active_count"] else "reference",
+            ),
         ]
     return [
-        card("OSINT", osint_records, "registros", "Usar URLs, noticias, advisories e índices públicos como primera capa de evidencia.", "Recolección abierta, pasiva y trazable.", "active" if osint_records else "quiet"),
-        card("SOCMINT", socmint_records + socmint_related, "señales públicas", "Escalar solo menciones públicas agregadas y autorizadas ligadas a fraude, marca o confianza.", "No se asume recolección social privada.", "active" if socmint_records + socmint_related else "quiet"),
-        card("Dark Web", darkweb_records, "registros", "Tratar como metadatos autorizados; rotar o hacer hunting solo con evidencia redacted, atribuible y en alcance.", "No afirma presencia en mercados privados.", "active" if darkweb_records else "quiet"),
-        card("Desinformación", disinfo["active_evidence"], "señales", "Separar narrativa, canal, audiencia y amplificación antes de responder.", f"Referencia DISARM cargada: {disinfo['techniques_count']} técnicas.", "active" if disinfo["active_evidence"] else "quiet"),
-        card("Superficie de ataque", surface_count, "señales", "Usar WHOIS/DNS/TLS/correo para priorizar cierres verificables.", "La evidencia propia se separa de dominios benchmark.", "active" if surface_count else "quiet"),
-        card("Marca y fraude", f"{metrics.get('fraud_pressure', 0):.2f}", "presión", "Conectar phishing, suplantación, reclamos y monitoreo transaccional.", f"{brand_fraud_count} señales asociadas a marca/fraude.", "active" if brand_fraud_count or metrics.get("fraud_pressure", 0) else "quiet"),
-        card("Mapeo de frameworks", framework_count, "marcos", "Mapear acciones a NIST, ISO, SOC 2, PCI, GDPR, ATT&CK y D3FEND.", "Solo la cobertura declarada puede pasar a remediación auditable; no es una evaluación de cumplimiento.", "reference"),
-        card("Posibilidades soportadas", scenario_library["active_count"], "corrida actual", "Usar posibilidades soportadas como opciones de decisión, no como incidentes confirmados.", "Solo se presentan escenarios de la corrida actual respaldados por evidencia.", "active" if scenario_library["active_count"] else "reference"),
+        card(
+            "OSINT",
+            osint_records,
+            "registros",
+            "Usar URLs, noticias, advisories e índices públicos como primera capa de evidencia.",
+            "Recolección abierta, pasiva y trazable.",
+            "active" if osint_records else "quiet",
+        ),
+        card(
+            "SOCMINT",
+            socmint_records + socmint_related,
+            "señales públicas",
+            "Escalar solo menciones públicas agregadas y autorizadas ligadas a fraude, marca o confianza.",
+            "No se asume recolección social privada.",
+            "active" if socmint_records + socmint_related else "quiet",
+        ),
+        card(
+            "Dark Web",
+            darkweb_records,
+            "registros",
+            "Tratar como metadatos autorizados; rotar o hacer hunting solo con evidencia redacted, atribuible y en alcance.",
+            "No afirma presencia en mercados privados.",
+            "active" if darkweb_records else "quiet",
+        ),
+        card(
+            "Desinformación",
+            disinfo["active_evidence"],
+            "señales",
+            "Separar narrativa, canal, audiencia y amplificación antes de responder.",
+            f"Referencia DISARM cargada: {disinfo['techniques_count']} técnicas.",
+            "active" if disinfo["active_evidence"] else "quiet",
+        ),
+        card(
+            "Superficie de ataque",
+            surface_count,
+            "señales",
+            "Usar WHOIS/DNS/TLS/correo para priorizar cierres verificables.",
+            "La evidencia propia se separa de dominios benchmark.",
+            "active" if surface_count else "quiet",
+        ),
+        card(
+            "Marca y fraude",
+            f"{metrics.get('fraud_pressure', 0):.2f}",
+            "presión",
+            "Conectar phishing, suplantación, reclamos y monitoreo transaccional.",
+            f"{brand_fraud_count} señales asociadas a marca/fraude.",
+            "active" if brand_fraud_count or metrics.get("fraud_pressure", 0) else "quiet",
+        ),
+        card(
+            "Mapeo de frameworks",
+            framework_count,
+            "marcos",
+            "Mapear acciones a NIST, ISO, SOC 2, PCI, GDPR, ATT&CK y D3FEND.",
+            "Solo la cobertura declarada puede pasar a remediación auditable; no es una evaluación de cumplimiento.",
+            "reference",
+        ),
+        card(
+            "Posibilidades soportadas",
+            scenario_library["active_count"],
+            "corrida actual",
+            "Usar posibilidades soportadas como opciones de decisión, no como incidentes confirmados.",
+            "Solo se presentan escenarios de la corrida actual respaldados por evidencia.",
+            "active" if scenario_library["active_count"] else "reference",
+        ),
     ]
 
 
@@ -2649,7 +3368,9 @@ def _model_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
         if method.status != "active" or method.methodId not in selected_ids:
             continue
         localized_name = method.name.en if language == "en" else method.name.es
-        localized_interpretation = method.interpretation.en if language == "en" else method.interpretation.es
+        localized_interpretation = (
+            method.interpretation.en if language == "en" else method.interpretation.es
+        )
         brief_models.append(
             {
                 "method_id": method.methodId,
@@ -2659,15 +3380,23 @@ def _model_summary(payload: Dict[str, Any], language: str) -> Dict[str, Any]:
             }
         )
     return {
-        "purpose": metrics.get("risk_methodology", {}).get("purpose", "Risk model" if language == "en" else "Modelo de riesgo"),
+        "purpose": metrics.get("risk_methodology", {}).get(
+            "purpose", "Risk model" if language == "en" else "Modelo de riesgo"
+        ),
         "registry_version": registry.registryVersion,
         "brief_models": brief_models,
         # Formulas remain available only through the admin methodology registry, not reports.
         "formulas": [],
         "assumptions": [
-            "No unavailable source is filled with invented evidence." if language == "en" else "Las fuentes no disponibles no se rellenan con evidencia inventada.",
-            "Benchmark domains are context, not proof of compromise." if language == "en" else "Los dominios comparativos son contexto, no prueba de compromiso.",
-            "Findings preserve evidence references in the technical report and exports." if language == "en" else "Los hallazgos conservan referencias de evidencia en el informe técnico y los exportes.",
+            "No unavailable source is filled with invented evidence."
+            if language == "en"
+            else "Las fuentes no disponibles no se rellenan con evidencia inventada.",
+            "Benchmark domains are context, not proof of compromise."
+            if language == "en"
+            else "Los dominios comparativos son contexto, no prueba de compromiso.",
+            "Findings preserve evidence references in the technical report and exports."
+            if language == "en"
+            else "Los hallazgos conservan referencias de evidencia en el informe técnico y los exportes.",
         ],
     }
 
@@ -2678,7 +3407,12 @@ def _recommendation_catalog(payload: Dict[str, Any], language: str) -> Dict[str,
         "risk": {"label": "Riesgos" if language == "es" else "Risk", "items": []},
         "compliance": {"label": "Cumplimiento" if language == "es" else "Compliance", "items": []},
         "technical": {"label": "Técnica" if language == "es" else "Technical", "items": []},
-        "prediction": {"label": "Índice de presión de señales" if language == "es" else "Signal pressure index", "items": []},
+        "prediction": {
+            "label": "Índice de presión de señales"
+            if language == "es"
+            else "Signal pressure index",
+            "items": [],
+        },
     }
     area_by_framework = {
         "attack": "technical",
@@ -2723,15 +3457,20 @@ def _recommendation_catalog(payload: Dict[str, Any], language: str) -> Dict[str,
     return areas
 
 
-def _append_library_recommendation(areas: Dict[str, Any], item: Dict[str, Any], matches: list[str], language: str, seen: set) -> None:
+def _append_library_recommendation(
+    areas: Dict[str, Any], item: Dict[str, Any], matches: list[str], language: str, seen: set
+) -> None:
     key = (item["area"], item["title_en"])
     if key in seen or item["area"] not in areas:
         return
     basis = (
-        f"Seleccionada por señales: {', '.join(matches[:4])}." if matches and language == "es" else
-        f"Selected by signals: {', '.join(matches[:4])}." if matches else
-        "Opción preventiva del catálogo interno; validar pertinencia con el owner." if language == "es" else
-        "Preventive option from the internal catalog; validate relevance with the owner."
+        f"Seleccionada por señales: {', '.join(matches[:4])}."
+        if matches and language == "es"
+        else f"Selected by signals: {', '.join(matches[:4])}."
+        if matches
+        else "Opción preventiva del catálogo interno; validar pertinencia con el owner."
+        if language == "es"
+        else "Preventive option from the internal catalog; validate relevance with the owner."
     )
     areas[item["area"]]["items"].append(
         {
@@ -2739,7 +3478,9 @@ def _append_library_recommendation(areas: Dict[str, Any], item: Dict[str, Any], 
             "action": item["action_en"] if language == "en" else item["action_es"],
             "owner": item["owner_en"] if language == "en" else item["owner_es"],
             "basis": basis,
-            "priority": ("Alta" if language == "es" else "High") if matches else ("Media" if language == "es" else "Medium"),
+            "priority": ("Alta" if language == "es" else "High")
+            if matches
+            else ("Media" if language == "es" else "Medium"),
         }
     )
     seen.add(key)
@@ -2765,20 +3506,37 @@ def _local_scenario_library() -> Dict[str, Any]:
 def _local_disarm_framework() -> Dict[str, Any]:
     path = PROJECT_ROOT / "data" / "frameworks" / "disarm_observable.json"
     if not path.exists():
-        return {"source": "DISARM Foundation", "source_url": None, "tactics": [], "techniques": [], "tactic_counts": []}
+        return {
+            "source": "DISARM Foundation",
+            "source_url": None,
+            "tactics": [],
+            "techniques": [],
+            "tactic_counts": [],
+        }
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {"source": "DISARM Foundation", "source_url": None, "tactics": [], "techniques": [], "tactic_counts": []}
+        return {
+            "source": "DISARM Foundation",
+            "source_url": None,
+            "tactics": [],
+            "techniques": [],
+            "tactic_counts": [],
+        }
     tactic_counts: Dict[str, int] = {}
     for technique in payload.get("techniques", []) or []:
         tactic = technique.get("tactic") or "Unmapped"
         tactic_counts[tactic] = tactic_counts.get(tactic, 0) + 1
-    payload["tactic_counts"] = [{"name": name, "value": value} for name, value in sorted(tactic_counts.items(), key=lambda item: item[1], reverse=True)]
+    payload["tactic_counts"] = [
+        {"name": name, "value": value}
+        for name, value in sorted(tactic_counts.items(), key=lambda item: item[1], reverse=True)
+    ]
     return payload
 
 
-def _build_report_scenario_matches(scenarios: list[Dict[str, Any]], payload: Dict[str, Any], language: str) -> list[Dict[str, Any]]:
+def _build_report_scenario_matches(
+    scenarios: list[Dict[str, Any]], payload: Dict[str, Any], language: str
+) -> list[Dict[str, Any]]:
     evidence = _scenario_evidence_signals(payload)
     if not scenarios or not evidence:
         return []
@@ -2814,7 +3572,9 @@ def _build_report_scenario_matches(scenarios: list[Dict[str, Any]], payload: Dic
 
 def _scenario_evidence_signals(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
     language = _report_language(payload)
-    domains = (payload.get("report_scope") or _report_scope(payload, language)).get("primary_domains", [])
+    domains = (payload.get("report_scope") or _report_scope(payload, language)).get(
+        "primary_domains", []
+    )
     signals = []
     events = payload.get("scope_events") or _scope_filtered_events(payload, language)
     for event in events[:160]:
@@ -2840,14 +3600,34 @@ def _scenario_evidence_signals(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
                 "domains": _domains_in_text(text, domains),
                 "tokens": _tokenize(text),
                 "evidence_status": evidence_status,
-                "confidence_score": float(event.get("confidence_score", event.get("confidence", 0)) or 0),
-                "attack_mapping_status": event.get("attack_mapping_status", "potentially_relevant_technique"),
+                "confidence_score": float(
+                    event.get("confidence_score", event.get("confidence", 0)) or 0
+                ),
+                "attack_mapping_status": event.get(
+                    "attack_mapping_status", "potentially_relevant_technique"
+                ),
                 "disarm_signal": bool(
-                    tags.intersection({"disarm_signal", "narrative_manipulation", "coordinated_amplification", "influence_operation"})
+                    tags.intersection(
+                        {
+                            "disarm_signal",
+                            "narrative_manipulation",
+                            "coordinated_amplification",
+                            "influence_operation",
+                        }
+                    )
                     or event.get("category") in {"disinformation", "narrative_manipulation"}
                 ),
                 "atlas_signal": bool(
-                    tags.intersection({"atlas_signal", "ai_asset", "ai_model", "ai_agent", "prompt_injection", "model_supply_chain"})
+                    tags.intersection(
+                        {
+                            "atlas_signal",
+                            "ai_asset",
+                            "ai_model",
+                            "ai_agent",
+                            "prompt_injection",
+                            "model_supply_chain",
+                        }
+                    )
                     or event.get("category") in {"ai_security", "ai_model_exposure"}
                 ),
                 "f3_signal": bool(f3_ids),
@@ -2911,18 +3691,24 @@ def _score_report_scenario(
         primary_framework = "attack"
         matched = attack_matches
         reasons.add(f"ATT&CK {attack.get('id')}")
-    elif len(disarm_matches) >= 2 and len(
-        {
-            source
-            for signal in disarm_matches
-            for source in (signal.get("source_refs", []) or [signal.get("source")])
-            if source
-        }
-    ) >= 2:
+    elif (
+        len(disarm_matches) >= 2
+        and len(
+            {
+                source
+                for signal in disarm_matches
+                for source in (signal.get("source_refs", []) or [signal.get("source")])
+                if source
+            }
+        )
+        >= 2
+    ):
         primary_framework = "disarm"
         matched = disarm_matches
         reasons.add(f"DISARM {disarm.get('id')}")
-    elif atlas_matches and any(float(signal.get("confidence_score", 0)) >= 0.65 for signal in atlas_matches):
+    elif atlas_matches and any(
+        float(signal.get("confidence_score", 0)) >= 0.65 for signal in atlas_matches
+    ):
         primary_framework = "atlas"
         matched = atlas_matches
         reasons.add(f"ATLAS {atlas.get('id')}")
@@ -2937,7 +3723,9 @@ def _score_report_scenario(
         else:
             matched_domains.add("__group__")
     evidence_count = len(matched)
-    mean_confidence = sum(float(signal.get("confidence_score", 0)) for signal in matched) / evidence_count
+    mean_confidence = (
+        sum(float(signal.get("confidence_score", 0)) for signal in matched) / evidence_count
+    )
     score = evidence_count * 5 + mean_confidence * 100
     confidence = min(95, round(mean_confidence * 100))
     fallback = (
@@ -2970,9 +3758,21 @@ def _scenario_framework_ids(text: str, tags: set[str]) -> set[str]:
         )
         if match:
             identifiers.add(match.group(1).upper())
-    identifiers.update(match.group(0).upper() for match in re.finditer(r"\bAML\.TA\d{4}\b", text, re.IGNORECASE))
-    identifiers.update(match.group(1).upper() for match in re.finditer(r"\bDISARM\s*[:#-]?\s*(T\d{4}(?:\.\d{3})?)\b", text, re.IGNORECASE))
-    identifiers.update(match.group(1).upper() for match in re.finditer(r"\bF3\s*[:#-]?\s*(F\d{4}(?:\.\d{3})?|FA\d{4}|T\d{4}(?:\.\d{3})?)\b", text, re.IGNORECASE))
+    identifiers.update(
+        match.group(0).upper() for match in re.finditer(r"\bAML\.TA\d{4}\b", text, re.IGNORECASE)
+    )
+    identifiers.update(
+        match.group(1).upper()
+        for match in re.finditer(r"\bDISARM\s*[:#-]?\s*(T\d{4}(?:\.\d{3})?)\b", text, re.IGNORECASE)
+    )
+    identifiers.update(
+        match.group(1).upper()
+        for match in re.finditer(
+            r"\bF3\s*[:#-]?\s*(F\d{4}(?:\.\d{3})?|FA\d{4}|T\d{4}(?:\.\d{3})?)\b",
+            text,
+            re.IGNORECASE,
+        )
+    )
     return identifiers
 
 
@@ -2980,7 +3780,9 @@ def _scenario_match_view(match: Dict[str, Any], language: str) -> Dict[str, Any]
     scenario = match.get("scenario", {})
     lens = _scenario_decision_lens(match, language)
     frameworks = scenario.get("frameworks", {}) or {}
-    recommendation = scenario.get("recommendation_en" if language == "en" else "recommendation_es") or ""
+    recommendation = (
+        scenario.get("recommendation_en" if language == "en" else "recommendation_es") or ""
+    )
     evidence_count = int(match.get("evidence_count", 0) or 0)
     reasons = match.get("reasons", []) or []
     return {
@@ -2991,9 +3793,13 @@ def _scenario_match_view(match: Dict[str, Any], language: str) -> Dict[str, Any]
         "evidence_count": evidence_count,
         "evidence_label": _scenario_evidence_label(evidence_count, reasons, language),
         "domains": match.get("domains", []),
-        "domains_label": _format_match_domains(match.get("domains", []), "grupo general" if language == "es" else "overall group"),
+        "domains_label": _format_match_domains(
+            match.get("domains", []), "grupo general" if language == "es" else "overall group"
+        ),
         "reasons": reasons,
-        "reasons_label": ", ".join(reasons[:4]) if reasons else ("sin criterio visible" if language == "es" else "no visible criterion"),
+        "reasons_label": ", ".join(reasons[:4])
+        if reasons
+        else ("sin criterio visible" if language == "es" else "no visible criterion"),
         "primary_framework": match.get("primary_framework", "attack"),
         "frameworks": {
             "attack": _framework_label(frameworks.get("attack", {}) or {}),
@@ -3025,7 +3831,13 @@ def _scenario_evidence_label(evidence_count: int, reasons: list[str], language: 
 
 def _framework_coverage_from_matches(matches: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
     sets = {"attack": set(), "d3fend": set(), "atlas": set(), "disarm": set(), "f3": set()}
-    labels = {"attack": "ATT&CK", "d3fend": "D3FEND", "atlas": "ATLAS", "disarm": "DISARM", "f3": "F3"}
+    labels = {
+        "attack": "ATT&CK",
+        "d3fend": "D3FEND",
+        "atlas": "ATLAS",
+        "disarm": "DISARM",
+        "f3": "F3",
+    }
     for match in matches:
         frameworks = match.get("scenario", {}).get("frameworks", {}) or {}
         for key in sets:
@@ -3105,7 +3917,9 @@ def _scenario_decision_lens(match: Dict[str, Any], language: str) -> Dict[str, s
     family = _scenario_family(match)
     scenario = match.get("scenario", {})
     frameworks = scenario.get("frameworks", {}) or {}
-    primary_domain = _format_match_domains(match.get("domains", []), "grupo general" if language == "es" else "overall group")
+    primary_domain = _format_match_domains(
+        match.get("domains", []), "grupo general" if language == "es" else "overall group"
+    )
     attack = _framework_label(frameworks.get("attack", {}) or {})
     control = _framework_label(frameworks.get("d3fend", {}) or {})
     atlas = _framework_label(frameworks.get("atlas", {}) or {})
@@ -3192,7 +4006,9 @@ def _scenario_decision_lens(match: Dict[str, Any], language: str) -> Dict[str, s
 
 
 def _framework_label(item: Dict[str, Any]) -> str:
-    return " ".join(str(part) for part in [item.get("id"), item.get("name")] if part).strip() or "n/a"
+    return (
+        " ".join(str(part) for part in [item.get("id"), item.get("name")] if part).strip() or "n/a"
+    )
 
 
 def _format_scenario_risk(value: Any, language: str) -> str:
@@ -3236,7 +4052,9 @@ def _category_terms(category: str, title: str) -> list[str]:
 
 
 def _tokenize(text: str) -> set[str]:
-    return {_stem_token(token) for token in re.split(r"[^a-z0-9]+", _normalize(text)) if len(token) > 2}
+    return {
+        _stem_token(token) for token in re.split(r"[^a-z0-9]+", _normalize(text)) if len(token) > 2
+    }
 
 
 def _stem_token(token: str) -> str:
@@ -3390,7 +4208,11 @@ def _surface_note(event: Dict[str, Any], language: str) -> str:
             else "It does not raise criticality by itself; confirm active service, exposed data or weak control."
         )
     if "validation_required" in tags:
-        return "Requiere validación manual/técnica antes de acción." if language == "es" else "Requires manual/technical validation before action."
+        return (
+            "Requiere validación manual/técnica antes de acción."
+            if language == "es"
+            else "Requires manual/technical validation before action."
+        )
     return "Evidencia técnica observada." if language == "es" else "Observed technical evidence."
 
 
@@ -3399,16 +4221,26 @@ def _event_validation_state(event: Dict[str, Any], language: str) -> str:
     if tags.intersection({"validation_required", "reputation_checker", "dns_inventory_only"}):
         return "Validación requerida" if language == "es" else "Validation required"
     if event.get("evidence_url") or float(event.get("severity", 0) or 0) >= 0.55:
-        return "Validada por evidencia técnica" if language == "es" else "Validated by technical evidence"
+        return (
+            "Validada por evidencia técnica"
+            if language == "es"
+            else "Validated by technical evidence"
+        )
     return "Contextual" if language == "es" else "Contextual"
 
 
-def _finding_validation_label(finding: Dict[str, Any], urls: list[str], rationale: str, language: str) -> str:
+def _finding_validation_label(
+    finding: Dict[str, Any], urls: list[str], rationale: str, language: str
+) -> str:
     evidence_text = " ".join(str(item) for item in finding.get("evidence", []) or []).lower()
     if "validation_required" in evidence_text or "reputation_checker" in evidence_text:
         return "Requiere validación" if language == "es" else "Requires validation"
     if urls and rationale:
-        return "Validada con URL y base técnica" if language == "es" else "Validated with URL and technical basis"
+        return (
+            "Validada con URL y base técnica"
+            if language == "es"
+            else "Validated with URL and technical basis"
+        )
     if rationale:
         return "Validada por base técnica" if language == "es" else "Validated by technical basis"
     if urls:
@@ -3420,11 +4252,17 @@ def _fallback_alert_basis(finding: Dict[str, Any], language: str) -> str:
     recommendations = finding.get("recommendations", []) or []
     if recommendations:
         return (
-            "Prioridad inferida por riesgo residual y recomendaciones asociadas: " + "; ".join(str(item) for item in recommendations[:2])
+            "Prioridad inferida por riesgo residual y recomendaciones asociadas: "
+            + "; ".join(str(item) for item in recommendations[:2])
             if language == "es"
-            else "Priority inferred from residual risk and associated recommendations: " + "; ".join(str(item) for item in recommendations[:2])
+            else "Priority inferred from residual risk and associated recommendations: "
+            + "; ".join(str(item) for item in recommendations[:2])
         )
-    return "Prioridad inferida por matriz de riesgo residual." if language == "es" else "Priority inferred from residual-risk matrix."
+    return (
+        "Prioridad inferida por matriz de riesgo residual."
+        if language == "es"
+        else "Priority inferred from residual-risk matrix."
+    )
 
 
 def _scope_filtered_events(payload: Dict[str, Any], language: str) -> list[Dict[str, Any]]:
@@ -3460,8 +4298,22 @@ def _scope_terms_for_payload(payload: Dict[str, Any], language: str) -> list[str
     org_name = str(organization.get("name", "") or "").strip().lower()
     if org_name and not org_name.startswith("domain intelligence:") and len(org_name) >= 4:
         add_term(org_name)
-        legal_suffixes = {"ag", "corp", "corporation", "inc", "incorporated", "ltd", "limited", "llc", "plc", "sa", "sas"}
-        without_suffix = " ".join(part for part in org_name.replace(",", " ").split() if part not in legal_suffixes)
+        legal_suffixes = {
+            "ag",
+            "corp",
+            "corporation",
+            "inc",
+            "incorporated",
+            "ltd",
+            "limited",
+            "llc",
+            "plc",
+            "sa",
+            "sas",
+        }
+        without_suffix = " ".join(
+            part for part in org_name.replace(",", " ").split() if part not in legal_suffixes
+        )
         if without_suffix != org_name:
             add_term(without_suffix)
     for field in (
@@ -3506,19 +4358,41 @@ def _event_matches_scope_terms(event: Dict[str, Any], terms: list[str]) -> bool:
 def _payload_signal_text(payload: Dict[str, Any]) -> str:
     parts = []
     for event in payload.get("raw_events", []):
-        parts.extend([event.get("title", ""), event.get("category", ""), event.get("source", ""), " ".join(event.get("tags", []) or [])])
+        parts.extend(
+            [
+                event.get("title", ""),
+                event.get("category", ""),
+                event.get("source", ""),
+                " ".join(event.get("tags", []) or []),
+            ]
+        )
     for finding in payload.get("risk_findings", []):
-        parts.extend([finding.get("title", ""), finding.get("category", ""), finding.get("matrix_label", ""), " ".join(finding.get("evidence", []) or [])])
+        parts.extend(
+            [
+                finding.get("title", ""),
+                finding.get("category", ""),
+                finding.get("matrix_label", ""),
+                " ".join(finding.get("evidence", []) or []),
+            ]
+        )
     metrics = payload.get("metrics", {})
     for row in metrics.get("risk_heat_radar", {}).get("rows", []):
-        parts.extend([row.get("name", ""), row.get("heat", ""), " ".join(row.get("signals", []) or [])])
+        parts.extend(
+            [row.get("name", ""), row.get("heat", ""), " ".join(row.get("signals", []) or [])]
+        )
     return " ".join(str(part).lower() for part in parts if part)
 
 
 def _forecast_snapshot(metrics: Dict[str, Any]) -> Dict[str, Any]:
     forecast = metrics.get("forecast", {}) or {}
     if not forecast:
-        return {"horizon": "n/a", "lower_label": "n/a", "base_label": "n/a", "upper_label": "n/a", "calibrated": False}
+        return {
+            "horizon": "n/a",
+            "lower_label": "n/a",
+            "base_label": "n/a",
+            "upper_label": "n/a",
+            "calibrated": False,
+        }
     key = sorted(forecast.keys(), key=lambda item: int(item) if str(item).isdigit() else 0)[-1]
     item = forecast.get(key, {})
     return {
@@ -3550,7 +4424,10 @@ def _pct(value: Any) -> str:
 
 def _status_is_healthy(status: Dict[str, Any]) -> bool:
     status_text = str(status.get("status", "")).lower()
-    return status_text in {"ok", "healthy", "active", "completed", "searched", "configured"} or (status.get("records", 0) or 0) > 0
+    return (
+        status_text in {"ok", "healthy", "active", "completed", "searched", "configured"}
+        or (status.get("records", 0) or 0) > 0
+    )
 
 
 def _control_status(value: float, language: str) -> str:
@@ -3572,18 +4449,46 @@ def _priority_from_score(score: float, language: str) -> str:
 def _scenario_modality(name: str, language: str) -> str:
     lowered = name.lower()
     if any(token in lowered for token in ["fraud", "fraude", "phishing", "suplant"]):
-        return "Phishing, suplantación, ATO o fraude transaccional" if language == "es" else "Phishing, impersonation, ATO or transactional fraud"
+        return (
+            "Phishing, suplantación, ATO o fraude transaccional"
+            if language == "es"
+            else "Phishing, impersonation, ATO or transactional fraud"
+        )
     if any(token in lowered for token in ["ransomware", "continu"]):
-        return "Extorsión, cifrado, interrupción o presión reputacional" if language == "es" else "Extortion, encryption, disruption or reputation pressure"
+        return (
+            "Extorsión, cifrado, interrupción o presión reputacional"
+            if language == "es"
+            else "Extortion, encryption, disruption or reputation pressure"
+        )
     if any(token in lowered for token in ["vulner", "exploit", "kev", "cve"]):
-        return "Explotación de vulnerabilidad o servicio expuesto" if language == "es" else "Vulnerability or exposed-service exploitation"
+        return (
+            "Explotación de vulnerabilidad o servicio expuesto"
+            if language == "es"
+            else "Vulnerability or exposed-service exploitation"
+        )
     if any(token in lowered for token in ["cloud", "api", "devsecops"]):
-        return "Abuso de API, secretos, nube o pipeline" if language == "es" else "API, secret, cloud or pipeline abuse"
+        return (
+            "Abuso de API, secretos, nube o pipeline"
+            if language == "es"
+            else "API, secret, cloud or pipeline abuse"
+        )
     if any(token in lowered for token in ["tercer", "supplier", "supply"]):
-        return "Compromiso de proveedor o dependencia crítica" if language == "es" else "Supplier or critical-dependency compromise"
+        return (
+            "Compromiso de proveedor o dependencia crítica"
+            if language == "es"
+            else "Supplier or critical-dependency compromise"
+        )
     if any(token in lowered for token in ["datos", "privacy", "privacidad", "data"]):
-        return "Exposición de datos, privacidad o obligación regulatoria" if language == "es" else "Data exposure, privacy or regulatory obligation"
-    return "Escenario de presión cyber a validar con evidencia" if language == "es" else "Cyber-pressure scenario to validate with evidence"
+        return (
+            "Exposición de datos, privacidad o obligación regulatoria"
+            if language == "es"
+            else "Data exposure, privacy or regulatory obligation"
+        )
+    return (
+        "Escenario de presión cyber a validar con evidencia"
+        if language == "es"
+        else "Cyber-pressure scenario to validate with evidence"
+    )
 
 
 def _scenario_confidence(row: Dict[str, Any], language: str) -> str:
@@ -3603,7 +4508,8 @@ def _heatmap(findings: list[Dict[str, Any]]) -> list[list[Dict[str, Any]]]:
             count = sum(
                 1
                 for finding in findings
-                if _index(finding["likelihood"]) == likelihood and _index(finding["impact"]) == impact
+                if _index(finding["likelihood"]) == likelihood
+                and _index(finding["impact"]) == impact
             )
             score = likelihood * impact
             if score <= 3:
@@ -3626,11 +4532,24 @@ def _index(value: float) -> int:
 
 
 def _evidence_rows(events: list[Dict[str, Any]], language: str) -> list[Dict[str, Any]]:
-    rows = sorted(events, key=lambda item: (item.get("source") or "", item.get("category") or "", item.get("title") or ""))
-    return [_search_row(row, language) | {
-        "technique": row.get("technique") or "",
-        "cve": row.get("cve") or "",
-    } for row in rows]
+    from cyberdeck.analysis.period import publication_date
+    rows = sorted(
+        events,
+        key=lambda item: (
+            item.get("source") or "",
+            item.get("category") or "",
+            item.get("title") or "",
+        ),
+    )
+    return [
+        _search_row(row, language)
+        | {
+            "technique": row.get("technique") or "",
+            "cve": row.get("cve") or "",
+            "published_date": str(publication_date(row) or ""),
+        }
+        for row in rows
+    ]
 
 
 def _evidence_type_summary(rows: list[Dict[str, Any]], language: str) -> list[Dict[str, Any]]:
@@ -3643,7 +4562,10 @@ def _evidence_type_summary(rows: list[Dict[str, Any]], language: str) -> list[Di
         "web_page": ("Páginas web", "Web pages"),
         "news": ("Noticias y comunicados", "News and releases"),
         "social_media": ("Redes sociales", "Social media"),
-        "technology_infrastructure": ("Tecnología e infraestructura", "Technology and infrastructure"),
+        "technology_infrastructure": (
+            "Tecnología e infraestructura",
+            "Technology and infrastructure",
+        ),
         "official_record": ("Registros oficiales", "Official records"),
         "authorized_dark_web": ("Dark web autorizada", "Authorized dark web"),
         "other": ("Otros registros", "Other records"),
@@ -3680,9 +4602,21 @@ def _executive_evidence_sample(rows: list[Dict[str, Any]], limit: int = 40) -> l
 
 def _search_groups(events: list[Dict[str, Any]], language: str = "es") -> Dict[str, Any]:
     groups = {
-        "internet": {"title": "Resultados de busquedas en internet", "title_en": "Internet search results", "rows": []},
-        "socmint": {"title": "Resultados de busquedas en redes sociales publicas", "title_en": "Public social media search results", "rows": []},
-        "darkweb": {"title": "Resultados dark web / TOR autorizados", "title_en": "Authorized dark web / TOR results", "rows": []},
+        "internet": {
+            "title": "Resultados de busquedas en internet",
+            "title_en": "Internet search results",
+            "rows": [],
+        },
+        "socmint": {
+            "title": "Resultados de busquedas en redes sociales publicas",
+            "title_en": "Public social media search results",
+            "rows": [],
+        },
+        "darkweb": {
+            "title": "Resultados dark web / TOR autorizados",
+            "title_en": "Authorized dark web / TOR results",
+            "rows": [],
+        },
     }
     for event in events:
         tags = set(event.get("tags") or [])
@@ -3691,7 +4625,14 @@ def _search_groups(events: list[Dict[str, Any]], language: str = "es") -> Dict[s
             groups["darkweb"]["rows"].append(_search_row(event, language))
         elif "socmint_public" in tags or "SOCMINT" in source:
             groups["socmint"]["rows"].append(_search_row(event, language))
-        elif "internet_search" in tags or "osint_public" in tags or "common_crawl" in tags or "Internet Search" in source or "OSINT" in source or "Common Crawl" in source:
+        elif (
+            "internet_search" in tags
+            or "osint_public" in tags
+            or "common_crawl" in tags
+            or "Internet Search" in source
+            or "OSINT" in source
+            or "Common Crawl" in source
+        ):
             groups["internet"]["rows"].append(_search_row(event, language))
     for group in groups.values():
         group["rows"] = sorted(
@@ -3735,7 +4676,7 @@ def _search_row(event: Dict[str, Any], language: str = "es") -> Dict[str, Any]:
         "recency_label": _recency_label(age_days, language),
         "tags": _clean_tag_list(tags, language),
         "evidence_url": review_url,
-        "evidence_url_label": _host_from_url(review_url) or ("fuente" if language == "es" else "source"),
+        "evidence_url_label": "Abrir URL" if language == "es" else "Open URL",
         "raw_evidence_url": raw_url,
         "preview_url": _event_preview_url(event),
         "relationship": _evidence_relationship(event, language),
@@ -3766,7 +4707,9 @@ def _search_category_label(value: Any, language: str) -> str:
 
 def _search_result_title(event: Dict[str, Any], evidence_url: str, language: str) -> str:
     title = _clean_evidence_text(event.get("title") or "", language)
-    normalized = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode("ascii").lower()
+    normalized = (
+        unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode("ascii").lower()
+    )
     if normalized.startswith("url publica indexada para"):
         host = str(event.get("domain") or "").strip()
         if not host and evidence_url:
@@ -3790,7 +4733,20 @@ def _observation_date_label(value: Any, language: str) -> str:
         except (TypeError, ValueError):
             return "Not reported" if language == "en" else "No informada"
     if language == "en":
-        months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        months = (
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        )
         return f"{months[parsed.month - 1]} {parsed.day}, {parsed.year}"
     months = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
     return f"{parsed.day} {months[parsed.month - 1]} {parsed.year}"
@@ -3804,9 +4760,7 @@ def _recency_label(age_days: int | None, language: str) -> str:
     if age_days == 1:
         return "Observed 1 day ago" if language == "en" else "Observado hace 1 día"
     return (
-        f"Observed {age_days} days ago"
-        if language == "en"
-        else f"Observado hace {age_days} días"
+        f"Observed {age_days} days ago" if language == "en" else f"Observado hace {age_days} días"
     )
 
 
@@ -3816,7 +4770,10 @@ def _evidence_type_label(value: Any, language: str) -> str:
         "web_page": ("Páginas web", "Web pages"),
         "news": ("Noticias y comunicados", "News and releases"),
         "social_media": ("Redes sociales", "Social media"),
-        "technology_infrastructure": ("Tecnología e infraestructura", "Technology and infrastructure"),
+        "technology_infrastructure": (
+            "Tecnología e infraestructura",
+            "Technology and infrastructure",
+        ),
         "official_record": ("Registros oficiales", "Official records"),
         "authorized_dark_web": ("Dark web autorizada", "Authorized dark web"),
         "other": ("Otros registros", "Other records"),
@@ -3839,7 +4796,9 @@ def _capture_preview_url(capture: Dict[str, Any]) -> str:
     if status not in {"captured", "verified"}:
         return ""
     path = str(capture.get("image_path") or capture.get("imagePath") or "").strip()
-    if ".." not in path and re.fullmatch(r"(?:\./)?assets/[A-Za-z0-9_.\-/]+\.(?:png|jpe?g|webp)", path, re.IGNORECASE):
+    if ".." not in path and re.fullmatch(
+        r"(?:\./)?assets/[A-Za-z0-9_.\-/]+\.(?:png|jpe?g|webp)", path, re.IGNORECASE
+    ):
         return path
     return ""
 
@@ -3854,7 +4813,9 @@ def _event_preview_url(event: Dict[str, Any]) -> str:
 
 
 def _urlscan_uuid(url: str) -> str:
-    match = re.search(r"urlscan\.io/(?:api/v1/)?result/([0-9a-f-]{32,36})/?", url or "", re.IGNORECASE)
+    match = re.search(
+        r"urlscan\.io/(?:api/v1/)?result/([0-9a-f-]{32,36})/?", url or "", re.IGNORECASE
+    )
     return match.group(1) if match else ""
 
 
@@ -3892,7 +4853,9 @@ def _evidence_relationship(event: Dict[str, Any], language: str) -> str:
     )
 
 
-def _evidence_validation(event: Dict[str, Any], raw_url: str, review_url: str, language: str) -> str:
+def _evidence_validation(
+    event: Dict[str, Any], raw_url: str, review_url: str, language: str
+) -> str:
     if _urlscan_uuid(raw_url):
         return (
             "La fuente entregó un resultado indexado. La URL pública se conserva; una captura solo se muestra si fue generada y verificada por el navegador interno."
@@ -3968,8 +4931,21 @@ def _brand_fraud_summary(payload: Dict[str, Any], language: str) -> Dict[str, An
         )
     negative = sum(1 for item in mentions if item["sentiment"] == "negative")
     positive = sum(1 for item in mentions if item["sentiment"] == "positive")
-    darkweb = sum(1 for item in mentions if _text_has_any(f"{item['source']} {item['category']}", ("dark", "onion", "ransom", "leak")))
-    socmint = sum(1 for item in mentions if _text_has_any(item["source"], ("socmint", "reddit", "facebook", "instagram", "tiktok", "linkedin", "x.com")))
+    darkweb = sum(
+        1
+        for item in mentions
+        if _text_has_any(
+            f"{item['source']} {item['category']}", ("dark", "onion", "ransom", "leak")
+        )
+    )
+    socmint = sum(
+        1
+        for item in mentions
+        if _text_has_any(
+            item["source"],
+            ("socmint", "reddit", "facebook", "instagram", "tiktok", "linkedin", "x.com"),
+        )
+    )
     reputation_impact = _brand_reputation_impact(mentions, darkweb, socmint)
     domain_rows = _brand_domain_rows(domains, mentions)
     lookalikes = _brand_lookalikes(events, domains, language)
@@ -4044,7 +5020,16 @@ def _brand_sentiment(text: str) -> str:
         "ciberataque",
         "hack",
     )
-    positive = ("seguridad", "security", "certificacion", "reconocimiento", "alianza", "award", "innovation", "innovacion")
+    positive = (
+        "seguridad",
+        "security",
+        "certificacion",
+        "reconocimiento",
+        "alianza",
+        "award",
+        "innovation",
+        "innovacion",
+    )
     if any(term in text for term in negative):
         return "negative"
     if any(term in text for term in positive):
@@ -4053,11 +5038,29 @@ def _brand_sentiment(text: str) -> str:
 
 
 def _brand_tone(text: str) -> str:
-    if any(term in text for term in ("ransom", "dark web", "onion", "leak", "filtracion", "credential", "password", "breach")):
+    if any(
+        term in text
+        for term in (
+            "ransom",
+            "dark web",
+            "onion",
+            "leak",
+            "filtracion",
+            "credential",
+            "password",
+            "breach",
+        )
+    ):
         return "critical"
-    if any(term in text for term in ("fraud", "fraude", "phishing", "suplant", "scam", "estafa", "farsa", "fake")):
+    if any(
+        term in text
+        for term in ("fraud", "fraude", "phishing", "suplant", "scam", "estafa", "farsa", "fake")
+    ):
         return "high"
-    if any(term in text for term in ("queja", "reclamo", "denuncia", "support", "login", "verificacion", "security")):
+    if any(
+        term in text
+        for term in ("queja", "reclamo", "denuncia", "support", "login", "verificacion", "security")
+    ):
         return "medium"
     return "low"
 
@@ -4081,19 +5084,42 @@ def _brand_reputation_impact(mentions: list[Dict[str, Any]], darkweb: int, socmi
     negative = sum(1 for item in mentions if item["sentiment"] == "negative")
     high = sum(1 for item in mentions if item["tone"] == "high")
     critical = sum(1 for item in mentions if item["tone"] == "critical")
-    return max(0, min(100, round((negative / len(mentions)) * 58 + high * 6 + critical * 10 + darkweb * 8 + socmint * 3)))
+    return max(
+        0,
+        min(
+            100,
+            round(
+                (negative / len(mentions)) * 58
+                + high * 6
+                + critical * 10
+                + darkweb * 8
+                + socmint * 3
+            ),
+        ),
+    )
 
 
 def _brand_domain_rows(domains: list[str], mentions: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
     rows = []
-    visible_domains = domains or sorted({str(item.get("domain")) for item in mentions if item.get("domain")})
+    visible_domains = domains or sorted(
+        {str(item.get("domain")) for item in mentions if item.get("domain")}
+    )
     for domain in visible_domains:
         scoped = [item for item in mentions if item.get("domain") == domain]
         total = len(scoped)
         positive = sum(1 for item in scoped if item["sentiment"] == "positive")
         neutral = sum(1 for item in scoped if item["sentiment"] == "neutral")
         negative = sum(1 for item in scoped if item["sentiment"] == "negative")
-        impact = max(0, min(100, round((negative / max(1, total)) * 65 + sum(1 for item in scoped if item["tone"] in {"high", "critical"}) * 7)))
+        impact = max(
+            0,
+            min(
+                100,
+                round(
+                    (negative / max(1, total)) * 65
+                    + sum(1 for item in scoped if item["tone"] in {"high", "critical"}) * 7
+                ),
+            ),
+        )
         rows.append(
             {
                 "domain": domain,
@@ -4116,7 +5142,9 @@ def _bar_pct(value: int, total: int) -> int:
     return max(8, round((value / total) * 100))
 
 
-def _brand_lookalikes(events: list[Dict[str, Any]], domains: list[str], language: str) -> list[Dict[str, Any]]:
+def _brand_lookalikes(
+    events: list[Dict[str, Any]], domains: list[str], language: str
+) -> list[Dict[str, Any]]:
     rows = []
     seen = set()
     for event in events:
@@ -4140,13 +5168,19 @@ def _brand_lookalikes(events: list[Dict[str, Any]], domains: list[str], language
                     "source": _display_source_name(event.get("source", ""), language),
                     "reason": analysis["reason"],
                     "similarity": analysis["similarity"],
-                    "tone": "critical" if analysis["similarity"] >= 90 else "high" if analysis["similarity"] >= 82 else "medium",
+                    "tone": "critical"
+                    if analysis["similarity"] >= 90
+                    else "high"
+                    if analysis["similarity"] >= 82
+                    else "medium",
                 }
             )
     return sorted(rows, key=lambda item: item["similarity"], reverse=True)
 
 
-def _lookalike_reason(target_domain: str, observed_domain: str, language: str) -> Dict[str, Any] | None:
+def _lookalike_reason(
+    target_domain: str, observed_domain: str, language: str
+) -> Dict[str, Any] | None:
     target = target_domain.lower().removeprefix("www.")
     observed = observed_domain.lower().removeprefix("www.")
     if observed == target or observed.endswith(f".{target}"):
@@ -4160,15 +5194,35 @@ def _lookalike_reason(target_domain: str, observed_domain: str, language: str) -
     conf_target = _normalize_confusables(compact_target)
     conf_observed = _normalize_confusables(compact_observed)
     if compact_target == compact_observed:
-        return {"reason": "Same brand label with different domain/TLD" if language == "en" else "Misma marca con dominio/TLD diferente", "similarity": 96}
+        return {
+            "reason": "Same brand label with different domain/TLD"
+            if language == "en"
+            else "Misma marca con dominio/TLD diferente",
+            "similarity": 96,
+        }
     if conf_target == conf_observed and compact_target != compact_observed:
-        return {"reason": "Possible visual substitution such as 0/o or 1/l" if language == "en" else "Sustitución visual posible tipo 0/o, 1/l", "similarity": 94}
+        return {
+            "reason": "Possible visual substitution such as 0/o or 1/l"
+            if language == "en"
+            else "Sustitución visual posible tipo 0/o, 1/l",
+            "similarity": 94,
+        }
     if compact_target in compact_observed and len(compact_observed) <= len(compact_target) + 8:
-        return {"reason": "Observed domain contains the protected brand label" if language == "en" else "El dominio observado contiene la marca protegida", "similarity": 88}
+        return {
+            "reason": "Observed domain contains the protected brand label"
+            if language == "en"
+            else "El dominio observado contiene la marca protegida",
+            "similarity": 88,
+        }
     distance = _levenshtein(conf_target, conf_observed)
     similarity = round((1 - distance / max(len(conf_target), len(conf_observed), 1)) * 100)
     if similarity >= 82 or (distance <= 2 and min(len(conf_target), len(conf_observed)) >= 5):
-        return {"reason": "High lexical similarity to protected domain" if language == "en" else "Alta similitud léxica con el dominio protegido", "similarity": similarity}
+        return {
+            "reason": "High lexical similarity to protected domain"
+            if language == "en"
+            else "Alta similitud léxica con el dominio protegido",
+            "similarity": similarity,
+        }
     return None
 
 
@@ -4199,7 +5253,9 @@ def _host_from_url(value: str) -> str:
     if not value:
         return ""
     try:
-        parsed = urlparse(value if value.startswith(("http://", "https://")) else f"https://{value}")
+        parsed = urlparse(
+            value if value.startswith(("http://", "https://")) else f"https://{value}"
+        )
         return (parsed.hostname or "").lower().removeprefix("www.")
     except ValueError:
         match = re.search(r"(?:https?://)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})(?:/|$)", value.lower())
@@ -4215,7 +5271,7 @@ def _radar_svg(title: str, dimensions: list[Dict[str, Any]]) -> str:
     import math
 
     if not dimensions:
-        return "<p class=\"small\">Informacion insuficiente para construir una visualizacion cuantitativa.</p>"
+        return '<p class="small">Informacion insuficiente para construir una visualizacion cuantitativa.</p>'
     center = 150
     radius = 88
     labels = []
@@ -4229,8 +5285,12 @@ def _radar_svg(title: str, dimensions: list[Dict[str, Any]]) -> str:
         ring_points = []
         for idx in range(count):
             angle = -math.pi / 2 + 2 * math.pi * idx / count
-            ring_points.append(f"{center + radius * ring * math.cos(angle):.1f},{center + radius * ring * math.sin(angle):.1f}")
-        rings.append(f"<polygon points=\"{' '.join(ring_points)}\" fill=\"none\" stroke=\"#d8e1ea\" stroke-width=\"1\" />")
+            ring_points.append(
+                f"{center + radius * ring * math.cos(angle):.1f},{center + radius * ring * math.sin(angle):.1f}"
+            )
+        rings.append(
+            f'<polygon points="{" ".join(ring_points)}" fill="none" stroke="#d8e1ea" stroke-width="1" />'
+        )
     for idx, dimension in enumerate(dimensions):
         raw_score = dimension.get("signalScore", dimension.get("signal_score"))
         angle = -math.pi / 2 + 2 * math.pi * idx / count
@@ -4238,31 +5298,41 @@ def _radar_svg(title: str, dimensions: list[Dict[str, Any]]) -> str:
         ay = center + radius * math.sin(angle)
         lx = center + (radius + 18) * math.cos(angle)
         ly = center + (radius + 18) * math.sin(angle)
-        short_name = html.escape(str(dimension.get("shortName") or dimension.get("name") or f"Dimension {idx + 1}"))
+        short_name = html.escape(
+            str(dimension.get("shortName") or dimension.get("name") or f"Dimension {idx + 1}")
+        )
         value_label = "N/D" if raw_score is None else f"{float(raw_score):.1f}"
-        axis_style = "stroke-dasharray=\"3 3\"" if raw_score is None else ""
-        axes.append(f"<line x1=\"{center}\" y1=\"{center}\" x2=\"{ax:.1f}\" y2=\"{ay:.1f}\" stroke=\"#d8e1ea\" stroke-width=\"1\" {axis_style} />")
-        labels.append(f"<g><title>{short_name}: {value_label}</title><circle cx=\"{lx:.1f}\" cy=\"{ly:.1f}\" r=\"9\" fill=\"#edf3f8\" stroke=\"#c8d6e2\" /><text x=\"{lx:.1f}\" y=\"{ly + 0.5:.1f}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"9\" font-weight=\"800\" fill=\"#18324d\">{idx + 1}</text></g>")
-        legend.append(f"<li><b>{idx + 1}</b><span>{short_name}</span><strong>{value_label}</strong></li>")
+        axis_style = 'stroke-dasharray="3 3"' if raw_score is None else ""
+        axes.append(
+            f'<line x1="{center}" y1="{center}" x2="{ax:.1f}" y2="{ay:.1f}" stroke="#d8e1ea" stroke-width="1" {axis_style} />'
+        )
+        labels.append(
+            f'<g><title>{short_name}: {value_label}</title><circle cx="{lx:.1f}" cy="{ly:.1f}" r="9" fill="#edf3f8" stroke="#c8d6e2" /><text x="{lx:.1f}" y="{ly + 0.5:.1f}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-weight="800" fill="#18324d">{idx + 1}</text></g>'
+        )
+        legend.append(
+            f"<li><b>{idx + 1}</b><span>{short_name}</span><strong>{value_label}</strong></li>"
+        )
         if raw_score is not None:
             score = max(0.0, min(1.0, float(raw_score) / 100.0))
             x = center + radius * score * math.cos(angle)
             y = center + radius * score * math.sin(angle)
             scored_points.append(f"{x:.1f},{y:.1f}")
-            markers.append(f"<line x1=\"{center}\" y1=\"{center}\" x2=\"{x:.1f}\" y2=\"{y:.1f}\" stroke=\"#087f8c\" stroke-width=\"2\" opacity=\".72\" /><circle cx=\"{x:.1f}\" cy=\"{y:.1f}\" r=\"4\" fill=\"#087f8c\"><title>{short_name}: {value_label}</title></circle>")
+            markers.append(
+                f'<line x1="{center}" y1="{center}" x2="{x:.1f}" y2="{y:.1f}" stroke="#087f8c" stroke-width="2" opacity=".72" /><circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="#087f8c"><title>{short_name}: {value_label}</title></circle>'
+            )
     polygon = (
-        f"<polygon points=\"{' '.join(scored_points)}\" fill=\"rgba(8,127,140,.28)\" stroke=\"#087f8c\" stroke-width=\"2\" />"
+        f'<polygon points="{" ".join(scored_points)}" fill="rgba(8,127,140,.28)" stroke="#087f8c" stroke-width="2" />'
         if len(scored_points) == count
         else "".join(markers)
     )
     escaped_title = html.escape(title)
     return (
-        f"<figure class=\"radar\"><figcaption>{escaped_title}</figcaption><svg viewBox=\"0 0 300 300\" role=\"img\" aria-label=\"{escaped_title} radar\">"
+        f'<figure class="radar"><figcaption>{escaped_title}</figcaption><svg viewBox="0 0 300 300" role="img" aria-label="{escaped_title} radar">'
         + "".join(rings)
         + "".join(axes)
         + polygon
         + "".join(labels)
-        + "</svg><ol class=\"radar-dimension-legend\">"
+        + '</svg><ol class="radar-dimension-legend">'
         + "".join(legend)
         + "</ol></figure>"
     )
@@ -4271,37 +5341,87 @@ def _radar_svg(title: str, dimensions: list[Dict[str, Any]]) -> str:
 def _risk_heat_svg(rows: list[Dict[str, Any]]) -> str:
     import math
 
-    if not rows:
-        return "<p class=\"small\">Sin datos suficientes para radar-calor.</p>"
-    center = 150
+    radar_rows = [row for row in rows if isinstance(row, dict)]
+    if not radar_rows:
+        return '<p class="small">Sin datos suficientes para radar-calor.</p>'
+
+    center = 160
     max_radius = 108
-    count = len(rows)
+    count = len(radar_rows)
     rings = []
     for ring in (0.25, 0.5, 0.75, 1.0):
-        rings.append(f"<circle cx=\"{center}\" cy=\"{center}\" r=\"{max_radius * ring:.1f}\" fill=\"none\" stroke=\"#d8e1ea\" stroke-width=\"1\" />")
-    wedges = []
-    for idx, row in enumerate(rows):
+        rings.append(
+            f'<circle cx="{center}" cy="{center}" r="{max_radius * ring:.1f}" fill="none" stroke="#d8e1ea" stroke-width="1" />'
+        )
+        rings.append(
+            f'<text x="{center + 4}" y="{center - max_radius * ring + 10:.1f}" font-size="8" fill="#718395">{int(ring * 100)}</text>'
+        )
+
+    sectors = []
+    for idx, row in enumerate(radar_rows):
         start = -math.pi / 2 + 2 * math.pi * idx / count
         end = -math.pi / 2 + 2 * math.pi * (idx + 1) / count
         mid = (start + end) / 2
-        score = max(0.05, min(1.0, float(row.get("score", 0))))
-        radius = max_radius * score
-        color = {"critical": "#b42318", "high": "#e47f22", "medium": "#d6a10d", "low": "#2e7d32"}.get(row.get("heat"), "#087f8c")
-        x1 = center + radius * math.cos(start)
-        y1 = center + radius * math.sin(start)
-        x2 = center + radius * math.cos(end)
-        y2 = center + radius * math.sin(end)
-        lx = center + (max_radius + 17) * math.cos(mid)
-        ly = center + (max_radius + 17) * math.sin(mid)
+        measured = (
+            isinstance(row.get("score"), (int, float))
+            and row.get("value_status") != "no_data"
+        )
+        score = max(0.0, min(1.0, float(row.get("score", 0)))) if measured else 0.0
+        color = ({
+            "critical": "#b42318",
+            "high": "#e47f22",
+            "medium": "#d6a10d",
+            "low": "#2e7d32",
+        }.get(row.get("heat"), "#087f8c")) if measured else "#8a9aa8"
+        lx = center + (max_radius + 22) * math.cos(mid)
+        ly = center + (max_radius + 22) * math.sin(mid)
         large_arc = 1 if (end - start) > math.pi else 0
-        path = f"M {center},{center} L {x1:.1f},{y1:.1f} A {radius:.1f},{radius:.1f} 0 {large_arc} 1 {x2:.1f},{y2:.1f} Z"
-        wedges.append(f"<path d=\"{path}\" fill=\"{color}\" fill-opacity=\"0.70\" stroke=\"#ffffff\" stroke-width=\"2\" />")
-        wedges.append(f"<text x=\"{lx:.1f}\" y=\"{ly:.1f}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#172033\">{row.get('index')}</text>")
+
+        background_x1 = center + max_radius * math.cos(start)
+        background_y1 = center + max_radius * math.sin(start)
+        background_x2 = center + max_radius * math.cos(end)
+        background_y2 = center + max_radius * math.sin(end)
+        background_path = (
+            f"M {center},{center} L {background_x1:.1f},{background_y1:.1f} "
+            f"A {max_radius:.1f},{max_radius:.1f} 0 {large_arc} 1 "
+            f"{background_x2:.1f},{background_y2:.1f} Z"
+        )
+        title = html.escape(str(row.get("name") or f"Riesgo {idx + 1}"))
+        score_label = f"{score * 100:.1f}/100" if measured else "N/D"
+        sectors.append(
+            f'<path class="risk-sector-background" d="{background_path}" fill="#edf2f5" '
+            f'stroke="#ffffff" stroke-width="2"><title>{title}: {score_label}</title></path>'
+        )
+        if measured and score > 0:
+            radius = max_radius * score
+            x1 = center + radius * math.cos(start)
+            y1 = center + radius * math.sin(start)
+            x2 = center + radius * math.cos(end)
+            y2 = center + radius * math.sin(end)
+            value_path = (
+                f"M {center},{center} L {x1:.1f},{y1:.1f} "
+                f"A {radius:.1f},{radius:.1f} 0 {large_arc} 1 {x2:.1f},{y2:.1f} Z"
+            )
+            sectors.append(
+                f'<path class="risk-sector-value" d="{value_path}" fill="{color}" '
+                f'fill-opacity="0.82" stroke="#ffffff" stroke-width="1.5">'
+                f'<title>{title}: {score_label}</title></path>'
+            )
+        sectors.append(
+            f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="11" fill="{color}" '
+            f'fill-opacity="{1 if measured else 0.25}" stroke="{color}" stroke-width="1" />'
+        )
+        sectors.append(
+            f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" dominant-baseline="middle" '
+            f'font-size="10" font-weight="800" fill="{("#ffffff" if measured else "#526879")}">'
+            f'{html.escape(str(row.get("index") or idx + 1))}</text>'
+        )
+
     return (
-        "<figure class=\"risk-heat\"><figcaption>Radar-calor de ciberriesgos</figcaption>"
-        "<svg viewBox=\"0 0 300 300\" role=\"img\" aria-label=\"Radar calor de ciberriesgos por categoria\">"
+        '<figure class="risk-heat"><figcaption>Radar-calor de ciberriesgos</figcaption>'
+        '<svg viewBox="0 0 320 320" role="img" aria-label="Radar calor de ciberriesgos por categoria y escala de cero a cien">'
         + "".join(rings)
-        + "".join(wedges)
-        + "<text x=\"150\" y=\"154\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"800\" fill=\"#18324d\">CDE</text>"
+        + "".join(sectors)
+        + '<text x="160" y="164" text-anchor="middle" font-size="12" font-weight="800" fill="#18324d">CDE</text>'
         + "</svg></figure>"
     )

@@ -294,8 +294,8 @@ def build_source_config(
     spiderfoot["domains"] = domains
     spiderfoot["max_records"] = min(3000 if budget_seconds or wait_until_complete else 1200 if is_deep else 500, max(80, int(len(domains) * 60 * budget_multiplier)))
     spiderfoot["depth"] = spiderfoot.get("depth", "deep")
-    spiderfoot["timeout_seconds"] = 0
-    spiderfoot["completion_policy"] = "wait_until_configured_modules_finish"
+    spiderfoot["timeout_seconds"] = 86400
+    spiderfoot["completion_policy"] = "complete_plan_with_idle_watchdog"
     spiderfoot["max_threads"] = int(spiderfoot.get("max_threads", 4))
     spiderfoot["include_raw"] = False
 
@@ -382,11 +382,31 @@ def _strategic_market_queries(
             f'"{location}" infraestructura digital OR nube OR inteligencia artificial OR interrupcion tecnologica',
         ])
     for competitor in competitors:
-        queries.append(f'"{primary}" "{competitor}" competencia digital OR mercado OR tecnologia OR ciberseguridad')
+        queries.extend(
+            [
+                f'"{primary}" "{competitor}" competencia digital OR mercado OR tecnologia OR ciberseguridad',
+                f'"{competitor}" ciberataque OR ransomware OR vulnerabilidad OR interrupcion digital',
+            ]
+        )
     for supplier in suppliers:
-        queries.append(f'"{primary}" "{supplier}" proveedor tecnologico OR interrupcion OR dependencia OR cadena de suministro de software OR ciberseguridad')
+        queries.extend(
+            [
+                f'"{primary}" "{supplier}" proveedor tecnologico OR interrupcion OR dependencia OR cadena de suministro de software OR ciberseguridad',
+                f'"{supplier}" ransomware OR incidente OR filtracion OR vulnerabilidad OR supply chain',
+            ]
+        )
     for product in products:
         queries.append(f'"{primary}" "{product}" mercado OR clientes OR sustituto OR riesgo digital')
+    activity = str(context.get("subsector") or "").strip()
+    threat_scope = " ".join(value for value in (sector or "", activity) if value).strip()
+    if threat_scope:
+        queries.extend(
+            [
+                f'"{threat_scope}" threat actor OR grupo ransomware OR campaña cibernetica',
+                f'"{threat_scope}" malware OR TTP OR MITRE ATT&CK OR intrusion set',
+                f'"{threat_scope}" third party cyber risk OR supply chain attack',
+            ]
+        )
     return _unique_ordered(queries)
 
 
@@ -506,6 +526,8 @@ def build_organization_profile(request: DomainAnalysisRequest, domains: List[str
             "authorized_scope": request.authorized_scope,
             "allow_tor": allow_tor,
             "analysis_window": request.analysis_window,
+            "analysis_start_date": request.analysis_start_date,
+            "analysis_end_date": request.analysis_end_date,
             "lookback_hours": request.lookback_hours,
             "lookback_days": request.lookback_days,
             "scan_time_budget_minutes": request.scan_time_budget_minutes,

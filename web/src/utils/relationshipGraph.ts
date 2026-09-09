@@ -1,4 +1,4 @@
-import type { RunRecord, ThreatEvent } from "../types";
+import type { CTIFrameworkFamily, RunRecord, ThreatEvent } from "../types";
 
 export type RelationshipEntityType =
   | "organization"
@@ -9,6 +9,7 @@ export type RelationshipEntityType =
   | "phone"
   | "person"
   | "country"
+  | "sector"
   | "document"
   | "hash"
   | "social_account"
@@ -17,7 +18,16 @@ export type RelationshipEntityType =
   | "vulnerability"
   | "vulnerability_candidate"
   | "actor"
+  | "threat_actor"
+  | "threat_group"
+  | "campaign"
+  | "malware"
+  | "tool"
+  | "framework"
+  | "tactic"
   | "technique"
+  | "control"
+  | "defense"
   | "source"
   | "evidence";
 
@@ -27,7 +37,7 @@ export interface RelationshipNode {
   id: string;
   label: string;
   type: RelationshipEntityType;
-  status: "declared" | "collected" | "validated" | "inferred";
+  status: "declared" | "collected" | "validated" | "inferred" | "reference";
   confidence: number;
   degree: number;
   centrality: number;
@@ -68,6 +78,11 @@ export interface RelationshipGraphModel {
   stats: RelationshipGraphStats;
 }
 
+interface ReferenceEntityAlias {
+  id: string;
+  type: RelationshipEntityType;
+}
+
 export interface RelationshipPerspective {
   key: RelationshipPerspectiveKey;
   nodeTypes: RelationshipEntityType[];
@@ -95,6 +110,7 @@ export const relationshipPerspectives: RelationshipPerspective[] = [
       "phone",
       "person",
       "country",
+      "sector",
       "document",
       "hash",
       "social_account",
@@ -103,14 +119,23 @@ export const relationshipPerspectives: RelationshipPerspective[] = [
       "vulnerability",
       "vulnerability_candidate",
       "actor",
+      "threat_actor",
+      "threat_group",
+      "campaign",
+      "malware",
+      "tool",
+      "framework",
+      "tactic",
       "technique",
+      "control",
+      "defense",
       "source",
       "evidence"
     ]
   },
   {
     key: "infrastructure",
-    nodeTypes: ["organization", "domain", "ip", "url", "country", "hash", "technology", "vulnerability", "vulnerability_candidate", "source", "evidence"]
+    nodeTypes: ["organization", "domain", "ip", "url", "country", "sector", "hash", "technology", "vulnerability", "vulnerability_candidate", "source", "evidence"]
   },
   {
     key: "evidence",
@@ -122,14 +147,14 @@ export const relationshipPerspectives: RelationshipPerspective[] = [
   },
   {
     key: "threats",
-    nodeTypes: ["organization", "domain", "url", "hash", "technology", "vulnerability", "vulnerability_candidate", "actor", "technique", "source", "evidence"]
+    nodeTypes: ["actor", "threat_actor", "threat_group", "campaign", "malware", "tool", "framework", "tactic", "technique", "control", "defense"]
   }
 ];
 
 export function buildRelationshipGraph(run?: RunRecord, baselineRun?: RunRecord): RelationshipGraphModel {
   if (!run) return emptyGraph();
 
-  const events = [...(run.summary.records ?? run.summary.events ?? [])];
+  const events = [...(run.summary.records?.length ? run.summary.records : run.summary.events ?? [])];
   const nodeMap = new Map<string, RelationshipNode>();
   const edgeMap = new Map<string, RelationshipEdge>();
   const organizationName = cleanValue(run.request.organization_name || run.request.legal_name || "");
@@ -218,10 +243,17 @@ export function buildRelationshipGraph(run?: RunRecord, baselineRun?: RunRecord)
         confidence: eventConfidence,
         metadata: {
           category: event.category || "unclassified",
-          source: event.source || "unclassified",
+          source: event.public_capability_label || "CyberDecisionEngine",
           observedAt: event.observed_at || "",
           relationship: event.relationship_to_scope || "unassessed",
-          validation: event.validation_result || event.evidence_status || "collected"
+          validation: event.validation_result || event.evidence_status || "collected",
+          primaryTechnologyDomain: event.primary_technology_domain || "unknown",
+          technologyDomains: (event.technology_domains ?? []).join(", ") || "unknown",
+          analysisDomains: (event.analysis_domains ?? []).join(", ") || "cyber",
+          attribution: event.public_attribution_status || "unattributed",
+          frameworkMappings: (event.framework_refs ?? []).join(", ") || "none",
+          scenarioReferences: (event.scenario_refs ?? []).join(", ") || "none",
+          fraudSignal: Boolean(event.fraud_refs?.length)
         },
         evidenceIds,
         evidenceUrls,
@@ -343,6 +375,8 @@ export function buildRelationshipGraph(run?: RunRecord, baselineRun?: RunRecord)
     });
   });
 
+  mergeCtiSnapshotGraph(run, nodeMap, edgeMap, organizationId);
+
   const nodes = [...nodeMap.values()];
   const edges = [...edgeMap.values()];
   const baselineIds = baselineRun
@@ -356,6 +390,793 @@ export function buildRelationshipGraph(run?: RunRecord, baselineRun?: RunRecord)
   return { nodes: centralNodes, edges, stats };
 }
 
+export function buildCTIReferenceGraph(families: CTIFrameworkFamily[], run?: RunRecord): RelationshipGraphModel {
+  const activeFamilies = families.filter((family) => family.status === "active");
+  if (!activeFamilies.length) return emptyGraph();
+
+  const nodeMap = new Map<string, RelationshipNode>();
+  const edgeMap = new Map<string, RelationshipEdge>();
+  const familyNamesByNode = new Map<string, Set<string>>();
+  const domainsByNode = new Map<string, Set<string>>();
+  const referenceEntitiesByAlias = new Map<string, ReferenceEntityAlias[]>();
+  const itemNodesByFamily = new Map<string, Map<string, { id: string; url: string; type: RelationshipEntityType }>>();
+  const frameworkNodeIds = new Map<string, string>();
+  const attackTechniqueNodes = new Map<string, { id: string; url: string }>();
+
+  activeFamilies.forEach((family) => {
+    const familyName = family.short_name || family.name;
+    const technologyDomains = referenceTechnologyDomains(family.id);
+    const primaryTechnologyDomain = technologyDomains.length === 1 ? technologyDomains[0] : "multidomain";
+    const analysisDomains = referenceAnalysisDomains(family.id);
+    const familyUrl = canonicalHttpUrl(family.source_url);
+    const frameworkId = nodeId("framework", family.id);
+    const itemNodes = new Map<string, { id: string; url: string; type: RelationshipEntityType }>();
+    const tacticNodes = new Map<string, string>();
+    frameworkNodeIds.set(family.id, frameworkId);
+    itemNodesByFamily.set(family.id, itemNodes);
+
+    upsertNode(nodeMap, {
+      id: frameworkId,
+      label: familyName,
+      type: "framework",
+      status: "reference",
+      confidence: 1,
+      metadata: compactMetadata({
+        source: familyName,
+        framework: familyName,
+        frameworkId: family.id,
+        viewType: family.view_type,
+        description: cleanValue(family.description || ""),
+        primaryTechnologyDomain,
+        technologyDomains: technologyDomains.join(", "),
+        analysisDomains: analysisDomains.join(", "),
+        knowledgeKind: "reference"
+      }),
+      evidenceIds: [],
+      evidenceUrls: familyUrl ? [familyUrl] : [],
+      isNew: false
+    });
+    addReferenceClassification(familyNamesByNode, frameworkId, familyName);
+    technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, frameworkId, domain));
+
+    family.tactics.forEach((tactic) => {
+      const tacticId = cleanValue(tactic.id || tactic.name || "");
+      if (!tacticId) return;
+      const id = referenceNodeId(family.id, "tactic", tacticId);
+      const label = cleanValue(tactic.name || tacticId);
+      tacticNodes.set(tacticId.toLowerCase(), id);
+      tacticNodes.set(label.toLowerCase(), id);
+      upsertNode(nodeMap, {
+        id,
+        label,
+        type: "tactic",
+        status: "reference",
+        confidence: 1,
+        metadata: compactMetadata({
+          source: familyName,
+          framework: familyName,
+          frameworkId: family.id,
+          tacticId,
+          techniqueCount: tactic.technique_count,
+          description: cleanValue(tactic.description || ""),
+          primaryTechnologyDomain,
+          technologyDomains: technologyDomains.join(", "),
+          analysisDomains: analysisDomains.join(", "),
+          knowledgeKind: "reference"
+        }),
+        evidenceIds: [],
+        evidenceUrls: familyUrl ? [familyUrl] : [],
+        isNew: false
+      });
+      addReferenceClassification(familyNamesByNode, id, familyName);
+      technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, id, domain));
+      upsertEdge(edgeMap, frameworkId, id, "contains_tactic", 1, [], familyUrl ? [familyUrl] : []);
+    });
+
+    family.techniques.forEach((technique) => {
+      const techniqueId = cleanValue(technique.technique_id || technique.id || "");
+      if (!techniqueId) return;
+      const type = referenceItemType(family.id);
+      const id = referenceNodeId(family.id, type, techniqueId);
+      const url = canonicalHttpUrl(technique.url);
+      itemNodes.set(techniqueId.toUpperCase(), { id, url, type });
+      if (family.id.startsWith("attack-")) attackTechniqueNodes.set(techniqueId.toUpperCase(), { id, url });
+      upsertNode(nodeMap, {
+        id,
+        label: `${techniqueId} · ${cleanValue(technique.name || techniqueId)}`,
+        type,
+        status: "reference",
+        confidence: 1,
+        metadata: compactMetadata({
+          source: familyName,
+          framework: familyName,
+          frameworkId: family.id,
+          referenceId: techniqueId,
+          tactics: unique(technique.tactics ?? []).join(", "),
+          platforms: unique(technique.platforms ?? []).join(", "),
+          dataSources: unique(technique.data_sources ?? []).join(", "),
+          parentTechnique: technique.parent_technique_id || undefined,
+          category: cleanValue(technique.category || ""),
+          abstraction: cleanValue(technique.abstraction || ""),
+          catalogStatus: cleanValue(technique.status || ""),
+          relatedItems: technique.related?.length,
+          relatedAttackTechniques: technique.related_attack_techniques?.length,
+          artifacts: unique(technique.artifacts ?? []).slice(0, 12).join(", "),
+          cwes: normalizedReferenceIds(technique.cwes, "CWE-").slice(0, 12).join(", "),
+          cves: normalizedReferenceIds(technique.cves, "CVE-").slice(0, 12).join(", "),
+          description: cleanValue(technique.description || ""),
+          primaryTechnologyDomain,
+          technologyDomains: technologyDomains.join(", "),
+          analysisDomains: analysisDomains.join(", "),
+          knowledgeKind: "reference"
+        }),
+        evidenceIds: [],
+        evidenceUrls: unique([url, familyUrl].filter(Boolean)),
+        isNew: false
+      });
+      addReferenceClassification(familyNamesByNode, id, familyName);
+      technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, id, domain));
+
+      const linkedTactics = unique(technique.tactics ?? [])
+        .map((tactic) => tacticNodes.get(cleanValue(tactic).toLowerCase()))
+        .filter((value): value is string => Boolean(value));
+      if (linkedTactics.length) {
+        linkedTactics.forEach((tacticId) => upsertEdge(edgeMap, tacticId, id, "contains_item", 1, [], unique([url, familyUrl].filter(Boolean))));
+      } else {
+        upsertEdge(edgeMap, frameworkId, id, "contains_item", 1, [], unique([url, familyUrl].filter(Boolean)));
+      }
+    });
+
+    family.techniques.forEach((technique) => {
+      const childId = cleanValue(technique.technique_id || technique.id || "");
+      const parentId = cleanValue(technique.parent_technique_id || "");
+      const child = itemNodes.get(childId.toUpperCase());
+      const parent = itemNodes.get(parentId.toUpperCase());
+      if (child && parent) upsertEdge(edgeMap, child.id, parent.id, "subtechnique_of", 1, [], unique([child.url, parent.url, familyUrl].filter(Boolean)));
+    });
+
+    family.entities.forEach((entity) => {
+      const entityType = ctiNodeType(entity.entity_type);
+      const externalId = cleanValue(entity.entity_id || "");
+      if (!entityType || !externalId) return;
+      const id = nodeId(entityType, externalId);
+      const entityUrl = canonicalHttpUrl(entity.url);
+      const documentedTechniques = unique(entity.technique_ids ?? []);
+      upsertNode(nodeMap, {
+        id,
+        label: cleanValue(entity.name || externalId),
+        type: entityType,
+        status: "reference",
+        confidence: 1,
+        metadata: compactMetadata({
+          source: familyName,
+          framework: familyName,
+          frameworkId: family.id,
+          referenceId: externalId,
+          aliases: unique(entity.aliases ?? []).join(", "),
+          documentedTechniques: documentedTechniques.length,
+          description: cleanValue(entity.description || ""),
+          primaryTechnologyDomain,
+          technologyDomains: technologyDomains.join(", "),
+          analysisDomains: analysisDomains.join(", "),
+          knowledgeKind: "reference"
+        }),
+        evidenceIds: [],
+        evidenceUrls: unique([entityUrl, familyUrl].filter(Boolean)),
+        isNew: false
+      });
+      addReferenceClassification(familyNamesByNode, id, familyName);
+      technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, id, domain));
+      unique([entity.name, externalId, ...(entity.aliases ?? [])].map(cleanValue).filter(Boolean)).forEach((alias) => {
+        addReferenceEntityAlias(referenceEntitiesByAlias, alias, { id, type: entityType });
+      });
+
+      documentedTechniques.forEach((rawTechniqueId) => {
+        const technique = itemNodes.get(cleanValue(rawTechniqueId).toUpperCase());
+        if (!technique) return;
+        upsertEdge(
+          edgeMap,
+          id,
+          technique.id,
+          "uses",
+          1,
+          [],
+          unique([entityUrl, technique.url, familyUrl].filter(Boolean))
+        );
+      });
+    });
+
+    if (family.id === "emb3d") {
+      const collections = asRecord(family.collections);
+      const collectionSpecs: Array<{ key: string; type: RelationshipEntityType; relation: string }> = [
+        { key: "properties", type: "technology", relation: "contains_property" },
+        { key: "threats", type: "technique", relation: "contains_threat" },
+        { key: "mitigations", type: "defense", relation: "contains_mitigation" }
+      ];
+      collectionSpecs.forEach((spec) => {
+        recordValues(collections[spec.key]).forEach((row) => {
+          const externalId = stringValue(row.id);
+          if (!externalId) return;
+          const id = referenceNodeId(family.id, spec.type, externalId);
+          const url = canonicalHttpUrl(stringValue(row.url));
+          itemNodes.set(externalId.toUpperCase(), { id, url, type: spec.type });
+          upsertNode(nodeMap, {
+            id,
+            label: `${externalId} · ${stringValue(row.name) || externalId}`,
+            type: spec.type,
+            status: "reference",
+            confidence: 1,
+            metadata: compactMetadata({
+              source: familyName,
+              framework: familyName,
+              frameworkId: family.id,
+              referenceId: externalId,
+              collection: spec.key,
+              category: stringValue(row.category),
+              description: stringValue(row.description),
+              primaryTechnologyDomain,
+              technologyDomains: technologyDomains.join(", "),
+              analysisDomains: analysisDomains.join(", "),
+              knowledgeKind: "reference"
+            }),
+            evidenceIds: [],
+            evidenceUrls: unique([url, familyUrl].filter(Boolean)),
+            isNew: false
+          });
+          addReferenceClassification(familyNamesByNode, id, familyName);
+          technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, id, domain));
+          upsertEdge(edgeMap, frameworkId, id, spec.relation, 1, [], unique([url, familyUrl].filter(Boolean)));
+        });
+      });
+    }
+
+    if (family.id === "inform") {
+      const dimensions = recordValues(asRecord(family.collections).dimensions);
+      dimensions.forEach((dimension) => {
+        const dimensionId = stringValue(dimension.id) || stringValue(dimension.name);
+        if (!dimensionId) return;
+        const dimensionNodeId = referenceNodeId(family.id, "tactic", dimensionId);
+        upsertNode(nodeMap, {
+          id: dimensionNodeId,
+          label: stringValue(dimension.name) || dimensionId,
+          type: "tactic",
+          status: "reference",
+          confidence: 1,
+          metadata: compactMetadata({
+            source: familyName,
+            framework: familyName,
+            frameworkId: family.id,
+            referenceId: dimensionId,
+            weight: numericValue(dimension.weight),
+            primaryTechnologyDomain,
+            technologyDomains: technologyDomains.join(", "),
+            analysisDomains: analysisDomains.join(", "),
+            knowledgeKind: "reference"
+          }),
+          evidenceIds: [],
+          evidenceUrls: familyUrl ? [familyUrl] : [],
+          isNew: false
+        });
+        addReferenceClassification(familyNamesByNode, dimensionNodeId, familyName);
+        technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, dimensionNodeId, domain));
+        upsertEdge(edgeMap, frameworkId, dimensionNodeId, "contains_dimension", 1, [], familyUrl ? [familyUrl] : []);
+
+        recordValues(dimension.components).forEach((component) => {
+          const componentId = stringValue(component.id) || stringValue(component.name);
+          if (!componentId) return;
+          const qualifiedComponentId = `${dimensionId}.${componentId}`;
+          const componentNodeId = referenceNodeId(family.id, "control", qualifiedComponentId);
+          upsertNode(nodeMap, {
+            id: componentNodeId,
+            label: stringValue(component.name) || qualifiedComponentId,
+            type: "control",
+            status: "reference",
+            confidence: 1,
+            metadata: compactMetadata({
+              source: familyName,
+              framework: familyName,
+              frameworkId: family.id,
+              referenceId: qualifiedComponentId,
+              weight: numericValue(component.weight),
+              dimension: stringValue(dimension.name),
+              primaryTechnologyDomain,
+              technologyDomains: technologyDomains.join(", "),
+              analysisDomains: analysisDomains.join(", "),
+              knowledgeKind: "reference"
+            }),
+            evidenceIds: [],
+            evidenceUrls: familyUrl ? [familyUrl] : [],
+            isNew: false
+          });
+          addReferenceClassification(familyNamesByNode, componentNodeId, familyName);
+          technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, componentNodeId, domain));
+          upsertEdge(edgeMap, dimensionNodeId, componentNodeId, "contains_component", 1, [], familyUrl ? [familyUrl] : []);
+
+          recordValues(component.levels).forEach((level) => {
+            const levelId = stringValue(level.uid) || `${qualifiedComponentId}.${stringValue(level.level_id)}`;
+            if (!levelId) return;
+            const levelNodeId = referenceNodeId(family.id, "control", levelId);
+            upsertNode(nodeMap, {
+              id: levelNodeId,
+              label: `${levelId} · ${stringValue(level.level) || levelId}`,
+              type: "control",
+              status: "reference",
+              confidence: 1,
+              metadata: compactMetadata({
+                source: familyName,
+                framework: familyName,
+                frameworkId: family.id,
+                referenceId: levelId,
+                question: stringValue(level.question),
+                impact: numericValue(level.impact),
+                complexity: numericValue(level.complexity),
+                points: numericValue(level.points),
+                primaryTechnologyDomain,
+                technologyDomains: technologyDomains.join(", "),
+                analysisDomains: analysisDomains.join(", "),
+                knowledgeKind: "reference"
+              }),
+              evidenceIds: [],
+              evidenceUrls: familyUrl ? [familyUrl] : [],
+              isNew: false
+            });
+            addReferenceClassification(familyNamesByNode, levelNodeId, familyName);
+            technologyDomains.forEach((domain) => addReferenceClassification(domainsByNode, levelNodeId, domain));
+            upsertEdge(edgeMap, componentNodeId, levelNodeId, "contains_maturity_level", 1, [], familyUrl ? [familyUrl] : []);
+          });
+        });
+      });
+    }
+
+    family.relationships.forEach((relationship) => {
+      const source = itemNodes.get(cleanValue(relationship.source || "").toUpperCase());
+      const target = itemNodes.get(cleanValue(relationship.target || "").toUpperCase());
+      if (!source || !target) return;
+      upsertEdge(edgeMap, source.id, target.id, relationship.type || "related_to", 1, [], unique([source.url, target.url, familyUrl].filter(Boolean)));
+    });
+  });
+
+  const d3fend = activeFamilies.find((family) => family.id === "d3fend");
+  const d3fendItems = itemNodesByFamily.get("d3fend");
+  if (d3fend && d3fendItems) {
+    d3fend.techniques.forEach((technique) => {
+      const defenseId = cleanValue(technique.technique_id || technique.id || "");
+      const defense = d3fendItems.get(defenseId.toUpperCase());
+      if (!defense) return;
+      unique(technique.related_attack_techniques ?? [])
+        .filter((attackId) => /^T\d{4}(?:\.\d{3})?$/i.test(attackId))
+        .forEach((rawAttackId) => {
+          const attackId = rawAttackId.toUpperCase();
+          let attack = attackTechniqueNodes.get(attackId);
+          if (!attack) {
+            const id = nodeId("technique", attackId);
+            const url = `https://attack.mitre.org/techniques/${attackId.replace(".", "/")}/`;
+            attack = { id, url };
+            attackTechniqueNodes.set(attackId, attack);
+            upsertNode(nodeMap, {
+              id,
+              label: attackId,
+              type: "technique",
+              status: "reference",
+              confidence: 1,
+              metadata: {
+                source: "MITRE ATT&CK",
+                framework: "ATT&CK",
+                referenceId: attackId,
+                primaryTechnologyDomain: "multidomain",
+                technologyDomains: "it, mobile, ot",
+                analysisDomains: "cyber, cti",
+                knowledgeKind: "reference"
+              },
+              evidenceIds: [],
+              evidenceUrls: [url],
+              isNew: false
+            });
+            addReferenceClassification(familyNamesByNode, id, "ATT&CK");
+            ["it", "mobile", "ot"].forEach((domain) => addReferenceClassification(domainsByNode, id, domain));
+          }
+          upsertEdge(edgeMap, defense.id, attack.id, "counters", 1, [], unique([defense.url, attack.url, canonicalHttpUrl(d3fend.source_url)].filter(Boolean)));
+        });
+    });
+  }
+
+  if (run) {
+    mergeReferenceScopeContext(run, nodeMap, edgeMap, referenceEntitiesByAlias);
+    const organizationName = cleanValue(run.request.organization_name || run.request.legal_name || "");
+    const organizationId = organizationName ? nodeId("organization", organizationName) : "";
+    if (organizationId && nodeMap.has(organizationId)) {
+      frameworkNodeIds.forEach((id, familyId) => {
+        const family = activeFamilies.find((candidate) => candidate.id === familyId);
+        upsertEdge(
+          edgeMap,
+          id,
+          organizationId,
+          "reference_context_for",
+          0.25,
+          [],
+          family?.source_url ? [family.source_url] : []
+        );
+      });
+    }
+  }
+
+  const nodes = [...nodeMap.values()].map((node) => {
+    const familyNames = [...(familyNamesByNode.get(node.id) ?? [])];
+    const technologyDomains = [...(domainsByNode.get(node.id) ?? [])];
+    return {
+      ...node,
+      metadata: {
+        ...node.metadata,
+        ...(familyNames.length ? { framework: familyNames.join(", ") } : {}),
+        ...(technologyDomains.length
+          ? {
+              technologyDomains: technologyDomains.join(", "),
+              primaryTechnologyDomain: technologyDomains.length > 1 ? "multidomain" : technologyDomains[0]
+            }
+          : {})
+      }
+    };
+  });
+  const edges = [...edgeMap.values()];
+  const centralNodes = applyCentrality(nodes, edges);
+  const profileTypes = new Set<RelationshipEntityType>(["actor", "threat_actor", "threat_group", "campaign", "malware", "tool"]);
+  const itemTypes = new Set<RelationshipEntityType>(["tactic", "technique", "control", "defense", "vulnerability", "technology"]);
+  const profileCount = centralNodes.filter((node) => profileTypes.has(node.type)).length;
+  const techniqueCount = centralNodes.filter((node) => itemTypes.has(node.type) && node.metadata.knowledgeKind === "reference").length;
+  return {
+    nodes: centralNodes,
+    edges,
+    stats: graphStats(centralNodes, edges, profileCount, techniqueCount)
+  };
+}
+
+function referenceItemType(familyId: string): RelationshipEntityType {
+  if (familyId === "d3fend") return "defense";
+  if (familyId === "cwe") return "vulnerability";
+  return "technique";
+}
+
+function referenceNodeId(familyId: string, type: RelationshipEntityType, externalId: string): string {
+  if (type === "technique" && familyId.startsWith("attack-")) return nodeId(type, externalId);
+  return nodeId(type, `${familyId}:${externalId}`);
+}
+
+function normalizedReferenceIds(values: string[] | undefined, prefix: string): string[] {
+  return unique((values ?? []).map(cleanValue).filter((value) => value.toUpperCase().startsWith(prefix)));
+}
+
+function mergeCtiSnapshotGraph(
+  run: RunRecord,
+  nodeMap: Map<string, RelationshipNode>,
+  edgeMap: Map<string, RelationshipEdge>,
+  organizationId: string,
+  referenceEntitiesByAlias?: Map<string, ReferenceEntityAlias[]>
+) {
+  const decisionSnapshot = asRecord(run.summary.decision_snapshot?.cti_snapshot);
+  const metricSnapshot = asRecord(run.summary.metrics?.cti);
+  const snapshot = Object.keys(decisionSnapshot).length ? decisionSnapshot : metricSnapshot;
+  const graph = asRecord(snapshot.graph);
+  const rawNodes = Array.isArray(graph.nodes) ? graph.nodes.filter(isUnknownRecord) : [];
+  const rawEdges = Array.isArray(graph.edges) ? graph.edges.filter(isUnknownRecord) : [];
+  if (!rawNodes.length) return;
+
+  const idMap = new Map<string, string>();
+  rawNodes.forEach((rawNode) => {
+    const sourceId = stringValue(rawNode.id);
+    const label = stringValue(rawNode.label) || sourceId;
+    const type = ctiNodeType(stringValue(rawNode.entity_type) || stringValue(rawNode.type));
+    if (!sourceId || !label || !type) return;
+    const attackId = stringValue(rawNode.attack_id) || attackIdentifier(label);
+    const referenceMatch = matchReferenceEntity(referenceEntitiesByAlias, attackId || label, type)
+      ?? matchReferenceEntity(referenceEntitiesByAlias, label, type);
+    const resolvedType = referenceMatch?.type ?? type;
+    const targetId = type === "organization" && organizationId
+      ? organizationId
+      : referenceMatch?.id ?? nodeId(type, type === "technique" && attackId ? attackId : label);
+    idMap.set(sourceId, targetId);
+    const ctiState = stringValue(rawNode.state).toUpperCase();
+    const evidenceIds = stringValues(rawNode.evidence_ids);
+    const evidenceUrls = unique([...stringValues(rawNode.evidence_urls), ...stringValues(rawNode.knowledge_urls), ...stringValues(rawNode.knowledge_references)]);
+    const relevance = numericValue(rawNode.relevance_score);
+    upsertNode(nodeMap, {
+      id: targetId,
+      label,
+      type: resolvedType,
+      status: relationshipStatusFromCti(ctiState),
+      confidence: relevance === undefined ? ctiStateConfidence(ctiState) : Math.min(1, Math.max(0, relevance / 100)),
+      metadata: compactMetadata({
+        source: "cti_snapshot",
+        ctiState: ctiState || "REFERENCE",
+        entityType: stringValue(rawNode.entity_type) || stringValue(rawNode.type),
+        attackId,
+        relevanceScore: relevance,
+        campaigns: stringValues(rawNode.campaigns).join(", "),
+        techniques: stringValues(rawNode.techniques).join(", "),
+        documentedTechniques: stringValues(rawNode.documented_techniques).join(", "),
+        platforms: stringValues(rawNode.platforms).join(", "),
+        profileStatus: stringValue(rawNode.profile_status),
+        catalogMatch: referenceMatch ? "name_or_alias" : undefined,
+        description: stringValue(rawNode.knowledge_description) || stringValue(rawNode.description)
+      }),
+      evidenceIds,
+      evidenceUrls,
+      isNew: false
+    });
+  });
+
+  rawEdges.forEach((rawEdge) => {
+    const source = idMap.get(stringValue(rawEdge.source));
+    const target = idMap.get(stringValue(rawEdge.target));
+    if (!source || !target) return;
+    const state = stringValue(rawEdge.state).toUpperCase();
+    upsertEdge(
+      edgeMap,
+      source,
+      target,
+      stringValue(rawEdge.type) || "cti_relationship",
+      Math.min(1, Math.max(0, numericValue(rawEdge.confidence) ?? ctiStateConfidence(state))),
+      stringValues(rawEdge.evidence_ids),
+      unique([...stringValues(rawEdge.evidence_urls), ...stringValues(rawEdge.knowledge_urls)])
+    );
+  });
+}
+
+function ctiNodeType(value: string): RelationshipEntityType | null {
+  const normalized = value.toLowerCase().replace(/-/g, "_");
+  const aliases: Record<string, RelationshipEntityType> = {
+    organization: "organization",
+    actor: "actor",
+    threat: "threat_actor",
+    threat_actor: "threat_actor",
+    threat_group: "threat_group",
+    intrusion_set: "threat_group",
+    campaign: "campaign",
+    malware: "malware",
+    tool: "tool",
+    technique: "technique",
+    defense: "defense"
+  };
+  return aliases[normalized] ?? null;
+}
+
+function relationshipStatusFromCti(value: string): RelationshipNode["status"] {
+  if (value === "OBSERVED") return "validated";
+  if (value === "INFERRED") return "inferred";
+  if (value === "RELATED") return "collected";
+  return "reference";
+}
+
+function ctiStateConfidence(value: string): number {
+  if (value === "OBSERVED") return 0.9;
+  if (value === "INFERRED") return 0.55;
+  if (value === "RELATED") return 0.4;
+  return 0.25;
+}
+
+function mergeReferenceScopeContext(
+  run: RunRecord,
+  nodeMap: Map<string, RelationshipNode>,
+  edgeMap: Map<string, RelationshipEdge>,
+  referenceEntitiesByAlias: Map<string, ReferenceEntityAlias[]>
+) {
+  const organizationName = cleanValue(run.request.organization_name || run.request.legal_name || "");
+  const organizationId = organizationName ? nodeId("organization", organizationName) : "";
+  if (!organizationId) return;
+
+  upsertNode(nodeMap, {
+    id: organizationId,
+    label: organizationName,
+    type: "organization",
+    status: "declared",
+    confidence: 1,
+    metadata: {
+      source: "declared_scope",
+      contextRole: "organization",
+      knowledgeKind: "scope_context"
+    },
+    evidenceIds: [],
+    evidenceUrls: [],
+    isNew: false
+  });
+
+  unique([...run.domains, ...(run.request.domains ?? [])].map(normalizeDomain).filter(Boolean)).forEach((domain) => {
+    const id = nodeId("domain", domain);
+    upsertNode(nodeMap, {
+      id,
+      label: domain,
+      type: "domain",
+      status: "declared",
+      confidence: 1,
+      metadata: { source: "declared_scope", contextRole: "domain", knowledgeKind: "scope_context" },
+      evidenceIds: [],
+      evidenceUrls: [],
+      isNew: false
+    });
+    upsertEdge(edgeMap, organizationId, id, "declared_domain", 1, [], []);
+  });
+
+  const metrics = asRecord(run.summary.metrics);
+  const sectorIntelligence = asRecord(metrics.sector_intelligence);
+  const declaredSectorValues = unique([
+    ...String(run.request.sector || "").split(","),
+    ...String(run.request.subsector || "").split(","),
+    ...stringValues(sectorIntelligence.declared_sectors)
+  ].map(cleanValue).filter(Boolean));
+  declaredSectorValues.forEach((sector) => {
+    addScopeContextNode(nodeMap, edgeMap, organizationId, "sector", sector, "declared_sector", "declared", 1, {
+      source: "declared_scope",
+      contextStatus: "declared"
+    });
+  });
+  recordValues(sectorIntelligence.contextual_sector_mentions)
+    .sort((left, right) => (numericValue(right.records) ?? 0) - (numericValue(left.records) ?? 0))
+    .slice(0, 8)
+    .forEach((row) => {
+      const sector = stringValue(row.sector);
+      if (!sector || declaredSectorValues.some((value) => value.toLowerCase() === sector.toLowerCase())) return;
+      addScopeContextNode(nodeMap, edgeMap, organizationId, "sector", sector, "mentions_sector", "collected", 0.55, {
+        source: "sector_intelligence",
+        contextStatus: stringValue(row.status) || "mention_only",
+        records: numericValue(row.records) ?? 0
+      }, stringValues(row.evidence_urls).slice(0, 20));
+    });
+
+  const geography = asRecord(metrics.geographic_intelligence);
+  const declaredCountryValues = unique([
+    ...declaredCountries(run),
+    ...stringValues(geography.declared_country_labels),
+    stringValue(geography.incorporation_country_label)
+  ].filter(Boolean));
+  declaredCountryValues.forEach((country) => {
+    addScopeContextNode(nodeMap, edgeMap, organizationId, "country", country, "declared_geography", "declared", 1, {
+      source: "declared_scope",
+      contextStatus: "declared"
+    });
+  });
+  recordValues(geography.evidence_supported_countries)
+    .sort((left, right) => (numericValue(right.records) ?? 0) - (numericValue(left.records) ?? 0))
+    .slice(0, 10)
+    .forEach((row) => {
+      const country = stringValue(row.country);
+      if (!country || declaredCountryValues.some((value) => value.toLowerCase() === country.toLowerCase())) return;
+      addScopeContextNode(nodeMap, edgeMap, organizationId, "country", country, "mentions_geography", "collected", 0.55, {
+        source: "geographic_intelligence",
+        contextStatus: stringValue(row.status) || "mention_only",
+        records: numericValue(row.records) ?? 0
+      }, stringValues(row.evidence_urls).slice(0, 20));
+    });
+
+  const technologyFootprint = asRecord(metrics.public_technology_footprint);
+  recordValues(technologyFootprint.rows).forEach((row) => {
+    const domain = stringValue(row.domain).toUpperCase();
+    if (!domain) return;
+    addScopeContextNode(nodeMap, edgeMap, organizationId, "technology", domain, "observes_technology_domain", "collected", 0.65, {
+      source: "public_technology_footprint",
+      contextStatus: "observed_context",
+      records: numericValue(row.records) ?? 0,
+      primaryTechnologyDomain: domain.toLowerCase(),
+      technologyDomains: domain.toLowerCase()
+    });
+    stringValues(row.products).slice(0, 12).forEach((product) => {
+      const productId = nodeId("technology", product);
+      upsertNode(nodeMap, {
+        id: productId,
+        label: product,
+        type: "technology",
+        status: "collected",
+        confidence: 0.55,
+        metadata: {
+          source: "public_technology_footprint",
+          contextStatus: "observed_context",
+          primaryTechnologyDomain: domain.toLowerCase(),
+          technologyDomains: domain.toLowerCase(),
+          knowledgeKind: "scope_context"
+        },
+        evidenceIds: [],
+        evidenceUrls: [],
+        isNew: false
+      });
+      upsertEdge(edgeMap, nodeId("technology", domain), productId, "contains_technology", 0.55, [], []);
+    });
+  });
+
+  mergeCtiSnapshotGraph(run, nodeMap, edgeMap, organizationId, referenceEntitiesByAlias);
+}
+
+function addScopeContextNode(
+  nodeMap: Map<string, RelationshipNode>,
+  edgeMap: Map<string, RelationshipEdge>,
+  organizationId: string,
+  type: "country" | "sector" | "technology",
+  label: string,
+  relation: string,
+  status: RelationshipNode["status"],
+  confidence: number,
+  metadata: Record<string, string | number | boolean>,
+  evidenceUrls: string[] = []
+) {
+  const id = nodeId(type, label);
+  upsertNode(nodeMap, {
+    id,
+    label,
+    type,
+    status,
+    confidence,
+    metadata: { ...metadata, contextRole: type, knowledgeKind: "scope_context" },
+    evidenceIds: [],
+    evidenceUrls,
+    isNew: false
+  });
+  upsertEdge(edgeMap, organizationId, id, relation, confidence, [], evidenceUrls);
+}
+
+function addReferenceClassification(index: Map<string, Set<string>>, nodeIdValue: string, value: string) {
+  const values = index.get(nodeIdValue) ?? new Set<string>();
+  values.add(value);
+  index.set(nodeIdValue, values);
+}
+
+function addReferenceEntityAlias(
+  index: Map<string, ReferenceEntityAlias[]>,
+  alias: string,
+  candidate: ReferenceEntityAlias
+) {
+  const key = referenceAliasKey(alias);
+  if (!key) return;
+  const candidates = index.get(key) ?? [];
+  if (!candidates.some((item) => item.id === candidate.id)) candidates.push(candidate);
+  index.set(key, candidates);
+}
+
+function matchReferenceEntity(
+  index: Map<string, ReferenceEntityAlias[]> | undefined,
+  alias: string,
+  requestedType: RelationshipEntityType
+): ReferenceEntityAlias | undefined {
+  const candidates = index?.get(referenceAliasKey(alias)) ?? [];
+  if (!candidates.length) return undefined;
+  const actorTypes = new Set<RelationshipEntityType>(["actor", "threat_actor", "threat_group"]);
+  if (actorTypes.has(requestedType)) return candidates.find((candidate) => actorTypes.has(candidate.type));
+  return candidates.find((candidate) => candidate.type === requestedType);
+}
+
+function referenceAliasKey(value: string): string {
+  return cleanValue(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function referenceTechnologyDomains(familyId: string): string[] {
+  if (familyId === "attack-ics") return ["ot"];
+  if (familyId === "attack-mobile") return ["mobile"];
+  if (familyId === "atlas") return ["ai"];
+  if (familyId === "emb3d") return ["iot", "iiot", "ot"];
+  if (["f3", "aadapt", "d3fend", "capec", "cwe", "inform", "disarm"].includes(familyId)) {
+    return ["it", "mobile", "ot"];
+  }
+  return ["it"];
+}
+
+function referenceAnalysisDomains(familyId: string): string[] {
+  if (familyId === "atlas") return ["cyber", "cti", "ai"];
+  if (familyId === "disarm") return ["cti", "influence", "disinformation"];
+  if (familyId === "f3") return ["cyber", "cti", "fraud"];
+  if (familyId === "aadapt") return ["cyber", "cti", "fraud", "digital_assets"];
+  if (familyId === "inform") return ["cyber", "cti", "maturity"];
+  if (familyId === "capec" || familyId === "cwe") return ["cyber", "vulnerability"];
+  return ["cyber", "cti"];
+}
+
+function recordValues(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.filter(isUnknownRecord) : [];
+}
+
+function attackIdentifier(value: string): string {
+  return value.match(/\b(?:T\d{4}(?:\.\d{3})?|G\d{4}|C\d{4}|S\d{4})\b/i)?.[0]?.toUpperCase() ?? "";
+}
+
 export function filterRelationshipGraph(
   model: RelationshipGraphModel,
   perspective: RelationshipPerspectiveKey
@@ -363,7 +1184,11 @@ export function filterRelationshipGraph(
   if (perspective === "all") return model;
   const allowed = new Set(relationshipPerspectives.find((item) => item.key === perspective)?.nodeTypes ?? []);
   const firstPass = new Set(model.nodes.filter((node) => allowed.has(node.type)).map((node) => node.id));
-  const contextTypes = new Set<RelationshipEntityType>(["organization", "domain", "country", "source", "evidence"]);
+  const contextTypes = new Set<RelationshipEntityType>(
+    perspective === "threats"
+      ? ["organization", "domain", "country", "sector", "technology"]
+      : ["organization", "domain", "country", "source", "evidence"]
+  );
   const nodeIndex = new Map(model.nodes.map((node) => [node.id, node]));
   model.edges.forEach((edge) => {
     if (!firstPass.has(edge.source) && !firstPass.has(edge.target)) return;
@@ -437,7 +1262,7 @@ function applyCentrality(nodes: RelationshipNode[], edges: RelationshipEdge[]): 
       centrality,
       pageRank: pageRank.get(node.id) ?? 0,
       betweenness: betweenness.get(node.id) ?? 0,
-      size: Math.min(34, 10 + Math.sqrt(degree) * 4.6)
+      size: Math.min(46, 11 + Math.log2(degree + 1) * 6.2)
     };
   });
 }
@@ -728,7 +1553,14 @@ function entityMetadata(
   const metadata: Record<string, string | number | boolean> = {
     records: 1,
     relationship: event.relationship_to_scope || "unassessed",
-    validation: event.validation_result || event.evidence_status || "collected"
+    validation: event.validation_result || event.evidence_status || "collected",
+    primaryTechnologyDomain: event.primary_technology_domain || "unknown",
+    technologyDomains: (event.technology_domains ?? []).join(", ") || "unknown",
+    analysisDomains: (event.analysis_domains ?? []).join(", ") || "cyber",
+    attribution: event.public_attribution_status || "unattributed",
+    frameworkMappings: (event.framework_refs ?? []).join(", ") || "none",
+    scenarioReferences: (event.scenario_refs ?? []).join(", ") || "none",
+    fraudSignal: Boolean(event.fraud_refs?.length)
   };
   if (type === "vulnerability" || type === "vulnerability_candidate") {
     metadata.product = String(validation.matched_product || "");
@@ -797,8 +1629,36 @@ function strongerStatus(
   left: RelationshipNode["status"],
   right: RelationshipNode["status"]
 ): RelationshipNode["status"] {
-  const rank: Record<RelationshipNode["status"], number> = { inferred: 0, collected: 1, declared: 2, validated: 3 };
+  const rank: Record<RelationshipNode["status"], number> = { reference: 0, inferred: 1, collected: 2, declared: 3, validated: 4 };
   return rank[right] > rank[left] ? right : left;
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return isUnknownRecord(value) ? value : {};
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? cleanValue(value) : "";
+}
+
+function stringValues(value: unknown): string[] {
+  return Array.isArray(value) ? unique(value.filter((item): item is string => typeof item === "string").map(cleanValue).filter(Boolean)) : [];
+}
+
+function numericValue(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function compactMetadata(values: Record<string, string | number | undefined>): Record<string, string | number | boolean> {
+  return Object.entries(values).reduce<Record<string, string | number | boolean>>((result, [key, value]) => {
+    if (value !== undefined && value !== "") result[key] = value;
+    return result;
+  }, {});
 }
 
 function nodeId(type: RelationshipEntityType, value: string): string {

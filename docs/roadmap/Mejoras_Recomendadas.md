@@ -1,6 +1,6 @@
 # Mejoras recomendadas de CyberDecisionEngine
 
-Documento separado del manual. Cada elemento se deriva de evidencia observada el 2026-07-19.
+Documento separado del manual. Cada elemento se deriva de evidencia observada hasta el 2026-08-20.
 
 | Prioridad | Horizonte | Esfuerzo | Problema/evidencia | Propuesta | Beneficio | Riesgo/dependencia | Criterio de aceptación |
 |---|---|---:|---|---|---|---|---|
@@ -12,8 +12,11 @@ Documento separado del manual. Cada elemento se deriva de evidencia observada el
 | P1 | corto | L | geolocalización normalizada incompleta | modelo `GeoObservation` con tipo, precisión, confianza y procedencia | honestidad geográfica | migración | 100 % de puntos trazables; desconocidos sin coordenada |
 | P1 | corto | L | grafo SOCMINT usa layout parcialmente sintético | construir nodos/aristas solo desde entidades y relaciones; métricas backend | rigor | modelo de entidades | cero nodos sin evidencia; export y panel lateral |
 | P1 | corto | M | autenticación local no es suficiente para SaaS | IdP/SSO, JWT rotativo, MFA, revocación y enforcement API | seguridad | proveedor de identidad | pruebas de aislamiento y sesión |
-| P1 | corto | M | OpenClaw tiene gateway pero roles limitados | contratos de agentes, auditoría, sanitización y fixtures de prompt injection | IA controlada | proveedor opcional | ejecución sin IA y pruebas de permisos |
+| P1 | corto | M | asistencia analítica tiene roles limitados | contratos de agentes, auditoría, sanitización y fixtures de prompt injection | IA controlada | motor opcional | ejecución sin IA y pruebas de permisos |
 | P2 | mediano | L | chunk de ciudades 2.19 MB gzip | generar catálogos por país y caché persistente | UX | pipeline build | <250 KB gzip por país |
+| P2 | mediano | L | índices multidominio son heurísticos y no probabilidades | construir dataset etiquetado por sector, calibrar y medir Brier/ECE | anticipación honesta | outcomes históricos | solo usar “probabilidad” tras métricas publicadas |
+| P2 | mediano | M | ATT&CK ICS, EMB3D y F3 evolucionan | sincronización firmada con diff, licencia, versión y rollback | vigencia de mappings | red y gobierno | cada run registra versión/hash del catálogo |
+| P2 | mediano | M | proyección multidominio se calcula en memoria | persistir agregados por runId para historiales de gran volumen | rendimiento | migración | 100k registros filtrados sin bloquear UI |
 | P2 | mediano | L | mapas y grafos dependen de resumen frontend | endpoints agregados geoespaciales y de grafo por `runId` | escalabilidad | esquema PostgreSQL | 10k registros sin bloquear UI |
 | P2 | mediano | M | ausencia de comparación histórica uniforme | snapshots comparables y delta por métrica/versiones | decisiones | migraciones | comparación no mezcla modelos |
 | P2 | mediano | L | fórmulas heurísticas sin dataset de outcomes | programa de calibración, Brier score y reliability curves | predicción honesta | datos etiquetados | solo usar “probabilidad” tras calibración |
@@ -25,4 +28,3 @@ Documento separado del manual. Cada elemento se deriva de evidencia observada el
 | P3 | largo | L | observabilidad dispersa | métricas, traces, correlación run/tool y SLO | soporte | stack observabilidad | error trazable por runId |
 | P3 | investigación | XL | sentimiento puede inducir error | validar modelo multilingüe por dominio y sesgo | marca/fraude | dataset etiquetado | métricas y limitaciones publicadas |
 | P3 | investigación | XL | Admiralty Code no implementado | doble dimensión confiabilidad de fuente/credibilidad de información | CTI | gobierno analítico | tabla, fórmula y test |
-

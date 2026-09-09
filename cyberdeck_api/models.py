@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -11,9 +11,11 @@ def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-AnalysisWindow = Literal["1h", "24h", "7d", "30d", "180d", "365d"]
+AnalysisWindow = Literal["1h", "24h", "7d", "30d", "180d", "365d", "custom"]
 SubjectType = Literal["organization", "person"]
 EvidenceReviewStatus = Literal["pending", "validated", "false_positive"]
+EvidenceReviewMode = Literal["manual", "ai_assisted"]
+ReportStatus = Literal["not_requested", "queued", "generating", "ready", "failed"]
 
 ANALYSIS_WINDOW_HOURS: Dict[str, int] = {
     "1h": 1,
@@ -26,6 +28,12 @@ ANALYSIS_WINDOW_HOURS: Dict[str, int] = {
 
 
 def normalize_analysis_window(request: "DomainAnalysisRequest") -> "DomainAnalysisRequest":
+    if request.analysis_start_date and request.analysis_end_date:
+        request.analysis_window = "custom"
+        days = (date.fromisoformat(request.analysis_end_date) - date.fromisoformat(request.analysis_start_date)).days + 1
+        request.lookback_days = min(365, days)
+        request.lookback_hours = min(8760, days * 24)
+        return request
     hours = ANALYSIS_WINDOW_HOURS.get(request.analysis_window, request.lookback_hours)
     request.lookback_hours = max(1, min(8760, int(hours)))
     request.lookback_days = max(1, min(365, math.ceil(request.lookback_hours / 24)))
@@ -58,6 +66,8 @@ class DomainAnalysisRequest(BaseModel):
     language: Literal["es", "en"] = "es"
     mode: Literal["snapshot", "deep"] = "deep"
     analysis_window: AnalysisWindow = "365d"
+    analysis_start_date: Optional[str] = None
+    analysis_end_date: Optional[str] = None
     lookback_hours: int = Field(default=8760, ge=1, le=8760)
     lookback_days: int = Field(default=365, ge=1, le=365)
     real_only: bool = True
@@ -89,6 +99,16 @@ class DomainAnalysisRequest(BaseModel):
 
     @model_validator(mode="after")
     def scope_requires_authorized_subject(self) -> "DomainAnalysisRequest":
+        if self.analysis_start_date or self.analysis_end_date or self.analysis_window == "custom":
+            if not self.analysis_start_date or not self.analysis_end_date:
+                raise ValueError("Both analysis dates are required.")
+            start, end = date.fromisoformat(self.analysis_start_date), date.fromisoformat(self.analysis_end_date)
+            if start > end:
+                raise ValueError("Analysis start date must not be after the end date.")
+            if end > datetime.now(timezone.utc).date():
+                raise ValueError("Analysis end date must not be in the future.")
+            self.analysis_start_date, self.analysis_end_date = start.isoformat(), end.isoformat()
+            self.analysis_window = "custom"
         has_domain = any(item and item.strip() for item in self.domains)
         has_organization = bool(self.organization_name and self.organization_name.strip())
         has_person = bool(self.person_name and self.person_name.strip())
@@ -97,14 +117,22 @@ class DomainAnalysisRequest(BaseModel):
         if self.subject_type == "person" and not has_person:
             raise ValueError("A person name is required when subject_type=person.")
         if not has_domain and not has_organization and not has_person:
-            raise ValueError("At least one domain, organization/brand name, or person name is required.")
+            raise ValueError(
+                "At least one domain, organization/brand name, or person name is required."
+            )
         return self
 
     @property
     def subject_name(self) -> Optional[str]:
         if self.subject_type == "person":
-            return self.person_name.strip() if self.person_name and self.person_name.strip() else None
-        return self.organization_name.strip() if self.organization_name and self.organization_name.strip() else None
+            return (
+                self.person_name.strip() if self.person_name and self.person_name.strip() else None
+            )
+        return (
+            self.organization_name.strip()
+            if self.organization_name and self.organization_name.strip()
+            else None
+        )
 
 
 class ReportSummary(BaseModel):
@@ -115,15 +143,48 @@ class ReportSummary(BaseModel):
     technical_url: Optional[str] = None
     technical_download_url: Optional[str] = None
     generated_at: str = Field(default_factory=utcnow_iso)
-    validation_status: Optional[Literal["approved", "approved_with_observations", "rejected"]] = None
+    validation_status: Optional[Literal["approved", "approved_with_observations", "rejected"]] = (
+        None
+    )
     validation_path: Optional[str] = None
     final: bool = True
+    language: Literal["es", "en"] = "es"
+    technology_domains: List[Literal["it", "iot", "iiot", "ot", "unknown"]] = Field(
+        default_factory=list
+    )
+    analysis_domains: List[Literal["cyber", "fraud", "brand", "disinformation", "ai_security"]] = (
+        Field(default_factory=list)
+    )
+    source_snapshot_hash: Optional[str] = None
+    report_snapshot_hash: Optional[str] = None
+    generator_version: Optional[str] = None
+    review_mode: EvidenceReviewMode = "manual"
+
+
+class ReportGenerationRequest(BaseModel):
+    force: bool = False
+    language: Literal["es", "en"] = "es"
+    review_mode: EvidenceReviewMode = "manual"
+    technology_domains: List[Literal["it", "iot", "iiot", "ot", "unknown"]] = Field(
+        default_factory=list
+    )
+    analysis_domains: List[Literal["cyber", "fraud", "brand", "disinformation", "ai_security"]] = (
+        Field(default_factory=list)
+    )
 
 
 class EvidenceReviewRequest(BaseModel):
     status: EvidenceReviewStatus
     reviewer: str = Field(default="authorized_user", min_length=2, max_length=120)
     reason: str = Field(default="", max_length=1000)
+
+
+class EvidenceReviewChange(EvidenceReviewRequest):
+    evidence_id: str = Field(min_length=1, max_length=512)
+
+
+class EvidenceReviewBatchRequest(BaseModel):
+    reviews: List[EvidenceReviewChange] = Field(min_length=1, max_length=500)
 
 
 class ReportCatalogItem(BaseModel):
@@ -220,9 +281,16 @@ class RunRecord(BaseModel):
     request: DomainAnalysisRequest
     domains: List[str] = Field(default_factory=list)
     progress: int = Field(default=0, ge=0, le=100)
-    estimated_seconds: int = Field(default=120, ge=30, le=14400)
+    estimated_seconds: int = Field(default=120, ge=30)
     error: Optional[str] = None
     report: Optional[ReportSummary] = None
+    report_status: ReportStatus = "not_requested"
+    report_error: Optional[str] = None
+    report_requested_at: Optional[str] = None
+    report_auto_due_at: Optional[str] = None
+    report_review_mode: EvidenceReviewMode = "manual"
+    evidence_review_status: Literal["not_started", "prepared", "completed"] = "not_started"
+    evidence_review_summary: Dict[str, Any] = Field(default_factory=dict)
     summary: AnalysisSummary = Field(default_factory=AnalysisSummary)
 
 
@@ -332,7 +400,15 @@ class MonitoringOverview(BaseModel):
     support_tickets: List[SupportTicket] = Field(default_factory=list)
 
 
-AIProvider = Literal["openai", "azure_openai", "anthropic", "gemini", "mistral", "local_openai_compatible", "openclaw_gateway"]
+AIProvider = Literal[
+    "openai",
+    "azure_openai",
+    "anthropic",
+    "gemini",
+    "mistral",
+    "local_openai_compatible",
+    "openclaw_gateway",
+]
 AIChatScope = Literal[
     "overview",
     "evidence",
@@ -352,7 +428,9 @@ AIChatScope = Literal[
 
 class AIAnalysisRequest(BaseModel):
     run_id: str
-    providers: List[AIProvider] = Field(default_factory=lambda: ["openai"], min_length=1, max_length=6)
+    providers: List[AIProvider] = Field(
+        default_factory=lambda: ["openai"], min_length=1, max_length=6
+    )
     audience: Literal["executive", "technical", "board", "incident", "fraud"] = "executive"
     depth: Literal["standard", "deep", "board"] = "deep"
     objective: str = "decision_intelligence"
@@ -411,7 +489,9 @@ class AIChatRequest(BaseModel):
     message: str = Field(min_length=2, max_length=4000)
     language: Literal["es", "en"] = "es"
     audience: Literal["executive", "technical", "board", "incident", "fraud"] = "executive"
-    scopes: List[AIChatScope] = Field(default_factory=lambda: ["overview"], min_length=1, max_length=13)
+    scopes: List[AIChatScope] = Field(
+        default_factory=lambda: ["overview"], min_length=1, max_length=13
+    )
     history: List[AIChatTurn] = Field(default_factory=list, max_length=12)
     output_token_budget: int = Field(default=800, ge=500, le=1200)
     analysis_mode: Literal["interactive", "deep"] = "interactive"

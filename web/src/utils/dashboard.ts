@@ -44,6 +44,7 @@ export interface GraphMetric {
 
 export interface FrameworkMappingItem {
   name: string;
+  version: string;
   family: string;
   coverage: number;
   coverageAssessed: boolean;
@@ -61,6 +62,8 @@ export interface FrameworkMappingItem {
   recordCount: number;
   validatedCount: number;
   directCount: number;
+  catalogStatus: string;
+  mappingStatus: string;
   axisMappings: FrameworkAxisMapping[];
 }
 
@@ -77,6 +80,7 @@ export interface FrameworkEvidenceRecord {
 
 export interface FrameworkAxisMapping {
   axis: string;
+  mappingStatus: string;
   controls: string[];
   recordCount: number;
   validatedCount: number;
@@ -162,10 +166,11 @@ export interface StrategyLens {
 export interface RiskHeatRow {
   index: number;
   name: string;
-  score: number;
-  heat: "low" | "medium" | "high" | "critical";
+  score: number | null;
+  heat: "no_data" | "low" | "medium" | "high" | "critical";
+  valueStatus: "no_data" | "evidence_backed";
   evidenceCount: number;
-  maxResidualRisk: number;
+  maxResidualRisk: number | null;
   decision: string;
 }
 
@@ -366,7 +371,7 @@ export interface DashboardModel {
 }
 
 const platformNames = ["Facebook", "Instagram", "TikTok", "X", "Public web"];
-export const FRAMEWORK_REFERENCES_VERIFIED_AT = "2026-07-26";
+export const FRAMEWORK_REFERENCES_VERIFIED_AT = "2026-08-25";
 const frameworkCatalog = [
   {
     name: "NIST CSF",
@@ -441,16 +446,52 @@ const frameworkCatalog = [
     sourceDate: "2024-06"
   },
   {
-    name: "MITRE ATT&CK",
+    name: "MITRE ATT&CK Enterprise",
     family: "Adversary behavior",
     domains: ["Initial access", "Execution", "Persistence", "Impact"],
     focus: ["ransomware", "phishing", "exploit_broker", "threat_intel"],
     considerations: ["Observed tactics", "mapped techniques", "coverage gaps", "example evidence"],
     evidenceFocus: ["technique_counts", "tactic coverage", "event technique", "source examples"],
     analysisUse: "Explain what adversary behavior is visible so detection and response can be prioritized by technique.",
-    sourceLabel: "MITRE ATT&CK Enterprise v19.1",
+    sourceLabel: "MITRE ATT&CK Enterprise v19.2",
     sourceUrl: "https://attack.mitre.org/resources/versions/",
-    sourceDate: "2026-04-28"
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "MITRE ATT&CK ICS",
+    family: "OT and industrial adversary behavior",
+    domains: ["Initial access", "Discovery", "Collection", "Command and control", "Inhibit response", "Impact"],
+    focus: ["ot", "iiot", "ics", "scada", "plc"],
+    considerations: ["Industrial asset context", "Safety and availability", "Process-control impact", "OT detection coverage"],
+    evidenceFocus: ["Explicit OT/IIoT assets", "ICS framework references", "industrial technology evidence", "mapped techniques"],
+    analysisUse: "Map evidence to the ICS matrix only when OT or IIoT context is explicitly supported.",
+    sourceLabel: "MITRE ATT&CK ICS v19.2",
+    sourceUrl: "https://attack.mitre.org/matrices/ics/",
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "MITRE ATT&CK Mobile",
+    family: "Mobile adversary behavior",
+    domains: ["Initial access", "Execution", "Persistence", "Collection", "Command and control", "Impact"],
+    focus: ["mobile", "android", "ios", "smartphone", "tablet"],
+    considerations: ["Mobile asset ownership", "Application provenance", "Credential exposure", "Device telemetry"],
+    evidenceFocus: ["Explicit mobile assets", "Android or iOS evidence", "mobile framework references", "mapped techniques"],
+    analysisUse: "Map evidence to the Mobile matrix only when mobile technology context is explicit.",
+    sourceLabel: "MITRE ATT&CK Mobile v19.2",
+    sourceUrl: "https://attack.mitre.org/matrices/mobile/",
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "MITRE EMB3D",
+    family: "Embedded device threats",
+    domains: ["Device properties", "Threats", "Mitigations"],
+    focus: ["iot", "iiot", "ot", "embedded", "firmware"],
+    considerations: ["Device properties", "Embedded threat applicability", "Firmware and hardware exposure", "Mitigation traceability"],
+    evidenceFocus: ["Explicit IoT/IIoT/OT assets", "embedded-device properties", "EMB3D references", "validated technology evidence"],
+    analysisUse: "Relate embedded-device evidence to EMB3D threats and mitigations without assuming an internal device inventory.",
+    sourceLabel: "MITRE EMB3D v2.0.2",
+    sourceUrl: "https://emb3d.mitre.org/subtabs/version-history.html",
+    sourceDate: "2026-08-25"
   },
   {
     name: "MITRE D3FEND",
@@ -460,9 +501,9 @@ const frameworkCatalog = [
     considerations: ["Countermeasure fit", "defensive tooling", "response action", "control uplift"],
     evidenceFocus: ["D3FEND rows", "ATT&CK mapped techniques", "samples", "recommended actions"],
     analysisUse: "Translate observed ATT&CK techniques into defensive actions and tool families.",
-    sourceLabel: "MITRE D3FEND Ontology v1.4.0",
+    sourceLabel: "MITRE D3FEND Ontology v1.5.0",
     sourceUrl: "https://d3fend.mitre.org/version/",
-    sourceDate: "2026-03-31"
+    sourceDate: "2026-08-25"
   },
   {
     name: "MITRE ATLAS",
@@ -472,9 +513,9 @@ const frameworkCatalog = [
     considerations: ["AI asset exposure", "prompt handling", "model supply chain", "agent autonomy"],
     evidenceFocus: ["AI/LLM matched signals", "ATLAS sections", "automation mentions", "supply-chain records"],
     analysisUse: "Review AI and automation risk only when explicit AI/model/agent/prompt signals are present.",
-    sourceLabel: "MITRE ATLAS Data v5.6.0",
-    sourceUrl: "https://github.com/mitre-atlas/atlas-data/releases/tag/v5.6.0",
-    sourceDate: "2026-05-04"
+    sourceLabel: "MITRE ATLAS living knowledge base",
+    sourceUrl: "https://atlas.mitre.org/",
+    sourceDate: "2026-08-25"
   },
   {
     name: "MITRE F3",
@@ -484,12 +525,72 @@ const frameworkCatalog = [
     considerations: ["Fraud actor behavior", "identity and transaction abuse", "impersonation infrastructure", "monetization path"],
     evidenceFocus: ["explicit F3 mappings", "assured current-run records", "fraud and brand evidence", "identity abuse signals"],
     analysisUse: "Map assured fraud-related evidence to official F3 tactics and techniques without treating a behavioral match as a confirmed fraud incident.",
-    sourceLabel: "MITRE Fight Fraud Framework (F3) v1.1",
+    sourceLabel: "MITRE Fight Fraud Framework (F3), 2026 release",
     sourceUrl: "https://ctid.mitre.org/fraud",
     sourceDate: "2026-06-23"
   },
   {
-    name: "COBIT",
+    name: "MITRE AADAPT",
+    family: "Digital-asset payment threats",
+    domains: ["Reconnaissance", "Access", "Execution", "Persistence", "Evasion", "Impact"],
+    focus: ["digital asset", "crypto", "blockchain", "wallet", "stablecoin", "payment technology"],
+    considerations: ["Wallet and key custody", "transaction authorization", "smart-contract exposure", "fraud and recovery"],
+    evidenceFocus: ["explicit AADAPT references", "digital-asset evidence", "wallet or payment abuse", "validated fraud signals"],
+    analysisUse: "Relate explicit digital-asset payment evidence to AADAPT without assuming that the organization operates blockchain infrastructure.",
+    sourceLabel: "MITRE AADAPT rolling knowledge base",
+    sourceUrl: "https://aadapt.mitre.org/",
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "MITRE CAPEC",
+    family: "Attack patterns",
+    domains: ["Mechanism", "Prerequisites", "Execution flow", "Consequences", "Mitigations"],
+    focus: ["attack pattern", "exploit", "vulnerability", "adversary"],
+    considerations: ["Pattern applicability", "prerequisites", "attack steps", "related weaknesses"],
+    evidenceFocus: ["explicit CAPEC references", "applicable CVE evidence", "attack-pattern descriptions", "validated technical context"],
+    analysisUse: "Use CAPEC to explain how an applicable weakness could be abused; a pattern match does not prove exploitation.",
+    sourceLabel: "MITRE CAPEC latest local catalog",
+    sourceUrl: "https://capec.mitre.org/",
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "MITRE CWE",
+    family: "Software and hardware weaknesses",
+    domains: ["Weakness", "Abstraction", "Relationships", "Consequences", "Mitigations"],
+    focus: ["cwe", "weakness", "vulnerability", "cve", "software", "hardware"],
+    considerations: ["Weakness applicability", "affected component", "technical preconditions", "mitigation traceability"],
+    evidenceFocus: ["explicit CWE references", "applicable product/version evidence", "CVE-to-weakness context", "validated exposure"],
+    analysisUse: "Connect applicable vulnerability evidence to weakness classes while keeping product presence and exploitability separate.",
+    sourceLabel: "MITRE CWE latest local catalog",
+    sourceUrl: "https://cwe.mitre.org/",
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "MITRE INFORM",
+    family: "Threat-informed defense maturity",
+    domains: ["People", "Process", "Technology", "Measurement", "Improvement"],
+    focus: ["threat-informed maturity", "capability assessment", "coverage gap", "inform"],
+    considerations: ["Maturity evidence", "capability ownership", "measurement basis", "improvement path"],
+    evidenceFocus: ["explicit INFORM assessment evidence", "documented capability gaps", "measurement records", "approved improvement actions"],
+    analysisUse: "Use INFORM only with explicit maturity-assessment evidence; public threat signals alone do not measure internal maturity.",
+    sourceLabel: "MITRE INFORM rolling model",
+    sourceUrl: "https://ctid.mitre.org/inform/",
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "DISARM",
+    family: "Influence and disinformation operations",
+    domains: ["Plan", "Prepare", "Execute", "Assess", "Observable assets"],
+    focus: ["disinformation", "narrative manipulation", "influence operation", "coordinated amplification"],
+    considerations: ["Narrative", "actor and channel", "target audience", "coordination evidence"],
+    evidenceFocus: ["explicit DISARM references", "observable narrative signals", "coordinated amplification", "traceable public sources"],
+    analysisUse: "Map observable influence-operation evidence without equating a mention or unfavorable narrative with coordinated disinformation.",
+    sourceLabel: "DISARM 2.0 Observable Framework",
+    sourceUrl: "https://www.disarm.foundation/framework",
+    sourceDate: "2026-08-25"
+  },
+  {
+    name: "COBIT 2019",
     family: "Governance",
     domains: ["Evaluate", "Align", "Build", "Deliver", "Monitor"],
     focus: ["risk", "governance", "open_web", "fraud"],
@@ -506,13 +607,14 @@ export function buildDashboardModel(run: RunRecord | undefined, filters: Dashboa
   const events = filterEvents(run?.summary.events ?? [], filters);
   const findings = run?.summary.findings ?? [];
   const statuses = run?.summary.source_statuses ?? [];
+  const threatNews = objectMetric(run?.summary.metrics?.threat_news);
   const categories = topCounts(events.map(dashboardCategory));
-  const actors = actorCounts(events, findings);
-  const ttpImpact = buildTtpImpact(events, findings);
+  const actors = actorCounts(events, threatNews);
+  const ttpImpact = buildTtpImpact(events, threatNews);
   const socmintEvents = events.filter(isSocmintEvent);
   const socmintNodes = buildSocmintNodes(socmintEvents);
-  const socmintLinks = buildSocmintLinks(socmintEvents);
-  const threatGraphNodes = buildThreatGraphNodes(events, actors, ttpImpact);
+  const socmintLinks = buildSocmintLinks(socmintEvents, socmintNodes);
+  const threatGraphNodes = buildThreatGraphNodes(events);
   const threatGraphLinks = buildThreatGraphLinks(threatGraphNodes, events);
   const strategicNews = objectMetric(run?.summary.metrics?.strategic_news);
   const strategicSnapshots = Array.isArray(strategicNews.snapshots) ? strategicNews.snapshots : [];
@@ -657,8 +759,18 @@ function topCounts(values: string[]): RankedItem[] {
   return rows.slice(0, 8);
 }
 
-function actorCounts(events: ThreatEvent[], _findings: Finding[]): RankedItem[] {
-  return topCounts(events.map((event) => explicitActor(event.actor)).filter(Boolean));
+function actorCounts(events: ThreatEvent[], threatNews: Record<string, unknown>): RankedItem[] {
+  const rows = Array.isArray(threatNews.actors) ? threatNews.actors.map((item) => objectMetric(item)) : [];
+  const attributed = rows
+    .map((item) => ({
+      name: explicitActor(stringMetric(item.actor, "")),
+      value: Math.round(numberMetric(item.record_count, 0))
+    }))
+    .filter((item) => item.name && item.value > 0)
+    .sort((left, right) => right.value - left.value);
+  return attributed.length
+    ? attributed.slice(0, 8)
+    : topCounts(events.map((event) => explicitActor(event.actor)).filter(Boolean));
 }
 
 function explicitActor(value?: string | null): string {
@@ -762,46 +874,50 @@ function buildSourceFreshness(statuses: SourceStatus[]): number {
 function buildGraphMetrics(events: ThreatEvent[], nodes: SocmintNode[], links: SocmintLink[]): GraphMetric[] {
   if (!events.length || !nodes.length) {
     return [
-      { label: "Connected signals", value: "0", helper: "No relationships mapped", tone: "low" },
-      { label: "Narrative clusters", value: "0", helper: "No active cluster", tone: "low" },
-      { label: "Decision confidence", value: "0%", helper: "No graph density", tone: "low" }
+      { label: "Traceable nodes", value: "0", helper: "No evidence-backed nodes", tone: "low" },
+      { label: "Traceable relationships", value: "0", helper: "No evidence-backed relationships", tone: "low" },
+      { label: "Connected-node coverage", value: "0%", helper: "No connected nodes", tone: "low" }
     ];
   }
-  const topics = nodes.filter((node) => node.group === "topic" || node.group === "mention");
-  const strongest = topics.sort((left, right) => right.size - left.size)[0]?.label ?? "pending";
-  const density = Math.min(100, Math.round((links.length / Math.max(1, nodes.length * 2)) * 100));
-  const confidence = Math.min(96, Math.max(42, events.length * 2 + links.length * 3 + 34));
+  const connected = new Set(links.flatMap((link) => [link.from, link.to]));
+  const coverage = Math.round((connected.size / Math.max(1, nodes.length)) * 100);
   return [
     {
-      label: "Connected signals",
+      label: "Traceable nodes",
       value: `${nodes.length}`,
-      helper: `${links.length} relationships mapped`,
+      helper: "Observed entities in current-run evidence",
       tone: "low"
     },
     {
-      label: "Narrative clusters",
-      value: `${topics.length}`,
-      helper: `Strongest: ${strongest}`,
-      tone: density > 55 ? "high" : "medium"
+      label: "Traceable relationships",
+      value: `${links.length}`,
+      helper: "Relations contained in the same evidence record",
+      tone: links.length ? "medium" : "low"
     },
     {
-      label: "Decision confidence",
-      value: `${confidence}%`,
-      helper: `${density}% graph density`,
-      tone: confidence > 78 ? "high" : "medium"
+      label: "Connected-node coverage",
+      value: `${coverage}%`,
+      helper: `${connected.size} of ${nodes.length} nodes participate in a relationship`,
+      tone: coverage >= 70 ? "high" : coverage > 0 ? "medium" : "low"
     }
   ];
 }
 
-function buildFrameworkMappings(findings: Finding[], events: ThreatEvent[], metrics: Record<string, unknown> | undefined): FrameworkMappingItem[] {
+function buildFrameworkMappings(_findings: Finding[], _events: ThreatEvent[], metrics: Record<string, unknown> | undefined): FrameworkMappingItem[] {
   const controlScores = objectMetric(metrics?.control_scores);
   const backendMapping = objectMetric(metrics?.framework_mapping);
   const backendRows = Array.isArray(backendMapping.mappings) ? backendMapping.mappings.map((item) => objectMetric(item)) : [];
+  const backendCatalog = Array.isArray(backendMapping.framework_catalog)
+    ? backendMapping.framework_catalog.map((item) => objectMetric(item))
+    : [];
 
   return frameworkCatalog.map((framework) => {
-    const axisMappings = backendRows.length
-      ? backendRows.filter((row) => stringMetric(row.framework, "") === framework.name).map(parseFrameworkAxisMapping)
-      : deriveFrameworkAxisMappings(framework, events, findings);
+    const catalogRow = backendCatalog.find(
+      (row) => canonicalFrameworkName(stringMetric(row.name, "")) === framework.name
+    );
+    const axisMappings = backendRows
+      .filter((row) => canonicalFrameworkName(stringMetric(row.framework, "")) === framework.name)
+      .map(parseFrameworkAxisMapping);
     const recordCount = new Set(axisMappings.flatMap((item) => item.evidence.map((evidence) => evidence.evidenceId))).size;
     const validatedCount = new Set(
       axisMappings.flatMap((item) => item.evidence.filter((evidence) => ["validated", "confirmed"].includes(evidence.status)).map((evidence) => evidence.evidenceId))
@@ -815,13 +931,21 @@ function buildFrameworkMappings(findings: Finding[], events: ThreatEvent[], metr
     const coverage = coverageValue === null ? 0 : Math.round(coverageValue * 100);
     const tone = validatedCount > 0 ? "high" : directCount > 0 ? "medium" : recordCount > 0 ? "low" : "low";
     const mappedAxes = axisMappings.map((item) => item.axis.replace(/_/g, " "));
+    const mappingStatus = strongestFrameworkMappingStatus(axisMappings.map((item) => item.mappingStatus));
     return {
       name: framework.name,
+      version: stringMetric(catalogRow?.version, framework.sourceLabel),
       family: framework.family,
       domains: framework.domains,
       affectedAspects: hasFrameworkEvidence ? mappedAxes : ["No active evidence"],
       considerations: framework.considerations,
-      evidenceFocus: axisMappings.flatMap((item) => item.evidence.map((evidence) => evidence.title)).slice(0, 8),
+      evidenceFocus: [
+        ...new Set(
+          axisMappings
+            .flatMap((item) => item.evidence.map((evidence) => evidence.title.trim()))
+            .filter(Boolean)
+        )
+      ].slice(0, 8),
       analysisUse: framework.analysisUse,
       sourceLabel: framework.sourceLabel,
       sourceUrl: framework.sourceUrl,
@@ -836,15 +960,40 @@ function buildFrameworkMappings(findings: Finding[], events: ThreatEvent[], metr
       recordCount,
       validatedCount,
       directCount,
+      catalogStatus: stringMetric(catalogRow?.status, hasFrameworkEvidence ? "evidence_backed" : "no_data"),
+      mappingStatus,
       axisMappings
     };
   });
+}
+
+function canonicalFrameworkName(value: string): string {
+  const aliases: Record<string, string> = {
+    "MITRE ATT&CK": "MITRE ATT&CK Enterprise",
+    "COBIT": "COBIT 2019"
+  };
+  return aliases[value] ?? value;
+}
+
+function strongestFrameworkMappingStatus(values: string[]): string {
+  const rank: Record<string, number> = {
+    no_data: 0,
+    preventive_reference: 1,
+    potentially_relevant: 2,
+    evidence_supported_candidate: 3,
+    observed_behavior: 4,
+    validated: 5
+  };
+  return values.length
+    ? [...values].sort((left, right) => (rank[right] ?? -1) - (rank[left] ?? -1))[0]
+    : "no_data";
 }
 
 function parseFrameworkAxisMapping(raw: Record<string, unknown>): FrameworkAxisMapping {
   const evidenceRows = Array.isArray(raw.evidence) ? raw.evidence.map((item) => objectMetric(item)) : [];
   return {
     axis: stringMetric(raw.axis, "unmapped"),
+    mappingStatus: stringMetric(raw.mapping_status, "potentially_relevant"),
     controls: stringList(raw.controls),
     recordCount: Math.round(numberMetric(raw.record_count, evidenceRows.length)),
     validatedCount: Math.round(numberMetric(raw.validated_count, 0)),
@@ -863,52 +1012,6 @@ function parseFrameworkAxisMapping(raw: Record<string, unknown>): FrameworkAxisM
       observedAt: stringMetric(item.observed_at, "")
     }))
   };
-}
-
-function deriveFrameworkAxisMappings(
-  framework: (typeof frameworkCatalog)[number],
-  events: ThreatEvent[],
-  findings: Finding[]
-): FrameworkAxisMapping[] {
-  const axes = [
-    { axis: "governance", terms: ["govern", "risk", "legal", "regulat", "policy", "audit"] },
-    { axis: "identity", terms: ["identity", "credential", "account", "login", "password", "mfa", "session", "bec"] },
-    { axis: "protect", terms: ["protect", "hardening", "configuration", "encryption", "backup", "recover"] },
-    { axis: "detect", terms: ["detect", "monitor", "logging", "telemetry", "alert", "indicator"] },
-    { axis: "response", terms: ["incident", "respond", "response", "contain", "recover", "takedown"] },
-    { axis: "privacy", terms: ["privacy", "personal data", "pii", "confidential", "breach", "gdpr"] },
-    { axis: "vulnerability", terms: ["vulnerab", "cve-", "kev", "exploit", "patch", "exposure", "surface"] },
-    { axis: "fraud", terms: ["fraud", "phish", "scam", "estafa", "suplant", "imperson", "fake job", "empleo falso"] },
-    { axis: "ai", terms: ["artificial intelligence", "machine learning", "llm", "prompt", "model", "agent", "atlas"] },
-    { axis: "adversary", terms: ["attack", "ransom", "malware", "campaign", "campaña", "actor", "apt", "ttp"] }
-  ];
-  const frameworkText = normalizeDashboardText([framework.name, framework.family, ...framework.domains, ...framework.focus, ...framework.considerations].join(" "));
-  return axes.flatMap(({ axis, terms }) => {
-    if (!terms.some((term) => frameworkText.includes(term))) return [];
-    const related = events.filter((event) => event.evidence_url && terms.some((term) => eventText(event).toLowerCase().includes(term)));
-    if (!related.length) return [];
-    const evidence = related.map((event) => ({
-      evidenceId: event.canonical_id || event.id,
-      title: event.title,
-      url: event.evidence_url || "",
-      source: event.source,
-      status: event.evidence_status || "raw",
-      relationship: event.relationship_to_scope || "unassessed",
-      domain: event.host || event.asset || "",
-      observedAt: event.observed_at
-    }));
-    return [{
-      axis,
-      controls: framework.domains.filter((domain) => terms.some((term) => normalizeDashboardText(domain).includes(term))).slice(0, 5),
-      recordCount: evidence.length,
-      validatedCount: evidence.filter((item) => ["validated", "confirmed"].includes(item.status)).length,
-      directCount: evidence.filter((item) => item.status === "direct").length,
-      relatedCount: evidence.filter((item) => !["direct", "validated", "confirmed"].includes(item.status)).length,
-      findingCount: findings.filter((finding) => terms.some((term) => `${finding.title} ${finding.category}`.toLowerCase().includes(term))).length,
-      domains: [...new Set(evidence.map((item) => item.domain).filter(Boolean))],
-      evidence: evidence.slice(0, 12)
-    }];
-  });
 }
 
 function buildPosturePoints(metrics: Record<string, unknown> | undefined): PosturePoint[] {
@@ -1020,15 +1123,21 @@ function buildRiskHeatRows(raw: unknown, findings: Finding[], events: ThreatEven
   const rowsRaw = Array.isArray(data.rows) ? data.rows : [];
   const rows = rowsRaw
     .map((item) => objectMetric(item))
-    .map((item) => ({
-      index: Math.round(numberMetric(item.index, 0)),
-      name: stringMetric(item.name, "Risk"),
-      score: numberMetric(item.score, 0),
-      heat: heatTone(stringMetric(item.heat, "low")),
-      evidenceCount: Math.round(numberMetric(item.evidence_count, 0)),
-      maxResidualRisk: numberMetric(item.max_residual_risk, 0),
-      decision: stringMetric(item.decision, "")
-    }));
+    .map((item) => {
+      const valueStatus = stringMetric(item.value_status, item.score == null ? "no_data" : "evidence_backed");
+      const hasScore = typeof item.score === "number" && Number.isFinite(item.score);
+      const hasResidual = typeof item.max_residual_risk === "number" && Number.isFinite(item.max_residual_risk);
+      return {
+        index: Math.round(numberMetric(item.index, 0)),
+        name: stringMetric(item.name, "Risk"),
+        score: valueStatus === "no_data" || !hasScore ? null : numberMetric(item.score, 0),
+        heat: valueStatus === "no_data" ? "no_data" as const : heatTone(stringMetric(item.heat, "low")),
+        valueStatus: valueStatus === "no_data" ? "no_data" as const : "evidence_backed" as const,
+        evidenceCount: Math.round(numberMetric(item.evidence_count, 0)),
+        maxResidualRisk: hasResidual ? numberMetric(item.max_residual_risk, 0) : null,
+        decision: stringMetric(item.decision, "")
+      };
+    });
   if (rows.length) return rows;
 
   return findings.slice(0, 8).map((finding, index) => ({
@@ -1036,6 +1145,7 @@ function buildRiskHeatRows(raw: unknown, findings: Finding[], events: ThreatEven
     name: finding.category,
     score: clamp(finding.residual_risk / 40, 0, 1),
     heat: toneForExposure(finding.residual_risk * 3),
+    valueStatus: "evidence_backed",
     evidenceCount: events.filter((event) => event.category === finding.category).length,
     maxResidualRisk: finding.residual_risk,
     decision: finding.recommendations[0] ?? "Prioritize validation"
@@ -1063,7 +1173,10 @@ function buildAttackPrediction(run: RunRecord | undefined, events: ThreatEvent[]
   const sector = sectorWeight(inferredSector);
   const socmint = clamp(analyticEvents.filter(isSocmintEvent).length / 12, 0, 1);
   const darkweb = clamp(analyticEvents.filter(isDarkwebEvent).length / 6, 0, 1);
-  const riskHeat = Math.max(...buildRiskHeatRows(metrics.risk_heat_radar, findings, analyticEvents).map((row) => row.score), 0);
+  const measuredRiskHeat = buildRiskHeatRows(metrics.risk_heat_radar, findings, analyticEvents)
+    .map((row) => row.score)
+    .filter((score): score is number => typeof score === "number" && Number.isFinite(score));
+  const riskHeat = Math.max(...measuredRiskHeat, 0);
   const w = predictionModelWeights;
   const signalRateDaily = Math.max(
     0,
@@ -1806,13 +1919,22 @@ function frameworkCoverage(name: string, controlScores: Record<string, unknown>)
     "NIST CSF": ["NIST CSF 2.0"],
     "ISO 27001": ["ISO 27001:2022"],
     "SOC 2": ["SOC 2"],
-    "MITRE ATT&CK": ["ATT&CK Detection"],
+    "MITRE ATT&CK Enterprise": ["ATT&CK Detection"],
+    "MITRE ATT&CK ICS": [],
+    "MITRE ATT&CK Mobile": [],
+    "MITRE EMB3D": [],
     "MITRE D3FEND": ["D3FEND"],
     "CIS Controls": ["NIST CSF 2.0", "Incident Response"],
-    COBIT: ["NIST CSF 2.0", "ISO 27001:2022"],
+    "COBIT 2019": ["NIST CSF 2.0", "ISO 27001:2022"],
     "PCI DSS": ["ISO 27001:2022", "SOC 2"],
     GDPR: ["ISO 27001:2022", "SOC 2"],
-    "MITRE ATLAS": []
+    "MITRE ATLAS": [],
+    "MITRE F3": [],
+    "MITRE AADAPT": [],
+    "MITRE CAPEC": [],
+    "MITRE CWE": [],
+    "MITRE INFORM": [],
+    DISARM: []
   };
   const keys = mapping[name] ?? [];
   const values = keys.map((key) => numberMetric(controlScores[key], NaN)).filter((value) => Number.isFinite(value));
@@ -1907,42 +2029,40 @@ function buildPlatformMentions(events: ThreatEvent[]): RankedItem[] {
 }
 
 function buildSocmintNodes(events: ThreatEvent[]): SocmintNode[] {
-  if (!events.length) return [];
-  const topics = topCounts(events.flatMap((event) => [event.category, ...(event.tags ?? []).slice(0, 2)]));
-  const nodes: SocmintNode[] = [
-    { id: "Public web", label: "Public web", group: "platform", x: 50, y: 50, size: 18 },
-    { id: "X", label: "X", group: "platform", x: 24, y: 32, size: 13 },
-    { id: "TikTok", label: "TikTok", group: "platform", x: 76, y: 28, size: 12 },
-    { id: "Instagram", label: "Instagram", group: "platform", x: 22, y: 76, size: 12 },
-    { id: "Facebook", label: "Facebook", group: "platform", x: 78, y: 76, size: 12 }
-  ];
-  topics.slice(0, 8).forEach((topic, index) => {
-    nodes.push({
-      id: topic.name,
-      label: topic.name,
-      group: index % 3 === 0 ? "mention" : "topic",
-      x: 33 + (index % 4) * 12,
-      y: 24 + Math.floor(index / 4) * 45,
-      size: Math.max(7, Math.min(16, topic.value + 6))
-    });
+  const seeds = new Map<string, { label: string; group: SocmintNode["group"]; count: number }>();
+  graphEligibleEvents(events).forEach((event) => {
+    addGraphSeed(seeds, graphPlatformId(event), graphPlatformLabel(event), "platform");
+    const actor = explicitActor(event.actor);
+    addGraphSeed(seeds, actor ? `actor:${actor}` : "", actor, "user");
+    graphTopics(event).forEach((topic) => addGraphSeed(seeds, `topic:${topic}`, topic, "topic"));
   });
-  return nodes;
+  return positionGraphSeeds(seeds, 18);
 }
 
-function buildSocmintLinks(events: ThreatEvent[]): SocmintLink[] {
-  if (!events.length) return [];
-  const topics = topCounts(events.flatMap((event) => [event.category, ...(event.tags ?? []).slice(0, 2)]));
-  return topics.slice(0, 8).flatMap((topic, index) => [
-    { from: "Public web", to: topic.name },
-    { from: platformNames[index % platformNames.length], to: topic.name }
-  ]);
+function buildSocmintLinks(events: ThreatEvent[], nodes: SocmintNode[]): SocmintLink[] {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const links = new Map<string, SocmintLink>();
+  graphEligibleEvents(events).forEach((event) => {
+    const actor = explicitActor(event.actor);
+    const baseIds = [graphPlatformId(event), actor ? `actor:${actor}` : ""].filter((id) => nodeIds.has(id));
+    const topicIds = graphTopics(event).map((topic) => `topic:${topic}`).filter((id) => nodeIds.has(id));
+    addEvidenceContainedLinks(links, [...baseIds, ...topicIds]);
+  });
+  return [...links.values()];
 }
 
-function buildTtpImpact(events: ThreatEvent[], findings: Finding[]): RankedItem[] {
-  return topCounts([
-    ...events.map((event) => event.technique || inferTechnique(event.title)),
-    ...findings.flatMap((finding) => finding.recommendations.map(inferTechnique))
-  ]);
+function buildTtpImpact(events: ThreatEvent[], threatNews: Record<string, unknown>): RankedItem[] {
+  const rows = Array.isArray(threatNews.ttps) ? threatNews.ttps.map((item) => objectMetric(item)) : [];
+  const mapped = rows
+    .map((item) => ({
+      name: stringMetric(item.technique, ""),
+      value: Math.round(numberMetric(item.record_count, 0))
+    }))
+    .filter((item) => item.name && item.value > 0)
+    .sort((left, right) => right.value - left.value);
+  return mapped.length
+    ? mapped.slice(0, 8)
+    : topCounts(events.map((event) => event.technique || "").filter(Boolean));
 }
 
 function buildAttackActions(events: ThreatEvent[], findings: Finding[]): RankedItem[] {
@@ -2032,38 +2152,105 @@ function isAttributedThreatHeadline(event: ThreatEvent): boolean {
   return cyberAction && attributed;
 }
 
-function buildThreatGraphNodes(events: ThreatEvent[], actors: RankedItem[], ttps: RankedItem[]): SocmintNode[] {
-  if (!events.length) return [];
-  const actorNodes = actors.slice(0, 5);
-  const ttpNodes = ttps.slice(0, 5);
-  const nodes: SocmintNode[] = [{ id: "Threat activity", label: "Threat activity", group: "platform", x: 50, y: 50, size: 18 }];
-  actorNodes.forEach((actor, index) => {
-    nodes.push({ id: `actor:${actor.name}`, label: actor.name, group: "mention", x: 22 + index * 14, y: index % 2 === 0 ? 24 : 34, size: Math.min(16, actor.value + 7) });
+function buildThreatGraphNodes(events: ThreatEvent[]): SocmintNode[] {
+  const seeds = new Map<string, { label: string; group: SocmintNode["group"]; count: number }>();
+  threatGraphEvents(events).forEach((event) => {
+    const actor = explicitActor(event.actor);
+    addGraphSeed(seeds, actor ? `actor:${actor}` : "", actor, "mention");
+    addGraphSeed(seeds, event.technique ? `ttp:${event.technique}` : "", event.technique ?? "", "topic");
+    addGraphSeed(seeds, event.host ? `host:${event.host}` : "", event.host ?? "", "platform");
   });
-  ttpNodes.forEach((ttp, index) => {
-    nodes.push({ id: `ttp:${ttp.name}`, label: ttp.name, group: "topic", x: 26 + index * 12, y: index % 2 === 0 ? 78 : 68, size: Math.min(15, ttp.value + 6) });
-  });
-  return nodes;
+  return positionGraphSeeds(seeds, 16);
 }
 
 function buildThreatGraphLinks(nodes: SocmintNode[], events: ThreatEvent[]): SocmintLink[] {
-  const hub = nodes[0]?.id;
-  if (!hub) return [];
   const nodeIds = new Set(nodes.map((node) => node.id));
   const links = new Map<string, SocmintLink>();
-  const connectedNodeIds = new Set<string>();
-  events.forEach((event) => {
-    const actorId = event.actor ? `actor:${event.actor}` : "";
-    const techniqueId = event.technique ? `ttp:${event.technique}` : "";
-    if (!nodeIds.has(actorId) || !nodeIds.has(techniqueId)) return;
-    links.set(`${actorId}|${techniqueId}`, { from: actorId, to: techniqueId });
-    connectedNodeIds.add(actorId);
-    connectedNodeIds.add(techniqueId);
-  });
-  nodes.slice(1).forEach((node) => {
-    if (!connectedNodeIds.has(node.id)) links.set(`${hub}|${node.id}`, { from: hub, to: node.id });
+  threatGraphEvents(events).forEach((event) => {
+    const actor = explicitActor(event.actor);
+    const ids = [
+      actor ? `actor:${actor}` : "",
+      event.technique ? `ttp:${event.technique}` : "",
+      event.host ? `host:${event.host}` : ""
+    ].filter((id) => nodeIds.has(id));
+    addEvidenceContainedLinks(links, ids);
   });
   return [...links.values()];
+}
+
+function graphEligibleEvents(events: ThreatEvent[]): ThreatEvent[] {
+  return events.filter((event) => Boolean(event.evidence_url) && !["false_positive", "discarded"].includes(event.evidence_status ?? ""));
+}
+
+function threatGraphEvents(events: ThreatEvent[]): ThreatEvent[] {
+  return graphEligibleEvents(events).filter(
+    (event) =>
+      ["direct", "validated", "confirmed"].includes(event.evidence_status ?? "") &&
+      Boolean(explicitActor(event.actor) || event.technique || event.host)
+  );
+}
+
+function graphTopics(event: ThreatEvent): string[] {
+  return [event.category, ...(event.tags ?? [])]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function graphPlatformLabel(event: ThreatEvent): string {
+  if (!event.evidence_url) return "";
+  try {
+    return new URL(event.evidence_url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function graphPlatformId(event: ThreatEvent): string {
+  const label = graphPlatformLabel(event);
+  return label ? `platform:${label}` : "";
+}
+
+function addGraphSeed(
+  seeds: Map<string, { label: string; group: SocmintNode["group"]; count: number }>,
+  id: string,
+  label: string,
+  group: SocmintNode["group"]
+): void {
+  if (!id || !label) return;
+  const current = seeds.get(id);
+  seeds.set(id, { label, group, count: (current?.count ?? 0) + 1 });
+}
+
+function positionGraphSeeds(
+  seeds: Map<string, { label: string; group: SocmintNode["group"]; count: number }>,
+  limit: number
+): SocmintNode[] {
+  const rows = [...seeds.entries()]
+    .sort((left, right) => right[1].count - left[1].count || left[0].localeCompare(right[0]))
+    .slice(0, limit);
+  return rows.map(([id, seed], index) => {
+    const angle = (Math.PI * 2 * index) / Math.max(1, rows.length) - Math.PI / 2;
+    const radius = rows.length <= 4 ? 25 : index % 2 === 0 ? 31 : 39;
+    return {
+      id,
+      label: seed.label,
+      group: seed.group,
+      x: 50 + Math.cos(angle) * radius,
+      y: 50 + Math.sin(angle) * radius,
+      size: Math.max(8, Math.min(18, 8 + seed.count * 2))
+    };
+  });
+}
+
+function addEvidenceContainedLinks(links: Map<string, SocmintLink>, ids: string[]): void {
+  const uniqueIds = [...new Set(ids)];
+  for (let index = 1; index < uniqueIds.length; index += 1) {
+    const from = uniqueIds[0];
+    const to = uniqueIds[index];
+    if (!from || !to || from === to) continue;
+    links.set(`${from}|${to}`, { from, to });
+  }
 }
 
 function inferTechnique(text: string): string {

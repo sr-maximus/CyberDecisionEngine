@@ -4,8 +4,8 @@
 |---|---|
 | Plataforma | CyberDecisionEngine |
 | Versión de aplicación | 0.1.0 |
-| Versión del manual | 1.1.0 |
-| Fecha | 2026-07-20 |
+| Versión del manual | 1.2.0 |
+| Fecha | 2026-08-20 |
 | Clasificación | Uso interno / información pública autorizada |
 | Creador conceptual | Edwin Peñuela, modelo desarrollado desde 2022 |
 
@@ -48,6 +48,8 @@ No sustituye una auditoría interna, un pentest, un peritaje, una certificación
 - inteligencia de vulnerabilidades con control de aplicabilidad;
 - fraude y suplantación de marca;
 - desinformación y mapeo DISARM;
+- huella tecnológica pública IT, IoT, IIoT y OT;
+- escenarios ATT&CK Enterprise/ICS, EMB3D, D3FEND, ATLAS, F3 y DISARM;
 - contexto estratégico PESTEL/Porter;
 - escenarios ATT&CK, D3FEND, ATLAS y DISARM;
 - informe ejecutivo y técnico bajo solicitud del usuario;
@@ -61,15 +63,15 @@ flowchart LR
     W --> A["FastAPI"]
     A --> R["RunStore y workers"]
     R --> C["Recolectores públicos"]
-    R --> S1["OSINT tools"]
-    R --> S2["Superficie externa"]
-    R --> S3["SpiderFoot pasivo"]
-    R --> T["Tor SOCKS opcional"]
+    R --> S1["Búsqueda y correlación pública"]
+    R --> S2["Superficie externa pasiva"]
+    R --> S3["Índices públicos y noticias"]
+    R --> T["Canal profundo autorizado"]
     R --> P["Normalización y deduplicación"]
     P --> M["Análisis, riesgo y escenarios"]
-    M --> AI["OpenClaw aislado: borradores y revisión"]
+    M --> AI["Asistencia analítica opcional"]
     M --> K["Backend interno de conocimiento"]
-    K -. "opcional" .-> O["OpenCTI"]
+    K -. "opcional" .-> O["Interoperabilidad de conocimiento"]
     M --> DB[("PostgreSQL")]
     M --> F["Contexto por runId"]
     F --> D["Dashboard"]
@@ -84,11 +86,10 @@ flowchart LR
 | `web` | interfaz y reportes | host 8080 |
 | `api` | API y motor | host 8000 |
 | `postgres` | datos persistentes | host 15432 para administración local |
-| `osint-tools` | búsquedas auxiliares autorizadas | solo red interna |
-| `kali-surface` | superficie defensiva | solo red interna |
-| `spiderfoot` | recolección pasiva | solo red interna |
-| `tor-proxy` | proxy SOCKS opcional | solo red interna |
-| `openclaw-gateway` | orquestación de IA controlada | solo red interna, sin puerto host |
+| `public-collection` | búsqueda y correlación pública | solo red interna |
+| `external-surface` | superficie defensiva pasiva | solo red interna |
+| `deep-channel` | canal profundo autorizado | solo red interna |
+| `analysis-assistant` | asistencia analítica controlada | solo red interna, sin puerto host |
 
 ### Fuente de verdad
 
@@ -108,9 +109,11 @@ Una ejecución organizacional requiere al menos un dominio o nombre de organizac
 
 - marca, grupo o conglomerado;
 - dominios propios;
-- sector y subsector;
+- sector y una o varias actividades o subsectores, con texto libre para no limitar industrias como aviación, transporte, energía o minería;
 - país y países de operación;
 - marcas, filiales, productos y activos estratégicos;
+- proveedores críticos y terceras partes declaradas;
+- competidores declarados y dominios comparativos, almacenados fuera del alcance técnico propio;
 - ventana temporal;
 - modo `snapshot` o `deep`;
 - presupuesto de tiempo;
@@ -121,7 +124,7 @@ Los dominios comparativos se almacenan aparte y no se mezclan con el alcance pro
 
 ### Fuentes
 
-Las API keys son opcionales. Su ausencia debe producir `disabled`, `not_applicable` o `skipped`, nunca registros simulados. OpenCTI usa `OPENCTI_MODE=disabled` por defecto.
+Las credenciales de capacidades externas son opcionales. Su ausencia debe producir `disabled`, `not_applicable` o `skipped`, nunca registros simulados. El backend interno continúa disponible sin interoperabilidad externa.
 
 ## 7. Operación paso a paso
 
@@ -129,16 +132,17 @@ Las API keys son opcionales. Su ausencia debe producir `disabled`, `not_applicab
 2. Cree o seleccione una empresa si corresponde.
 3. Abra **Overview**; allí se integran alcance, configuración, ejecución, progreso y resumen de resultados.
 4. Escriba la marca/organización y dominios autorizados.
-5. Defina sector, país, ventana, profundidad y Tor.
+5. Defina sector, actividades, países, proveedores críticos, competidores, ventana, profundidad y Tor.
 6. Confirme el alcance.
 7. Lance la ejecución.
 8. Observe `Estado de corrida`; cada etapa cambia progreso y estado.
 9. Revise cobertura de conectores y errores parciales.
 10. Desde Overview abra tablero estratégico, evidencia, superficie, OSINT, Inteligencia SOCMINT y posibilidades soportadas.
 11. Valide o descarte evidencia desde el ledger.
-12. Solicite el informe con el botón **Generar informe**.
-13. Revise el resultado del validador.
-14. Descargue HTML, JSON o CSV.
+12. Solicite el informe con el botón **Generar informe** y elija revisión manual o asistida.
+13. En modo manual los registros conservan su estado hasta que el usuario decida. En modo asistido el motor prioriza y explica qué revisar, pero no valida ni descarta automáticamente.
+14. Revise el resultado del validador del informe.
+15. Descargue HTML, JSON o CSV.
 
 Cerrar sesión no detiene el worker: la ejecución vive en la API y queda persistida.
 
@@ -159,7 +163,7 @@ flowchart TD
 
 ## 9. Fuentes y estados
 
-El catálogo puede incluir buscadores públicos/RSS, noticias, CISA KEV, NVD, FIRST EPSS, GitHub Advisories, OTX, urlscan, DNS/certificados/WHOIS, SpiderFoot, índices autorizados de dark web, MISP y TAXII.
+El catálogo puede incluir búsqueda pública, noticias y RSS, inteligencia de vulnerabilidades, DNS/certificados/WHOIS, superficie externa, índices autorizados de canal profundo e interoperabilidad CTI. La interfaz muestra la capacidad pública y su estado operativo; los nombres de implementación permanecen en documentación interna del operador.
 
 Estados del ciclo de vida:
 
@@ -214,6 +218,16 @@ Revisa DNS, correo, certificados, WHOIS, subdominios y tecnologías mediante té
 
 Busca suplantación, dominios similares y narrativas relacionadas. La similitud lexical es una señal, no prueba de fraude. El impacto reputacional requiere evidencia de alcance, contexto y corroboración.
 
+### Relaciones, terceras partes y dominios similares
+
+El motor separa tres lecturas:
+
+- **terceras partes:** proveedores declarados o relaciones explícitamente observadas; una relación sin evidencia de riesgo permanece como contexto;
+- **dominios similares:** únicamente hosts que aparecieron en registros de la corrida; nunca se generan dominios hipotéticos para presentarlos como observados;
+- **contexto competitivo:** competidores declarados o representados por evidencia para Porter y PESTEL; la declaración no suma riesgo técnico.
+
+Una puntuación de atención de terceros solo se calcula cuando existe evidencia directa, validada o confirmada con términos de riesgo. Un dominio parecido nunca se presenta como malicioso sin validar titularidad, contenido, uso y relación con el alcance.
+
 ### Dark web
 
 Usa índices y metadatos autorizados. Tor es opcional. No descarga datos robados ni interactúa con mercados. `no_data` describe la cobertura disponible, no ausencia global.
@@ -230,14 +244,20 @@ Combina CVE, CVSS, EPSS y KEV con aplicabilidad. CVSS mide severidad técnica; E
 
 Clasifican clusters de evidencia vinculada al sujeto: información corporativa, regulatoria, sectorial, financiera, tecnológica, operacional, de sostenibilidad y noticias públicas. El análisis se calcula una vez para la marca, grupo o conglomerado y sus dominios propios; los comparativos permanecen fuera del alcance. Cada dimensión muestra cobertura de evidencia aunque todavía no exista soporte suficiente para publicar una presión direccional. La presión agregada solo se publica cuando cobertura >= 60 %, confianza >= 50 y más de la mitad de dimensiones tienen datos puntuables. Cobertura no es riesgo, cumplimiento ni probabilidad de ataque.
 
-### Escenarios y plantillas preventivas
+Las actividades, geografías, proveedores, competidores, productos y activos declarados amplían las consultas estratégicas. El motor busca contexto de actores, campañas, TTP, interrupciones, regulación, mercado y cadena de suministro relacionado con ese alcance. Una noticia sectorial orienta la decisión, pero no se convierte automáticamente en un ataque contra la organización.
 
-El catálogo contiene 1.500 **plantillas preventivas de referencia**, no 1.500 escenarios ejecutables. Actualmente existen 0 definiciones que satisfagan el contrato completo de escenario ejecutable. Una posibilidad se muestra como soportada solo cuando evidencia de la corrida satisface criterios explícitos; esto no confirma un ataque ni un incidente. El detalle auditable está en `docs/auditoria/escenarios-inventario.md`.
+### Huella tecnológica pública y escenarios
+
+La huella clasifica observaciones externas en IT, IoT, IIoT, OT o sin clasificar. Cada registro conserva atribución `posible`, `relacionada`, `observada públicamente`, `corroborada públicamente` o `confirmada`, sin convertir una mención en inventario interno.
+
+El catálogo contiene 1.138 **plantillas preventivas de referencia**, no escenarios ejecutables: 1.116 derivadas de marcos y 22 multidominio. Una posibilidad se muestra como candidata solo cuando evidencia de la corrida satisface criterios explícitos de relación, actualidad y atribución. `corroborada públicamente` requiere al menos dos referencias independientes. Una vulnerabilidad aplicable exige producto y versión o CPE. Esto no confirma ataque, compromiso ni incidente.
+
+> Este análisis se basa en evidencia pública y observaciones externas consolidadas por CyberDecisionEngine. No constituye un inventario interno, auditoría, prueba de compromiso, confirmación de firmware instalado ni certificación de cumplimiento.
 
 ## 12. Matemáticas y cálculos
 
-**Versión de riesgo residual:** `P-CIDER 1.0.0`.  
-**Versión de evidencia:** `1.0.0`.  
+**Versión de riesgo residual:** `P-CIDER 1.0.0`.
+**Versión de evidencia:** `1.0.0`.
 **Versión claim-evidence:** registrada en cada contexto.
 
 ### Actividad de amenazas
@@ -302,6 +322,8 @@ Cada cluster aporta `match * quality * recency * directness * novelty * corrobor
 ## 13. Marcos de referencia
 
 - ATT&CK 19.1: comportamiento adversario y técnicas;
+- ATT&CK ICS: comportamiento adversario sobre sistemas de control industrial;
+- EMB3D 2.0.2: amenazas y mitigaciones para dispositivos embebidos;
 - D3FEND 1.4.0: contramedidas defensivas;
 - ATLAS 5.6.0: amenazas contra sistemas de IA;
 - DISARM: tácticas de desinformación;
@@ -354,6 +376,8 @@ Presenta alcance, cobertura, hallazgos validados, riesgo, contexto y plan de tra
 
 Incluye consulta, respuesta original disponible, URL, hash, timestamp, fuente, entidad, relación, validación, contradicciones y limitaciones. Las evidencias HTTP(S) públicas priorizadas pueden incluir una captura aislada con hash, dimensiones, URL final, código HTTP y fecha; la imagen amplía al seleccionarla. Una captura demuestra el contenido observado en ese momento, no confirma por sí sola la interpretación. Permite reconstruir el análisis.
 
+La generación ejecuta preparación analítica, renderizado y validación en un proceso separado del servidor web. Así una corrida grande puede producir informes sin bloquear la API ni dejar en blanco los tableros. El informe conserva el mismo `runId`, snapshot, hash y versión del modelo que el dashboard.
+
 ### Estados
 
 - candidato: relación pendiente;
@@ -372,7 +396,9 @@ Cada hallazgo explica qué se encontró, qué demuestra, qué no demuestra, cóm
 
 ## 19. Asistencia analítica opcional
 
-OpenClaw es una capa reemplazable de orquestación analítica, no el núcleo. En el despliegue local actual su gateway se inicia en una red Docker interna con autenticación por token, filesystem de solo lectura, límites de CPU/memoria y herramientas de ejecución denegadas. Puede preparar borradores, explicar scores, detectar contradicciones y proponer consultas; no publica, no cambia scores ni ejecuta comandos arbitrarios.
+La asistencia analítica es una capa reemplazable, no el núcleo. Puede preparar borradores, explicar scores, detectar contradicciones y proponer consultas; no publica, no cambia scores ni ejecuta comandos arbitrarios. La plataforma funciona completamente sin esta capacidad.
+
+Antes de generar un informe, la revisión asistida aplica una clasificación determinista y trazable a cada registro revisable: ya revisado, requiere validación humana, posible falso positivo o contexto. Esta salida es una propuesta; `automatic_validation=false` es obligatorio y el estado original no cambia hasta una acción humana registrada.
 
 El tablero **Asistente estratégico** trabaja siempre sobre la corrida seleccionada. El usuario puede elegir los módulos que forman el contexto, formular preguntas ejecutivas o técnicas, abrir los tableros relacionados y solicitar con lenguaje natural la generación de los informes ejecutivo y técnico. La conversación se separa por `runId`; el historial del usuario se trata como solicitud no confiable y nunca como evidencia.
 
@@ -387,8 +413,7 @@ La ejecución usa una arquitectura híbrida:
    seis en modo profundo;
 2. cada especialista reduce de forma determinista solo los datos de su alcance;
 3. un sintetizador determinista produce la respuesta interactiva inmediata, u
-   OpenClaw realiza una única síntesis profunda con el modelo local de mayor
-   capacidad;
+   el motor opcional realiza una única síntesis profunda con el perfil autorizado;
 4. un verificador determinista comprueba que las referencias pertenezcan al
    `runId`;
 5. la interfaz muestra la traza, el estado y las limitaciones de cada etapa.
@@ -397,28 +422,25 @@ No se ejecuta un modelo generativo independiente por agente. Así se evita
 duplicar contexto, competir por memoria y multiplicar latencia. Los agentes son
 roles lógicos sin acceso a shell, navegación ni escritura.
 
-La ejecución local usa dos perfiles Ollama:
+Las cifras, estados, cobertura y enlaces no los calcula un modelo generativo. Se leen directamente de la fuente de verdad de la corrida y llevan referencias `kpi:*`. La conversación sintetiza reducciones especializadas; si el motor falla, la respuesta se limita a una lectura verificable y registra la limitación. Sin hallazgos validados, ninguna ruta puede convertir registros relacionados o contextuales en hechos. La generación de informes continúa siendo determinista y solo ocurre por una acción explícita del usuario.
 
-- `cyberdecision-cti-chat`, derivado de `qwen3:0.6b`, disponible como capacidad
-  local de respaldo y prueba;
-- `cyberdecision-cti`, derivado de `qwen3:1.7b`, para análisis profundo orquestado por OpenClaw.
-
-Las cifras, estados, cobertura y enlaces no los calcula un modelo generativo. Se leen directamente de la fuente de verdad de la corrida y llevan referencias `kpi:*`. La conversación interactiva sintetiza de forma determinista las reducciones especializadas; el análisis profundo puede usar OpenClaw. Si el modelo solicitado falla, la respuesta se limita a esa lectura verificable y registra la limitación. Sin hallazgos validados, ninguna ruta puede convertir registros relacionados o contextuales en hechos. La generación de informes continúa siendo determinista y solo ocurre por una acción explícita del usuario.
-
-`ollama_chat.ready` describe el respaldo conversacional y
-`openclaw_gateway.ready` la orquestación analítica principal. La configuración
-publica además `agent_architecture`, con el modo, número máximo de especialistas,
-síntesis y validación posterior. Los modelos se descargan de memoria tras tres
-minutos de inactividad. Si cualquiera falla, la recolección, los cálculos, los
-tableros y los informes continúan operando. Una salida incompleta del modelo se
-reemplaza por una respuesta segura basada en KPI; nunca se publica como
-conclusión.
+La configuración publica el modo, número máximo de especialistas, síntesis y validación posterior, sin exponer el producto interno utilizado. Si la capacidad falla, la recolección, los cálculos, los tableros y los informes continúan operando. Una salida incompleta se reemplaza por una respuesta segura basada en KPI y nunca se publica como conclusión.
 
 El contenido web se trata como dato no confiable. Las salidas deben registrar hechos, inferencias, evidencia, confianza, versión del motor y limitaciones. La aprobación humana permanece obligatoria. Una respuesta vacía, `NO_REPLY`, una referencia desconocida o un desbordamiento de contexto no se marca como análisis completado.
 
-## 20. OpenCTI
+## 20. Interoperabilidad de conocimiento
 
-OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto. Modos: `disabled`, `read_context`, `sync_validated`, `system_of_record`. Solo `sync_validated` envía entidades y relaciones validadas; nunca datos brutos, caché, falsos positivos o propuestas no aprobadas.
+El backend interno es suficiente para operar. La interoperabilidad externa permanece opcional y deshabilitada por defecto. Cuando se habilita sincronización validada, solo transmite entidades y relaciones aprobadas; nunca datos brutos, caché, falsos positivos o propuestas no aprobadas.
+
+### Inteligencia CTI especializada
+
+El menú **CTI - Threat-Informed Intelligence** consume el snapshot canónico de
+la corrida. Presenta actores, campañas, TTP, matriz ATT&CK, relaciones,
+victimología, controles D3FEND y evidencia enlazada. Sus estados son
+`OBSERVED`, `INFERRED`, `RELATED` y `REFERENCE`; una coincidencia contextual no
+se publica como ataque observado. El score mostrado es relevancia contextual,
+no probabilidad de ataque. La arquitectura, fórmula y reglas de lectura se
+detallan en `docs/arquitectura/CTI_THREAT_INFORMED_ARCHITECTURE.md`.
 
 ## 21. Seguridad y privacidad
 
@@ -431,7 +453,7 @@ OpenCTI es un backend de conocimiento opcional y está deshabilitado por defecto
 - logs y auditoría;
 - TLP/PAP en evidencia;
 - sesiones y MFA disponibles en la capa local, pendientes de IdP/SSO para producción;
-- OpenClaw en modo propuesta y allowlist;
+- asistencia analítica en modo propuesta y lista de capacidades permitidas;
 - redacción de datos sensibles en informes.
 
 ## 22. Administración
@@ -491,12 +513,11 @@ server-side con JWT/refresh o SSO, MFA, revocación y hashing robusto.
 - `docs/EVIDENCE_MODEL.md`
 - `docs/CLAIM_EVIDENCE_GUIDE.md`
 - `docs/TERM_DICTIONARY.md`
-- `docs/OPENCTI_DECISION.md`
-- `docs/opencti_value_assessment.md`
 - `docs/HOW_TO_READ_REPORTS.md`
-- `docs/arquitectura/openclaw-cti.md`
-- `docs/seguridad/openclaw-threat-model.md`
-- `docs/seguridad/openclaw-controls.md`
+- `docs/manual/Manual_Inteligencia_Multidominio.md`
+- `docs/arquitectura/inteligencia-multidominio.md`
+- `docs/arquitectura/CTI_THREAT_INFORMED_ARCHITECTURE.md`
+- `docs/operacion/CTI_KNOWLEDGE_UPDATE_RUNBOOK.md`
 - `docs/auditoria/00-diagnostico-inicial.md`
 - `docs/auditoria/01-optimizacion-geografica.md`
 - `docs/auditoria/02-matriz-referencias.md`

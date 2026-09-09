@@ -51,7 +51,7 @@ export function RiskTrend({ signals, language }: RiskTrendProps) {
               </div>
               <div className="bar-score">
                 <strong>{hasRisk ? formatRisk(risk) : "N/D"}</strong>
-                <span>{formatDateTime(row.last_seen)}</span>
+                <span>{formatDateTime(row.last_seen, language)}</span>
               </div>
             </div>
           );

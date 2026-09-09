@@ -123,6 +123,7 @@ def _parse_rss(
                 source_weight=float(metadata.get("source_weight", 0.65) or 0.65),
                 confidence=float(metadata.get("confidence", 0.58) or 0.58),
                 age_days=age_days(pub_date),
+                published_at=pub_date,
                 severity=0.58,
                 epss=0.0,
                 cvss=0.0,

@@ -1,10 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { createAnalysis, deleteReport, generateRunReport, getLicensingOverview, listReports, listRuns, rerunAnalysis } from "./api";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bot, FileCheck2, UserCheck } from "lucide-react";
+import { createAnalysis, deleteReport, generateRunReport, getLicensingOverview, getRun, listReports, listRuns, rerunAnalysis } from "./api";
 import { ALL_CONTINENTS, ALL_COUNTRIES, ALL_SECTORS, countriesFor, economicSectors, selectedWithoutAll } from "./data/catalog";
 import { DEFAULT_ANALYSIS_WINDOW, analysisWindowConfig } from "./data/analysisWindows";
 import { clearSession, loadUsers, readSession, saveUsers, sessionPolicyForUser, touchSession, writeSession } from "./data/auth";
 import { AppShell } from "./components/AppShell";
 import { EvidenceLedger } from "./components/EvidenceLedger";
+import { evidenceReviews } from "./utils/evidenceReviewQueue";
 import { FindingsTable } from "./components/FindingsTable";
 import { KpiStrip } from "./components/KpiStrip";
 import { LoginView } from "./components/LoginView";
@@ -12,10 +14,12 @@ import { PlatformBrief } from "./components/PlatformBrief";
 import { RiskTrend } from "./components/RiskTrend";
 import { RunTimeline } from "./components/RunTimeline";
 import { AnalysisContextBar } from "./components/AnalysisContextBar";
+import { IntelligenceDomainFilter } from "./components/IntelligenceDomainFilter";
 import type { RiskContextDraft } from "./components/DomainComposer";
 import type {
   AnalysisMode,
   AnalysisWindow,
+  EvidenceReviewMode,
   LanguageMode,
   LocalUser,
   ReportCatalogItem,
@@ -25,6 +29,15 @@ import type {
   ViewKey
 } from "./types";
 import { formatDateTime } from "./utils/format";
+import { preferredRunForDisplay } from "./utils/runSelection";
+import {
+  analysisDomainOptions,
+  defaultIntelligenceFilters,
+  projectRunByIntelligenceFilters,
+  technologyDomainOptions,
+  type IntelligenceFilters
+} from "./utils/intelligenceProjection";
+import type { RelationshipPerspectiveKey } from "./utils/relationshipGraph";
 
 const AttackSurfaceView = lazy(() => import("./components/AttackSurfaceView").then((module) => ({ default: module.AttackSurfaceView })));
 const BrandRiskView = lazy(() => import("./components/BrandRiskView").then((module) => ({ default: module.BrandRiskView })));
@@ -35,17 +48,18 @@ const DomainsView = lazy(() => import("./components/ManagementViews").then((modu
 const RunsView = lazy(() => import("./components/ManagementViews").then((module) => ({ default: module.RunsView })));
 const ReportsView = lazy(() => import("./components/ReportsView").then((module) => ({ default: module.ReportsView })));
 const RelationshipGraphView = lazy(() => import("./components/RelationshipGraphView").then((module) => ({ default: module.RelationshipGraphView })));
-const ScenarioDecisionView = lazy(() => import("./components/ScenarioDecisionView").then((module) => ({ default: module.ScenarioDecisionView })));
+const DecisionWorkspaceView = lazy(() => import("./components/DecisionWorkspaceView").then((module) => ({ default: module.DecisionWorkspaceView })));
 const SettingsView = lazy(() => import("./components/SettingsView").then((module) => ({ default: module.SettingsView })));
 const OpenSourceIntelligenceView = lazy(() => import("./components/OpenSourceIntelligenceView").then((module) => ({ default: module.OpenSourceIntelligenceView })));
 const SourceIntelligenceView = lazy(() => import("./components/SourceIntelligenceView").then((module) => ({ default: module.SourceIntelligenceView })));
 const StrategicDashboard = lazy(() => import("./components/StrategicDashboard").then((module) => ({ default: module.StrategicDashboard })));
 const UsageGuideView = lazy(() => import("./components/UsageGuideView").then((module) => ({ default: module.UsageGuideView })));
-const AIAssistantView = lazy(() => import("./components/AIAssistantView").then((module) => ({ default: module.AIAssistantView })));
+const CTIView = lazy(() => import("./components/CTIView").then((module) => ({ default: module.CTIView })));
 
 const seedDomains = "";
 const seedOrganizationName = "";
 const scopeDefaultsPrefix = "cyberdecision.defaultScope.";
+const intelligenceFilterStorageKey = "cyberdecision.intelligenceFilters.v1";
 const emptyRiskContext: RiskContextDraft = {
   scenarioName: "",
   initiatingEventFrequency: "",
@@ -87,11 +101,28 @@ function buildScenarioRiskInputs(draft: RiskContextDraft): Record<string, unknow
   };
 }
 
+function loadIntelligenceFilters(): IntelligenceFilters {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(intelligenceFilterStorageKey) ?? "null") as Partial<IntelligenceFilters> | null;
+    if (stored?.technologyDomains?.length && stored.analysisDomains?.length) {
+      return {
+        technologyDomains: stored.technologyDomains,
+        analysisDomains: stored.analysisDomains
+      };
+    }
+  } catch {
+    // A malformed browser preference must never prevent the application from loading.
+  }
+  return defaultIntelligenceFilters;
+}
+
 const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
   es: {
     overview: "CyberDecisionEngine",
     dashboards: "Tablero estratégico",
-    scenarios: "Escenarios de decisión",
+    cti: "CTI orientada por amenazas",
+    evidence: "Evidencia y revisión",
+    scenarios: "Decisiones y asistente estratégico",
     brand: "Marca y Fraude",
     attackSurface: "Superficie de ataque",
     employeeRisk: "Riesgo virtual de empleados",
@@ -101,7 +132,7 @@ const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
     relationshipGraph: "Grafo de análisis y relaciones",
     darkweb: "Inteligencia Dark Web",
     frameworks: "Mapeo de Frameworks",
-    ai: "Asistente estratégico",
+    ai: "Decisiones y asistente estratégico",
     runs: "Historial de análisis",
     reports: "Informes CyberDecisionEngine",
     help: "Uso de la plataforma",
@@ -110,7 +141,9 @@ const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
   en: {
     overview: "CyberDecisionEngine Overview",
     dashboards: "Strategic Dashboard",
-    scenarios: "Decision Scenarios",
+    cti: "Threat-informed CTI",
+    evidence: "Evidence and review",
+    scenarios: "Decisions and Strategic Assistant",
     brand: "Brand & Fraud Risk",
     attackSurface: "Attack Surface",
     employeeRisk: "Employee Virtual Risk",
@@ -120,7 +153,7 @@ const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
     relationshipGraph: "Relationship Analysis Graph",
     darkweb: "Dark Web Intelligence",
     frameworks: "Framework Mapping",
-    ai: "Strategic Assistant",
+    ai: "Decisions and Strategic Assistant",
     runs: "Analysis Runs",
     reports: "CyberDecisionEngine Reports",
     help: "Platform Usage",
@@ -131,6 +164,8 @@ const viewTitles: Record<LanguageMode, Record<ViewKey, string>> = {
 const allViews: ViewKey[] = [
   "overview",
   "dashboards",
+  "cti",
+  "evidence",
   "scenarios",
   "attackSurface",
   "brand",
@@ -154,26 +189,42 @@ function initialViewFromUrl(): ViewKey {
   return candidate && allViews.includes(candidate as ViewKey) ? (candidate as ViewKey) : "dashboards";
 }
 
+function initialRunIdFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get("run")?.trim() || null;
+}
+
 const viewAccess: Record<UserRole, ViewKey[]> = {
   super_admin: allViews,
   admin: allViews,
-  analyst: ["overview", "dashboards", "scenarios", "attackSurface", "brand", "employeeRisk", "disinformation", "osint", "socmint", "relationshipGraph", "darkweb", "frameworks", "ai", "runs", "reports", "help"],
-  executive: ["overview", "dashboards", "scenarios", "attackSurface", "brand", "disinformation", "frameworks", "ai", "reports", "help"],
+  analyst: ["overview", "dashboards", "cti", "scenarios", "attackSurface", "brand", "employeeRisk", "disinformation", "osint", "socmint", "relationshipGraph", "darkweb", "frameworks", "ai", "runs", "reports", "help"],
+  executive: ["overview", "dashboards", "cti", "scenarios", "attackSurface", "brand", "disinformation", "frameworks", "ai", "reports", "help"],
   viewer: ["overview", "dashboards", "reports", "help"]
 };
-
-const evidenceViews: ViewKey[] = ["dashboards", "scenarios", "brand", "attackSurface", "disinformation", "osint", "socmint", "darkweb", "frameworks"];
 
 const appCopy = {
   es: {
     apiError: "No se puede conectar con la API",
     startError: "No se pudo iniciar el analisis",
-    refreshError: "No se pudieron actualizar los datos"
+    refreshError: "No se pudieron actualizar los datos",
+    reviewTitle: "Revisión previa al informe",
+    reviewDescription: "Elige cómo preparar la evidencia. Ningún modo valida registros automáticamente ni convierte contexto en riesgo.",
+    manualReview: "Revisión manual",
+    manualReviewText: "El informe conserva los estados definidos por el usuario. Los registros pendientes no sustentan riesgo.",
+    assistedReview: "Revisión asistida",
+    assistedReviewText: "El motor prioriza relaciones, contradicciones y posibles falsos positivos para revisión humana.",
+    cancel: "Cancelar"
   },
   en: {
     apiError: "Unable to reach API",
     startError: "Unable to start analysis",
-    refreshError: "Unable to refresh data"
+    refreshError: "Unable to refresh data",
+    reviewTitle: "Pre-report evidence review",
+    reviewDescription: "Choose how to prepare evidence. Neither mode validates records automatically or converts context into risk.",
+    manualReview: "Manual review",
+    manualReviewText: "The report preserves user-defined states. Pending records do not support risk.",
+    assistedReview: "Assisted review",
+    assistedReviewText: "The engine prioritizes relationships, contradictions and possible false positives for human review.",
+    cancel: "Cancel"
   }
 };
 
@@ -190,49 +241,83 @@ function parseDomains(value: string): string[] {
     });
 }
 
+function parseLooseList(value: string): string[] {
+  const seen = new Set<string>();
+  return value
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 function hasViewAccess(user: LocalUser, view: ViewKey): boolean {
-  if (!viewAccess[user.role].includes(view)) return false;
+  if (view !== "evidence" && !viewAccess[user.role].includes(view)) return false;
   if (user.role === "super_admin") return true;
   if (!user.licenseModules?.length) return true;
   if (view === "settings") return user.role === "admin" && user.licenseModules.includes("settings");
   if (view === "osint" || view === "socmint") {
     return user.licenseModules.includes("osint") || user.licenseModules.includes("socmint");
   }
+  if (view === "cti") {
+    return user.licenseModules.includes("cti") || user.licenseModules.includes("dashboards");
+  }
+  if (view === "evidence") return user.licenseModules.some((module) => ["evidence", "dashboards", "osint", "cti"].includes(module));
   return user.licenseModules.includes(view);
 }
 
 function selectDashboardRun(selectedRun: RunRecord | undefined, runs: RunRecord[]): RunRecord | undefined {
-  if (!selectedRun) return latestCompletedWithData(runs);
-  const selectedHasEvidence =
-    selectedRun.status === "completed" ||
-    Boolean(selectedRun.report) ||
-    selectedRun.summary.kpis.new_events > 0 ||
-    selectedRun.summary.findings.length > 0;
-  if (selectedHasEvidence) return selectedRun;
-  return latestCompletedWithData(runs, selectedRun.domains) ?? selectedRun;
+  return selectedRun ?? preferredRunForDisplay(runs);
 }
 
-function latestCompletedWithData(runs: RunRecord[], domains?: string[]): RunRecord | undefined {
-  const domainSet = new Set((domains ?? []).map((domain) => domain.toLowerCase()));
-  const candidates = runs.filter((run) => {
-    if (run.status !== "completed") return false;
-    if (!run.report && run.summary.kpis.new_events === 0 && run.summary.findings.length === 0) return false;
-    if (!domainSet.size) return true;
-    return run.domains.some((domain) => domainSet.has(domain.toLowerCase()));
+function hasDetailedSummary(run: RunRecord | undefined): boolean {
+  if (!run) return false;
+  return Boolean(
+    (run.summary.events?.length ?? 0)
+      || (run.summary.findings?.length ?? 0)
+      || (run.summary.source_statuses?.length ?? 0)
+      || Object.keys(run.summary.metrics ?? {}).length
+      || run.summary.decision_snapshot?.snapshot_hash
+  );
+}
+
+function mergeRunStatuses(current: RunRecord[], statuses: RunRecord[]): RunRecord[] {
+  const currentById = new Map(current.map((run) => [run.id, run]));
+  return statuses.map((status) => {
+    const existing = currentById.get(status.id);
+    if (!hasDetailedSummary(existing)) return status;
+    return {
+      ...existing,
+      ...status,
+      summary: {
+        ...existing!.summary,
+        kpis: status.summary.kpis,
+        domain_signals: status.summary.domain_signals
+      }
+    };
   });
-  return candidates[0];
 }
 
 export function App() {
   const [activeView, setActiveView] = useState<ViewKey>(initialViewFromUrl);
+  const [relationshipGraphPerspective, setRelationshipGraphPerspective] = useState<RelationshipPerspectiveKey>("all");
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [reports, setReports] = useState<ReportCatalogItem[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(initialRunIdFromUrl);
   const [rawDomains, setRawDomains] = useState(seedDomains);
   const [rawCompetitorDomains, setRawCompetitorDomains] = useState("");
+  const [rawActivities, setRawActivities] = useState("");
+  const [rawCriticalSuppliers, setRawCriticalSuppliers] = useState("");
+  const [rawDeclaredCompetitors, setRawDeclaredCompetitors] = useState("");
   const [organizationName, setOrganizationName] = useState(seedOrganizationName);
   const [mode, setMode] = useState<AnalysisMode>("deep");
   const [analysisWindow, setAnalysisWindow] = useState<AnalysisWindow>(DEFAULT_ANALYSIS_WINDOW);
+  const [analysisStartDate, setAnalysisStartDate] = useState("");
+  const [analysisEndDate, setAnalysisEndDate] = useState("");
   const [scanTimeBudgetMinutes, setScanTimeBudgetMinutes] = useState(0);
   const [reportDisplayAt, setReportDisplayAt] = useState("");
   const [selectedSectors, setSelectedSectors] = useState<string[]>([ALL_SECTORS]);
@@ -249,9 +334,30 @@ export function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => (window.localStorage.getItem("cyberdecision.theme") as ThemeMode | null) ?? "light");
   const [language, setLanguage] = useState<LanguageMode>(() => (window.localStorage.getItem("cyberdecision.language") as LanguageMode | null) ?? "es");
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("cyberdecision.sidebar.collapsed") === "true");
+  const [intelligenceFilters, setIntelligenceFilters] = useState<IntelligenceFilters>(loadIntelligenceFilters);
   const [isOnline, setIsOnline] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingReportRunId, setPendingReportRunId] = useState<string | null>(null);
+  const [reportRequestInFlight, setReportRequestInFlight] = useState(false);
+  const detailVersions = useRef<Record<string, string>>({});
+  const detailRequests = useRef<Set<string>>(new Set());
+  const refreshRunsInFlight = useRef(false);
   const labels = appCopy[language];
+
+  useEffect(() => {
+    const unsubscribe = evidenceReviews.onSaved((updated) => {
+      detailVersions.current[updated.id] = `${updated.status}:${updated.report?.generated_at ?? updated.report_status ?? "none"}`;
+      setRuns((current) => current.map((run) => run.id === updated.id ? updated : run));
+    });
+    const warnUnsaved = (event: BeforeUnloadEvent) => {
+      if (evidenceReviews.hasUnsettled()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", warnUnsaved);
+    return () => { unsubscribe(); window.removeEventListener("beforeunload", warnUnsaved); };
+  }, []);
 
   const currentUser = useMemo(() => users.find((user) => user.id === sessionUserId) ?? null, [sessionUserId, users]);
   const domains = useMemo(() => parseDomains(rawDomains), [rawDomains]);
@@ -265,9 +371,20 @@ export function App() {
       [...run.domains].sort().join("|") === key
     ) ?? null;
   }, [domains, organizationName, runs]);
-  const selectedRun = selectedRunId ? runs.find((run) => run.id === selectedRunId) : undefined;
-  const dashboardRun = useMemo(() => selectDashboardRun(selectedRun, runs), [runs, selectedRun]);
-  const evidenceRun = activeView === "dashboards" ? dashboardRun : selectedRun;
+  const sourceSelectedRun = selectedRunId ? runs.find((run) => run.id === selectedRunId) : undefined;
+  const selectedRun = useMemo(
+    () => projectRunByIntelligenceFilters(sourceSelectedRun, intelligenceFilters),
+    [sourceSelectedRun, intelligenceFilters]
+  );
+  const projectedRuns = useMemo(
+    () => runs.map((run) => projectRunByIntelligenceFilters(run, intelligenceFilters) ?? run),
+    [runs, intelligenceFilters]
+  );
+  const sourceDashboardRun = useMemo(() => selectDashboardRun(sourceSelectedRun, runs), [runs, sourceSelectedRun]);
+  const dashboardRun = useMemo(
+    () => projectRunByIntelligenceFilters(sourceDashboardRun, intelligenceFilters),
+    [sourceDashboardRun, intelligenceFilters]
+  );
   const isRunning = runs.some((run) => run.status === "queued" || run.status === "running");
   const countryOptions = useMemo(() => countriesFor([ALL_CONTINENTS]), []);
 
@@ -298,25 +415,70 @@ export function App() {
   }, []);
 
   const refreshRuns = useCallback(async () => {
+    if (refreshRunsInFlight.current) return;
+    refreshRunsInFlight.current = true;
     try {
-      const [nextRuns, nextReports] = await Promise.all([listRuns(), listReports()]);
-      setRuns(nextRuns);
-      setReports(nextReports);
+      const nextRuns = await listRuns();
+      setRuns((current) => mergeRunStatuses(current, nextRuns));
       setIsOnline(true);
       setError(null);
-      setSelectedRunId((current) => (current && nextRuns.some((run) => run.id === current) ? current : latestCompletedWithData(nextRuns)?.id ?? null));
+      setSelectedRunId((current) => (current && nextRuns.some((run) => run.id === current) ? current : preferredRunForDisplay(nextRuns)?.id ?? null));
     } catch (exc) {
       setIsOnline(false);
       setError(exc instanceof Error ? exc.message : labels.apiError);
+    } finally {
+      refreshRunsInFlight.current = false;
     }
   }, [labels.apiError]);
 
   useEffect(() => {
     if (!currentUser) return;
-    refreshRuns();
-    const timer = window.setInterval(refreshRuns, 2500);
-    return () => window.clearInterval(timer);
-  }, [currentUser, refreshRuns]);
+    const refreshVisibleRuns = () => {
+      if (document.visibilityState === "visible") refreshRuns();
+    };
+    const refreshVisibleReports = () => {
+      if (document.visibilityState === "visible") refreshReports().catch(() => undefined);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      refreshRuns();
+      refreshReports().catch(() => undefined);
+    };
+    refreshVisibleRuns();
+    refreshVisibleReports();
+    const timer = window.setInterval(refreshVisibleRuns, isRunning ? 3000 : 30000);
+    const reportTimer = window.setInterval(refreshVisibleReports, 30000);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(timer);
+      window.clearInterval(reportTimer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [currentUser, isRunning, refreshReports, refreshRuns]);
+
+  useEffect(() => {
+    if (!currentUser || !selectedRunId) return;
+    const statusRun = runs.find((run) => run.id === selectedRunId);
+    if (statusRun && !["completed", "failed"].includes(statusRun.status)) return;
+    if (statusRun && hasDetailedSummary(statusRun) && ["queued", "generating"].includes(statusRun.report_status ?? "")) return;
+    const version = statusRun
+      ? `${statusRun.status}:${statusRun.report?.generated_at ?? statusRun.report_status ?? "none"}`
+      : "initial";
+    if (detailVersions.current[selectedRunId] === version || detailRequests.current.has(selectedRunId)) return;
+    detailRequests.current.add(selectedRunId);
+    getRun(selectedRunId)
+      .then((detail) => {
+        detailVersions.current[selectedRunId] = `${detail.status}:${detail.report?.generated_at ?? detail.report_status ?? "none"}`;
+        setRuns((current) => (
+          current.some((run) => run.id === detail.id)
+            ? current.map((run) => (run.id === detail.id ? detail : run))
+            : [detail, ...current]
+        ));
+        if (detail.report) refreshReports().catch(() => undefined);
+      })
+      .catch((exc) => setError(exc instanceof Error ? exc.message : labels.refreshError))
+      .finally(() => detailRequests.current.delete(selectedRunId));
+  }, [currentUser, labels.refreshError, refreshReports, runs, selectedRunId]);
 
   useEffect(() => {
     if (sessionUserId && !currentUser) {
@@ -406,7 +568,12 @@ export function App() {
     window.localStorage.setItem("cyberdecision.language", language);
     window.localStorage.setItem("cyberdecision.sidebar.collapsed", String(collapsed));
     document.documentElement.dataset.theme = theme;
+    document.documentElement.lang = language;
   }, [collapsed, language, theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem(intelligenceFilterStorageKey, JSON.stringify(intelligenceFilters));
+  }, [intelligenceFilters]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -418,11 +585,16 @@ export function App() {
   useEffect(() => {
     const url = new URL(window.location.href);
     url.searchParams.set("view", activeView);
-    window.history.replaceState({ view: activeView }, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [activeView]);
+    if (selectedRunId) url.searchParams.set("run", selectedRunId);
+    else url.searchParams.delete("run");
+    window.history.replaceState({ view: activeView, runId: selectedRunId }, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [activeView, selectedRunId]);
 
   useEffect(() => {
-    const handleNavigation = () => setActiveView(initialViewFromUrl());
+    const handleNavigation = () => {
+      setActiveView(initialViewFromUrl());
+      setSelectedRunId(initialRunIdFromUrl());
+    };
     window.addEventListener("popstate", handleNavigation);
     return () => window.removeEventListener("popstate", handleNavigation);
   }, []);
@@ -449,10 +621,15 @@ export function App() {
         organization_name: organizationName.trim() || undefined,
         person_name: undefined,
         sector: targetSectors.join(", "),
+        subsector: parseLooseList(rawActivities).join(" | ") || undefined,
         country: targetCountries.join(", "),
+        critical_suppliers: parseLooseList(rawCriticalSuppliers),
+        declared_competitors: parseLooseList(rawDeclaredCompetitors),
         language,
         mode,
         analysis_window: windowConfig.value,
+        analysis_start_date: analysisWindow === "custom" ? analysisStartDate : undefined,
+        analysis_end_date: analysisWindow === "custom" ? analysisEndDate : undefined,
         lookback_hours: windowConfig.hours,
         lookback_days: windowConfig.days,
         real_only: realOnly,
@@ -502,15 +679,32 @@ export function App() {
   }
 
   async function handleGenerateReport(runId: string) {
+    if (evidenceReviews.hasUnsettled(runId)) {
+      setError(language === "es" ? "Hay revisiones por guardar. Espera el guardado o reintenta las revisiones sin confirmar." : "Reviews are not saved yet. Wait for saving or retry unconfirmed reviews.");
+      return;
+    }
     setError(null);
+    setPendingReportRunId(runId);
+  }
+
+  async function executeGenerateReport(runId: string, reviewMode: EvidenceReviewMode) {
+    if (evidenceReviews.hasUnsettled(runId)) {
+      await handleGenerateReport(runId);
+      return;
+    }
+    setError(null);
+    setPendingReportRunId(null);
+    setReportRequestInFlight(true);
     try {
-      const run = await generateRunReport(runId);
+      const run = await generateRunReport(runId, language, [], [], reviewMode);
       setSelectedRunId(run.id);
-      setRuns((current) => current.map((item) => (item.id === run.id ? run : item)));
-      await refreshReports();
+      detailVersions.current[run.id] = "";
+      setRuns((current) => mergeRunStatuses(current, [run, ...current.filter((item) => item.id !== run.id)]));
       await refreshRuns();
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : labels.refreshError);
+    } finally {
+      setReportRequestInFlight(false);
     }
   }
 
@@ -545,6 +739,21 @@ export function App() {
   function handleRawCompetitorDomainsChange(value: string) {
     markScopeTouched();
     setRawCompetitorDomains(value);
+  }
+
+  function handleRawActivitiesChange(value: string) {
+    markScopeTouched();
+    setRawActivities(value);
+  }
+
+  function handleRawCriticalSuppliersChange(value: string) {
+    markScopeTouched();
+    setRawCriticalSuppliers(value);
+  }
+
+  function handleRawDeclaredCompetitorsChange(value: string) {
+    markScopeTouched();
+    setRawDeclaredCompetitors(value);
   }
 
   function handleOrganizationNameChange(value: string) {
@@ -616,6 +825,9 @@ export function App() {
   const domainComposerProps = {
     rawDomains,
     rawCompetitorDomains,
+    rawActivities,
+    rawCriticalSuppliers,
+    rawDeclaredCompetitors,
     organizationName,
     domains,
     competitorDomains,
@@ -626,6 +838,10 @@ export function App() {
     language,
     mode,
     analysisWindow,
+    analysisStartDate,
+    analysisEndDate,
+    onAnalysisStartDateChange: setAnalysisStartDate,
+    onAnalysisEndDateChange: setAnalysisEndDate,
     scanTimeBudgetMinutes,
     reportDisplayAt,
     canOverrideReportDate: currentUser?.role === "super_admin",
@@ -635,6 +851,9 @@ export function App() {
     isRunning,
     onRawDomainsChange: handleRawDomainsChange,
     onRawCompetitorDomainsChange: handleRawCompetitorDomainsChange,
+    onRawActivitiesChange: handleRawActivitiesChange,
+    onRawCriticalSuppliersChange: handleRawCriticalSuppliersChange,
+    onRawDeclaredCompetitorsChange: handleRawDeclaredCompetitorsChange,
     onOrganizationNameChange: handleOrganizationNameChange,
     onSectorsChange: handleSectorsChange,
     onCountriesChange: handleCountriesChange,
@@ -658,7 +877,30 @@ export function App() {
 
   function renderView() {
     if (activeView === "dashboards") return <StrategicDashboard run={dashboardRun} language={language} />;
-    if (activeView === "scenarios") return <ScenarioDecisionView run={selectedRun} language={language} />;
+    if (activeView === "evidence") return <EvidenceLedger key={sourceSelectedRun?.id ?? sourceDashboardRun?.id} run={sourceSelectedRun ?? sourceDashboardRun} language={language} onGenerateReport={handleGenerateReport} />;
+    if (activeView === "cti") {
+      return (
+        <CTIView
+          run={selectedRun}
+          language={language}
+          onOpenRelationshipGraph={() => {
+            setRelationshipGraphPerspective("threats");
+            setActiveView("relationshipGraph");
+          }}
+        />
+      );
+    }
+    if (activeView === "scenarios" || activeView === "ai") {
+      return (
+        <DecisionWorkspaceView
+          run={selectedRun}
+          language={language}
+          initialTab={activeView === "ai" ? "assistant" : "scenarios"}
+          onGenerateReport={handleGenerateReport}
+          onOpenView={setActiveView}
+        />
+      );
+    }
     if (activeView === "attackSurface") return <AttackSurfaceView run={selectedRun} competitorDomains={competitorDomains} language={language} />;
     if (activeView === "brand") return <BrandRiskView run={selectedRun} language={language} />;
     if (activeView === "employeeRisk") return <EmployeeRiskView language={language} onReportReady={refreshReports} />;
@@ -672,25 +914,24 @@ export function App() {
         />
       );
     }
-    if (activeView === "relationshipGraph") return <RelationshipGraphView run={selectedRun} runs={runs} language={language} />;
-    if (activeView === "darkweb") return <SourceIntelligenceView run={selectedRun} channel="darkweb" language={language} />;
-    if (activeView === "frameworks") return <FrameworksView run={selectedRun} language={language} />;
-    if (activeView === "ai") {
+    if (activeView === "relationshipGraph") {
       return (
-        <AIAssistantView
+        <RelationshipGraphView
           run={selectedRun}
+          runs={projectedRuns}
           language={language}
-          onGenerateReport={handleGenerateReport}
-          onOpenView={setActiveView}
+          initialPerspective={relationshipGraphPerspective}
         />
       );
     }
-    if (activeView === "runs") return <RunsView runs={runs} language={language} onOpenRun={(runId) => { setSelectedRunId(runId); setActiveView("dashboards"); }} onGenerateReport={handleGenerateReport} />;
+    if (activeView === "darkweb") return <SourceIntelligenceView run={selectedRun} channel="darkweb" language={language} />;
+    if (activeView === "frameworks") return <FrameworksView run={selectedRun} language={language} />;
+    if (activeView === "runs") return <RunsView runs={projectedRuns} language={language} onOpenRun={(runId) => { setSelectedRunId(runId); setActiveView("dashboards"); }} onGenerateReport={handleGenerateReport} />;
     if (activeView === "reports") {
       return (
         <ReportsView
           reports={reports}
-          runs={runs}
+          runs={projectedRuns}
           language={language}
           canDelete={["super_admin", "admin"].includes(currentUser?.role ?? "viewer")}
           onDelete={handleDeleteReport}
@@ -773,7 +1014,9 @@ export function App() {
       collapsed={collapsed}
       onCollapsedChange={setCollapsed}
       onViewChange={(view) => {
-        if (hasViewAccess(currentUser, view)) setActiveView(view);
+        if (!hasViewAccess(currentUser, view)) return;
+        if (view === "relationshipGraph") setRelationshipGraphPerspective("all");
+        setActiveView(view);
       }}
       onThemeChange={setTheme}
       onLanguageChange={setLanguage}
@@ -786,7 +1029,7 @@ export function App() {
             <p>
               CyberDecisionEngine -{" "}
               {selectedRun
-                ? `${language === "es" ? "Última actualización" : "Last update"} ${formatDateTime(selectedRun.updated_at)}`
+                ? `${language === "es" ? "Última actualización" : "Last update"} ${formatDateTime(selectedRun.updated_at, language)}`
                 : language === "es"
                   ? "sin análisis seleccionado"
                   : "no analysis selected"}
@@ -803,11 +1046,71 @@ export function App() {
           draftDomains={domains}
           draftAnalysisWindow={analysisWindow}
         />
+        {selectedRun && !["employeeRisk", "settings", "help"].includes(activeView) ? (
+          <IntelligenceDomainFilter
+            filters={intelligenceFilters}
+            language={language}
+            onChange={setIntelligenceFilters}
+          />
+        ) : null}
         <Suspense fallback={<div className="module-loading" role="status">{language === "es" ? "Cargando módulo..." : "Loading module..."}</div>}>
-          {renderView()}
+          {selectedRunId && !selectedRun ? (
+            <div className="module-loading run-detail-loading" role="status" aria-live="polite">
+              <span aria-hidden="true" />
+              <strong>{language === "es" ? "Cargando datos de la corrida" : "Loading run data"}</strong>
+              <small>#{selectedRunId}</small>
+            </div>
+          ) : renderView()}
         </Suspense>
-        {evidenceRun && evidenceViews.includes(activeView) ? <EvidenceLedger run={evidenceRun} language={language} view={activeView} /> : null}
       </main>
+      {pendingReportRunId ? (
+        <div
+          className="in-app-confirmation-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !reportRequestInFlight) setPendingReportRunId(null);
+          }}
+        >
+          <div
+            aria-describedby="report-review-description"
+            aria-labelledby="report-review-title"
+            aria-modal="true"
+            className="in-app-confirmation report-review-confirmation"
+            role="dialog"
+          >
+            <div className="in-app-confirmation-icon" aria-hidden="true"><FileCheck2 size={24} /></div>
+            <div className="in-app-confirmation-copy">
+              <h3 id="report-review-title">{labels.reviewTitle}</h3>
+              <p id="report-review-description">{labels.reviewDescription}</p>
+            </div>
+            <div className="report-review-options">
+              <button
+                className="report-review-option"
+                disabled={reportRequestInFlight}
+                onClick={() => void executeGenerateReport(pendingReportRunId, "manual")}
+                type="button"
+              >
+                <UserCheck size={20} />
+                <span><strong>{labels.manualReview}</strong><small>{labels.manualReviewText}</small></span>
+              </button>
+              <button
+                className="report-review-option"
+                disabled={reportRequestInFlight}
+                onClick={() => void executeGenerateReport(pendingReportRunId, "ai_assisted")}
+                type="button"
+              >
+                <Bot size={20} />
+                <span><strong>{labels.assistedReview}</strong><small>{labels.assistedReviewText}</small></span>
+              </button>
+            </div>
+            <div className="in-app-confirmation-actions">
+              <button className="secondary-button compact" disabled={reportRequestInFlight} onClick={() => setPendingReportRunId(null)} type="button">
+                {labels.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

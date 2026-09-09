@@ -1,0 +1,69 @@
+{% set mdi = multidomain_intelligence | default({}, true) %}
+{% set footprint = mdi.technology_footprint | default({"status": "no_data", "total_records": 0, "assured_records": 0, "attributed_records": 0, "domain_counts": {}, "rows": []}, true) %}
+{% set domain_counts = footprint.domain_counts | default({}, true) %}
+{% set analysis_counts = mdi.analysis_dimensions | default({}, true) %}
+{% set method_scores = mdi.method_scores | default({}, true) %}
+<details id="huella-tecnologica" class="report-module technology-report-section">
+  <summary><span>02T</span><h2>{{ "Technology, cyber-physical and fraud perspective" if report_lang == "en" else "Perspectiva tecnológica, ciberfísica y de fraude" }}</h2><small>{{ footprint.total_records }} {{ "records" if report_lang == "en" else "registros" }}</small></summary>
+  <div class="report-module-body">
+  <div class="section-heading-row">
+    <div>
+      <span class="section-kicker">{{ "PUBLIC TECHNOLOGY FOOTPRINT" if report_lang == "en" else "HUELLA TECNOLÓGICA PÚBLICA" }}</span>
+      <h3>{{ "Observed technology domains" if report_lang == "en" else "Dominios tecnológicos observados" }}</h3>
+      <p class="small">{{ "Evidence-backed external observations classified across IT, IoT, IIoT and OT. A classification describes the public signal; it does not prove ownership, internal deployment or compromise." if report_lang == "en" else "Observaciones externas sustentadas en evidencia y clasificadas en IT, IoT, IIoT y OT. La clasificación describe la señal pública; no prueba propiedad, despliegue interno ni compromiso." }}</p>
+    </div>
+    <span class="status-pill {{ 'ok' if footprint.total_records else 'muted' }}">{{ footprint.total_records }} {{ "records" if report_lang == "en" else "registros" }}</span>
+  </div>
+  <div class="technology-report-kpis">
+    {% for key, label in [("it", "IT"), ("iot", "IoT"), ("iiot", "IIoT"), ("ot", "OT"), ("unknown", ("Unclassified" if report_lang == "en" else "Sin clasificar"))] %}
+    <article class="technology-report-kpi domain-{{ key }}">
+      <span>{{ label }}</span>
+      <strong>{{ domain_counts.get(key, 0) }}</strong>
+      <small>{{ "public observations" if report_lang == "en" else "observaciones públicas" }}</small>
+    </article>
+    {% endfor %}
+    <article class="technology-report-kpi domain-fraud">
+      <span>{{ "Fraud" if report_lang == "en" else "Fraude" }}</span>
+      <strong>{{ analysis_counts.get("fraud", 0) }}</strong>
+      <small>{{ "classified signals" if report_lang == "en" else "señales clasificadas" }}</small>
+    </article>
+  </div>
+  <div class="technology-assurance-grid">
+    <article><span>{{ "Direct or validated basis" if report_lang == "en" else "Base directa o validada" }}</span><strong>{{ footprint.assured_records }}</strong></article>
+    <article><span>{{ "Related or attributed" if report_lang == "en" else "Relacionados o atribuidos" }}</span><strong>{{ footprint.attributed_records }}</strong></article>
+    <article><span>{{ "Evidence sufficiency" if report_lang == "en" else "Suficiencia de evidencia" }}</span><strong>{% if method_scores.domain_evidence_sufficiency and method_scores.domain_evidence_sufficiency.value is not none %}{{ "%.1f"|format(method_scores.domain_evidence_sufficiency.value) }}/100{% else %}N/D{% endif %}</strong></article>
+    <article><span>{{ "Cross-domain scenarios" if report_lang == "en" else "Escenarios multidominio" }}</span><strong>{{ mdi.scenario_candidates | default([]) | length }}</strong></article>
+  </div>
+  {% if footprint_detail and footprint.rows %}
+  <div class="technology-report-list">
+    {% for row in footprint.rows %}
+    <article>
+      <div class="technology-row-heading">
+        <strong>{{ "N/D" if row.domain == "unknown" else row.domain | upper }}</strong>
+        <span>{{ row.records }} {{ "records" if report_lang == "en" else "registros" }} · {{ row.assured_records }} {{ "with direct/validated basis" if report_lang == "en" else "con base directa/validada" }}</span>
+      </div>
+      <div class="technology-row-detail">
+        <p><b>{{ "Observed elements" if report_lang == "en" else "Elementos observados" }}:</b> {{ row.assets | join(", ") if row.assets else "N/D" }}</p>
+        <p><b>{{ "Products / protocols" if report_lang == "en" else "Productos / protocolos" }}:</b> {{ ([row.products | join(", "), row.protocols | join(", ")] | reject("equalto", "") | join(" · ")) or "N/D" }}</p>
+        <p><b>{{ "Reference mappings" if report_lang == "en" else "Mapeos de referencia" }}:</b> {{ row.framework_refs | join(" · ") if row.framework_refs else "N/D" }}</p>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if footprint_detail and mdi.scenario_candidates %}
+  <h3>{{ "Evidence-supported multidomain scenarios" if report_lang == "en" else "Escenarios multidominio respaldados por evidencia" }}</h3>
+  <div class="scenario-grid compact-scenarios">
+    {% for scenario in mdi.scenario_candidates %}
+    <article>
+      <span class="scenario-id">{{ scenario.scenario_id }}</span>
+      <strong>{{ scenario.title_en if report_lang == "en" else scenario.title_es }}</strong>
+      <p>{{ scenario.framework_refs | join(" · ") }}</p>
+      <small>{{ scenario.evidence_ids | length }} {{ "evidence references" if report_lang == "en" else "referencias de evidencia" }} · {{ "candidate, not a confirmed incident" if report_lang == "en" else "candidato, no incidente confirmado" }}</small>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <p class="technology-disclaimer">{{ mdi.disclaimer_en if report_lang == "en" else mdi.disclaimer_es }}</p>
+  </div>
+</details>

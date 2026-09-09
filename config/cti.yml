@@ -1,0 +1,132 @@
+relevance:
+  weights:
+    direct_evidence: 0.25
+    ttp_overlap: 0.20
+    technology_vulnerability_fit: 0.15
+    sector_fit: 0.15
+    geography_fit: 0.10
+    campaign_recency: 0.10
+    source_diversity: 0.05
+
+knowledge:
+  sources:
+    - id: attack-enterprise
+      name: MITRE ATT&CK Enterprise
+      family: ATT&CK
+      url: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
+      path: data/frameworks/mitre_attack_enterprise.json
+      format: json
+      version: rolling
+      required: true
+      license: MITRE ATT&CK Terms of Use
+    - id: attack-ics
+      name: MITRE ATT&CK for ICS
+      family: ATT&CK
+      url: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/ics-attack/ics-attack.json
+      path: data/frameworks/mitre_attack_ics.json
+      format: json
+      version: rolling
+      required: true
+      license: MITRE ATT&CK Terms of Use
+    - id: attack-mobile
+      name: MITRE ATT&CK Mobile
+      family: ATT&CK
+      url: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/mobile-attack/mobile-attack.json
+      path: data/frameworks/mitre_attack_mobile.json
+      format: json
+      version: rolling
+      required: true
+      license: MITRE ATT&CK Terms of Use
+    - id: d3fend
+      name: MITRE D3FEND
+      family: D3FEND
+      url: https://next.d3fend.mitre.org/api/ontology/inference/d3fend-full-mappings.json
+      path: data/frameworks/mitre_d3fend.json
+      format: json
+      version: rolling
+      required: false
+      license: MITRE D3FEND Terms of Use
+    - id: atlas
+      name: MITRE ATLAS
+      family: ATLAS
+      url: https://raw.githubusercontent.com/mitre-atlas/atlas-navigator-data/main/dist/stix-atlas.json
+      path: data/frameworks/mitre_atlas.json
+      format: json
+      version: rolling
+      required: false
+      license: MITRE ATLAS Terms of Use
+    - id: f3
+      name: MITRE Fight Fraud Framework
+      family: F3
+      url: https://raw.githubusercontent.com/center-for-threat-informed-defense/fight-fraud-framework/main/public/f3-v1.1.json
+      path: data/frameworks/mitre_f3_v1_1.json
+      format: json
+      version: "1.1"
+      required: false
+      license: Apache-2.0
+    - id: attack-flow
+      name: CTID Attack Flow schema
+      family: Attack Flow
+      url: https://raw.githubusercontent.com/center-for-threat-informed-defense/attack-flow/main/stix/attack-flow-schema-2.0.0.json
+      path: data/frameworks/ctid_attack_flow_schema.json
+      format: json
+      version: "2.0.0"
+      required: false
+      license: Apache-2.0
+    - id: aadapt
+      name: MITRE AADAPT
+      family: AADAPT
+      url: https://raw.githubusercontent.com/mitre/AADAPT/main/AADAPT.yaml
+      path: data/frameworks/mitre_aadapt.yaml
+      format: yaml
+      version: rolling
+      required: false
+      license: MITRE Terms of Use
+    - id: emb3d
+      name: MITRE EMB3D
+      family: EMB3D
+      url: https://raw.githubusercontent.com/mitre/emb3d/main/assets/emb3d-stix-2.0.1.json
+      path: data/frameworks/mitre_emb3d.json
+      format: json
+      version: "2.0.1"
+      required: false
+      license: MITRE Terms of Use
+    - id: capec
+      name: MITRE CAPEC
+      family: CAPEC
+      url: https://capec.mitre.org/data/archive/capec_latest.zip
+      path: data/frameworks/capec_latest.zip
+      format: zip
+      version: rolling
+      required: false
+      max_bytes: 10000000
+      license: CAPEC Terms of Use
+    - id: cwe
+      name: MITRE CWE
+      family: CWE
+      url: https://cwe.mitre.org/data/xml/cwec_latest.xml.zip
+      path: data/frameworks/cwe_latest.zip
+      format: zip
+      version: rolling
+      required: false
+      max_bytes: 15000000
+      license: CWE Terms of Use
+    - id: inform
+      name: MITRE INFORM
+      family: INFORM
+      url: https://raw.githubusercontent.com/center-for-threat-informed-defense/inform/main/docs/extra/inform-component-all-data.json
+      path: data/frameworks/mitre_inform.json
+      format: json
+      version: rolling
+      required: false
+      license: Apache-2.0
+    - id: technique-inference-engine
+      name: CTID Technique Inference Engine
+      family: TIE
+      url: https://github.com/center-for-threat-informed-defense/technique-inference-engine
+      path: data/frameworks/ctid_tie_reference.txt
+      format: text
+      version: reference
+      required: false
+      download: false
+      license: Apache-2.0

@@ -16,6 +16,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
 from cyberdeck.analysis.control_theory import prioritize_actions
+from cyberdeck.analysis.period import select_period_events
 from cyberdeck.analysis.cyber_radar import build_cyber_risk_radar
 from cyberdeck.analysis.f3_mapping import build_f3_profile, enrich_f3_mappings
 from cyberdeck.analysis.framework_evidence import build_framework_evidence_mapping
@@ -24,10 +25,12 @@ from cyberdeck.analysis.fraud import FRAUD_REFERENCE_NOTES, build_fraud_findings
 from cyberdeck.analysis.game_theory import minimax_recommendations
 from cyberdeck.analysis.layered_scenario_risk import calculate_layered_scenario_risk
 from cyberdeck.analysis.mitre_mapping import build_atlas_profile, build_d3fend_profile, build_mitre_profile
+from cyberdeck.analysis.multidomain import enrich_multidomain_findings, enrich_multidomain_intelligence
 from cyberdeck.analysis.narratives import build_narrative_intelligence
 from cyberdeck.analysis.public_entities import build_public_entity_intelligence
 from cyberdeck.analysis.pivot_intelligence import build_pivot_intelligence
 from cyberdeck.analysis.prospective_risk import build_prospective_attack_risk
+from cyberdeck.analysis.relationship_risk import build_relationship_risk_intelligence
 from cyberdeck.analysis.sector_intelligence import build_sector_intelligence
 from cyberdeck.analysis.strategic_news import build_strategic_intelligence
 from cyberdeck.analysis.threat_news import build_threat_news
@@ -61,6 +64,7 @@ from cyberdeck.collectors.stix_taxii import StixTaxiiCollector
 from cyberdeck.collectors.tor_runtime import TorRuntimeCollector
 from cyberdeck.collectors.urlscan_search import UrlscanSearchCollector
 from cyberdeck.collectors.web_search import WebSearchCollector
+from cyberdeck.cti import build_cti_snapshot
 from cyberdeck.enrichment.cve_enricher import cves_from_events
 from cyberdeck.enrichment.evidence_pipeline import process_evidence_records
 from cyberdeck.enrichment.normalizer import normalize_events
@@ -227,6 +231,7 @@ async def run_pipeline(
     source_config_override: Optional[Dict[str, object]] = None,
     return_context: bool = False,
     render_html: bool = True,
+    progress_callback=None,
 ):
     org_data = enforce_authorized_scope(org_path)
     org = OrganizationProfile(**org_data["organization"])
@@ -254,12 +259,14 @@ async def run_pipeline(
         task = progress.add_task(f"Loading organization profile: {org.name}", total=None)
         await asyncio.sleep(0.05)
         progress.update(task, description="Collecting passive and authorized sources")
-        first_results = await _collect_primary_sources(source_config, org_data, real_only=real_only)
+        first_results = await _collect_primary_sources(source_config, org_data, real_only=real_only, progress_callback=progress_callback)
         for result in first_results:
             context.source_statuses.append(result.status)
             context.raw_events.extend(result.events)
 
         progress.update(task, description="Enriching CVEs with EPSS and NVD")
+        if progress_callback:
+            await progress_callback("Enriqueciendo vulnerabilidades con las fuentes disponibles", 78)
         cves = cves_from_events(context.raw_events)
         enrich_results = await _collect_vulnerability_enrichment(source_config, cves)
         for result in enrich_results:
@@ -276,7 +283,9 @@ async def run_pipeline(
         events = processed.records
         if real_only:
             events = [event for event in events if not event.demo]
-        context.raw_events = [event for event in events if _event_within_window(event, lookback_days, lookback_hours)]
+        context.raw_events = select_period_events(context, events) if org.analysis_start_date else [event for event in events if _event_within_window(event, lookback_days, lookback_hours)]
+        if progress_callback:
+            await progress_callback("Validando las evidencias recolectadas", 84)
         evidence_result = await _collect_evidence_validation(source_config, context.raw_events, org)
         context.source_statuses.append(evidence_result.status)
         if evidence_result.events:
@@ -289,20 +298,47 @@ async def run_pipeline(
             context.raw_events = processed.records
             if real_only:
                 context.raw_events = [event for event in context.raw_events if not event.demo]
-            context.raw_events = [event for event in context.raw_events if _event_within_window(event, lookback_days, lookback_hours)]
+            context.raw_events = select_period_events(context, context.raw_events) if org.analysis_start_date else [event for event in context.raw_events if _event_within_window(event, lookback_days, lookback_hours)]
         artifact_summary = enrich_unstructured_artifacts(context.raw_events)
         f3_summary = enrich_f3_mappings(context.raw_events)
+        multidomain_summary = enrich_multidomain_intelligence(context.raw_events, org)
+        context.multidomain_intelligence = multidomain_summary
         context.processing_summary = {
             **dict(processed.summary),
             "artifact_extraction": artifact_summary,
             "mitre_f3_mapping": f3_summary,
+            "multidomain_classification": {
+                "model_version": multidomain_summary["model_version"],
+                "classified_records": multidomain_summary["technology_footprint"]["total_records"],
+                "scenario_candidates": len(multidomain_summary["scenario_candidates"]),
+                "relationships": len(multidomain_summary["relationships"]),
+            },
         }
+        if org.analysis_start_date:
+            context.processing_summary.update({
+                "unique_records": len(context.raw_events),
+                "period_excluded_records": len(context.excluded_period_events),
+                "undated_records_included": context.metrics["analysis_period"]["undated_records"],
+                "discarded_records": int(processed.summary.get("discarded_records", 0)) + len(context.excluded_period_events),
+            })
         stored = store_events(context.raw_events, app_config.get("cache_db", "data/cyberdeck.sqlite"))
         context.source_statuses.append(SourceStatus(name="Cache local de evidencias", status="ok", records=stored, mode="cache"))
 
         progress.update(task, description="Calculating risk, fraud and posture metrics")
         context.risk_findings = _build_all_findings(context.raw_events, org, real_only=real_only)
-        context.metrics = _build_metrics(context.raw_events, context.risk_findings, org, context.source_statuses)
+        enrich_multidomain_findings(context.risk_findings, context.raw_events)
+        period_metrics = context.metrics.get("analysis_period")
+        context.metrics = _build_metrics(
+            context.raw_events,
+            context.risk_findings,
+            org,
+            context.source_statuses,
+            generated_at=context.generated_at,
+        )
+        context.metrics["multidomain_intelligence"] = multidomain_summary
+        if period_metrics:
+            context.metrics["analysis_period"] = period_metrics
+        context.metrics["public_technology_footprint"] = multidomain_summary["technology_footprint"]
         context.processing_summary["validated_findings"] = sum(
             1
             for finding in context.risk_findings
@@ -371,7 +407,7 @@ def _parse_event_datetime(value: str) -> Optional[datetime]:
     return parsed.astimezone(timezone.utc)
 
 
-async def _collect_primary_sources(source_config: Dict[str, object], org_data: Dict[str, object], real_only: bool = True):
+async def _collect_primary_sources(source_config: Dict[str, object], org_data: Dict[str, object], real_only: bool = True, progress_callback=None):
     cisa_config = source_config.get("cisa_kev", {})
     web_search_config = source_config.get("web_search", {})
     osint_public_config = source_config.get("osint_public", {})
@@ -401,6 +437,9 @@ async def _collect_primary_sources(source_config: Dict[str, object], org_data: D
             timeout_seconds=float(web_search_config.get("timeout_seconds", 8.0)),
             collection_timeout_seconds=float(web_search_config.get("collection_timeout_seconds", 80.0)),
             provider_query_limits=web_search_config.get("provider_query_limits"),
+            start_date=org_data.get("organization", {}).get("analysis_start_date"),
+            end_date=org_data.get("organization", {}).get("analysis_end_date"),
+            progress_callback=progress_callback,
         ),
         UrlscanSearchCollector(
             urlscan_config.get("terms", []),
@@ -478,8 +517,22 @@ async def _collect_primary_sources(source_config: Dict[str, object], org_data: D
     ]
     if not real_only:
         collectors.insert(2, FraudIntelligenceCollector())
+    completed = 0
+
+    async def collect_and_report(collector):
+        nonlocal completed
+        result = await _collect_safely(collector)
+        completed += 1
+        if progress_callback:
+            await progress_callback(
+                f"Fuentes finalizadas: {completed}/{len(collectors)}. Ultima: {collector.name}",
+                35 + int(40 * completed / len(collectors)),
+                result.status,
+            )
+        return result
+
     for collector in collectors:
-        eps.append(_collect_safely(collector))
+        eps.append(collect_and_report(collector))
     return await asyncio.gather(*eps)
 
 
@@ -518,9 +571,21 @@ async def _collect_evidence_validation(source_config: Dict[str, object], events:
     return await _collect_safely(collector)
 
 
-async def _collect_safely(collector: Collector) -> CollectionResult:
+async def _collect_safely(collector: Collector, timeout_seconds: Optional[float] = None) -> CollectionResult:
+    if timeout_seconds is None:
+        timeout_seconds = min(86400, max(60, int(os.getenv("CDE_COLLECTOR_TIMEOUT_SECONDS", "86400"))))
     try:
-        return await collector.collect()
+        return await asyncio.wait_for(collector.collect(), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        events = list(getattr(collector, "partial_events", []))
+        return CollectionResult(
+            SourceStatus(
+                name=collector.name, status="partial" if events else "error",
+                records=len(events), mode="real",
+                warning=f"Collection deadline reached after {timeout_seconds:g} seconds; "
+                "available records retained; source coverage is incomplete.",
+            ), events,
+        )
     except Exception as exc:  # pragma: no cover - runtime/network defensive guard
         return CollectionResult(
             SourceStatus(
@@ -783,7 +848,14 @@ def _owner_for_event(event: ThreatEvent) -> str:
     return "CISO"
 
 
-def _build_metrics(events: List[ThreatEvent], findings: List[RiskFinding], org: OrganizationProfile, statuses: List[SourceStatus]) -> Dict[str, object]:
+def _build_metrics(
+    events: List[ThreatEvent],
+    findings: List[RiskFinding],
+    org: OrganizationProfile,
+    statuses: List[SourceStatus],
+    *,
+    generated_at: Optional[datetime] = None,
+) -> Dict[str, object]:
     analysis_events = [
         event
         for event in _scope_relevant_events(events, org)
@@ -832,7 +904,19 @@ def _build_metrics(events: List[ThreatEvent], findings: List[RiskFinding], org: 
         else 0.0
     )
     monte_carlo = monte_carlo_risk(avg_likelihood, avg_impact, avg_ce, n=2000)
-    strategic_news = build_strategic_intelligence(analysis_events, org)
+    strategic_news = build_strategic_intelligence(
+        analysis_events,
+        org,
+        created_at=generated_at,
+    )
+    threat_news = build_threat_news(analysis_events)
+    cti_snapshot = build_cti_snapshot(
+        analysis_events,
+        findings,
+        org,
+        threat_news=threat_news,
+        generated_at=generated_at,
+    )
     prospective_attack_risk = build_prospective_attack_risk(
         assured_events,
         findings,
@@ -866,7 +950,11 @@ def _build_metrics(events: List[ThreatEvent], findings: List[RiskFinding], org: 
         "risk_heat_radar": build_cyber_risk_radar(analysis_events, findings),
         "strategy": build_strategic_action_plan(findings, analysis_events, org, source_coverage),
         "strategic_news": strategic_news,
-        "threat_news": build_threat_news(analysis_events),
+        "threat_news": threat_news,
+        "cti": cti_snapshot,
+        "relationship_risk_intelligence": build_relationship_risk_intelligence(
+            analysis_events, org
+        ),
         "framework_mapping": build_framework_evidence_mapping(analysis_events, findings, org),
         "geographic_intelligence": build_geographic_intelligence(analysis_events, org),
         "sector_intelligence": build_sector_intelligence(analysis_events, org),

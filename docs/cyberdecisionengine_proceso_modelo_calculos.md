@@ -186,13 +186,23 @@ Sin evidencia, el estado es `unassessed`, el índice es cero y no se crea escena
 
 ## 12. Marcos y escenarios
 
-- ATT&CK: técnica exacta y `observed_adversary_behavior`, respaldado por telemetría, log, IP fuente o patrón validado.
-- D3FEND: opción defensiva asociada; por sí solo no activa un escenario.
+- ATT&CK Enterprise, ICS y Mobile 19.2: técnica exacta y `observed_adversary_behavior`, respaldado por telemetría, log, IP fuente o patrón validado. El dominio se selecciona según IT, OT/IIoT o móvil; no se intercambian matrices.
+- EMB3D 2.0.2: amenazas y mitigaciones de dispositivos IoT, IIoT, OT y embebidos; exige dominio tecnológico o referencia EMB3D explícita.
+- D3FEND 1.5.0: opción defensiva asociada; por sí solo no activa un escenario.
 - ATLAS: identificador ATLAS explícito, señal de IA y confianza mínima de `0.65`.
+- Fight Fraud Framework (F3): táctica o técnica de fraude explícita en evidencia técnica; una noticia genérica de fraude no se convierte automáticamente en mapeo validado.
 - DISARM: identificador DISARM explícito, al menos dos evidencias y dos fuentes independientes.
-- NIST, ISO, PCI, SOC 2, GDPR, CIS y COBIT: mapeos de recomendaciones o evidencia; no son porcentaje de cumplimiento ni auditoría.
+- NIST CSF 2.0, ISO/IEC 27001:2022, PCI DSS 4.0.1, SOC 2, GDPR, CIS Controls 8.1 y COBIT 2019: mapeos de recomendaciones o evidencia; no son porcentaje de cumplimiento ni auditoría.
 
 La biblioteca contiene 1.500 plantillas preventivas con scores en cero. Los scores se calculan únicamente con evidencia de la corrida actual. Una coincidencia genérica de palabras no activa escenarios.
+
+El catálogo de marcos siempre puede consultarse, pero cada marco conserva uno de estos estados para la corrida: `no_data`, referencia preventiva, potencialmente relacionado, candidato respaldado por evidencia, comportamiento observado o validado. El estado del catálogo no sustituye el estado de la evidencia.
+
+### 12.1 Actores y TTP
+
+La sección de actores exige una acción cibernética y una atribución explícita en una URL trazable. La relación se clasifica como respaldada en el alcance, relevancia contextual o candidata. Una noticia sectorial puede orientar vigilancia, pero no confirma que el actor haya atacado a la organización.
+
+Las TTP se toman únicamente de identificadores o referencias explícitas de la evidencia. F3, ATLAS, D3FEND y EMB3D no se etiquetan como ATT&CK por compartir un identificador técnico. `Ataque observado` solo se publica cuando existe incidente confirmado y evidencia confirmada.
 
 ## 13. Índice de postura externa
 
@@ -209,6 +219,16 @@ El Índice de Postura de Ciberinteligencia Externa evalúa salud de fuentes, pro
 El contexto completo se escribe de forma atómica en `data/web_runs/<run_id>/context.json` y en Postgres `run_contexts.payload` cuando `DATABASE_URL` está configurado. Postgres es respaldo de lectura si el archivo no está disponible. Los eventos conservan además un ledger SQLite/Postgres con payload completo y campos canónicos indexados.
 
 El informe ejecutivo explica alcance, conteos, postura externa, riesgos sustentados, presión de señales, escenarios soportados y plan priorizado. El técnico conserva dominios, activos, URLs completas, evidencia, validación, entradas matemáticas, vulnerabilidades, mappings, fuentes y limitaciones. JSON y CSV contienen el mismo modelo estructurado.
+
+### 14.1 Independencia y selección de corridas
+
+Cada solicitud crea un `runId` independiente. Ventana temporal, dominios, modalidad profunda, TOR, disponibilidad de conectores y fecha pueden producir resultados diferentes para una misma organización. La interfaz prefiere la corrida más completa del sujeto más reciente mediante alcance, profundidad, registros únicos, evidencia validada, hallazgos, fuentes productivas e informe final. Esta selección no mezcla evidencia ni modifica el historial.
+
+Los informes sin filtros son canónicos. Una exportación filtrada usa el sufijo `-view-...`, conserva su propio snapshot y no puede sobrescribir el informe canónico. Las entidades HTML como `&#x20;` representan espacios codificados y no constituyen otro `runId`.
+
+La vigencia del informe depende tanto del hash de la fuente de verdad como de la versión del generador. Un cambio en la lógica analítica o de presentación invalida el artefacto anterior y exige regenerarlo, aun cuando la evidencia recolectada no haya cambiado.
+
+Dashboard, informe ejecutivo, informe técnico, JSON y CSV se derivan del snapshot sellado de la corrida. El validador compara los hashes de origen y de informe antes de marcarlo como final.
 
 ## 15. Principios anti-alucinación
 

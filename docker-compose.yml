@@ -70,6 +70,9 @@ services:
       KALI_SURFACE_MAX_HOSTS: ${KALI_SURFACE_MAX_HOSTS:-24}
       KALI_SURFACE_TIMEOUT_SECONDS: ${KALI_SURFACE_TIMEOUT_SECONDS:-26}
       KALI_SURFACE_LIGHT_PROBE: ${KALI_SURFACE_LIGHT_PROBE:-true}
+      CDE_AUTO_REPORT_DELAY_SECONDS: ${CDE_AUTO_REPORT_DELAY_SECONDS:-600}
+      CDE_REPORT_CONCURRENCY: ${CDE_REPORT_CONCURRENCY:-1}
+      CDE_REPORT_CAPTURE_TIMEOUT_SECONDS: ${CDE_REPORT_CAPTURE_TIMEOUT_SECONDS:-180}
     volumes:
       - ./reports:/app/reports
       - ./data:/app/data
@@ -107,6 +110,7 @@ services:
     build:
       context: ./infra/openclaw
     container_name: cyberdecisionengine-openclaw
+    profiles: ["ai"]
     restart: unless-stopped
     depends_on:
       openclaw-init:
@@ -146,6 +150,7 @@ services:
   ollama:
     image: ollama/ollama:0.32.3
     container_name: cyberdecisionengine-ollama
+    profiles: ["ai"]
     restart: unless-stopped
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
@@ -176,6 +181,7 @@ services:
   ollama-init:
     image: ollama/ollama:0.32.3
     container_name: cyberdecisionengine-ollama-init
+    profiles: ["ai"]
     restart: "no"
     depends_on:
       ollama:
@@ -198,6 +204,7 @@ services:
   openclaw-init:
     image: ghcr.io/openclaw/openclaw:2026.6.6
     container_name: cyberdecisionengine-openclaw-init
+    profiles: ["ai"]
     restart: "no"
     user: "0:0"
     entrypoint: ["/bin/sh", "-c"]

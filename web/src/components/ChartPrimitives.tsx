@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
+import { DisclosureSummary } from "./DisclosureSummary";
 import { localizedSectorLabel } from "../data/catalog";
 import type { LanguageMode } from "../types";
 import type { GeographicCountryItem, RankedItem, SocmintLink, SocmintNode, TrendPoint } from "../utils/dashboard";
@@ -74,9 +75,9 @@ export function BarRanking({ items, language = "en" }: { items: RankedItem[]; la
   if (!items.length) {
     return <div className="chart-empty">{copy.noRanking}</div>;
   }
-  return (
-    <div className="rank-list">
-      {items.map((item) => (
+  const primaryItems = items.slice(0, 5);
+  const additionalItems = items.slice(5);
+  const row = (item: RankedItem) => (
         <div className="rank-row" key={item.name}>
           <span title={item.name}>{item.name}</span>
           <div className="rank-track">
@@ -84,7 +85,16 @@ export function BarRanking({ items, language = "en" }: { items: RankedItem[]; la
           </div>
           <strong>{item.value}</strong>
         </div>
-      ))}
+  );
+  return (
+    <div className="rank-list">
+      {primaryItems.map(row)}
+      {additionalItems.length ? (
+        <details className="compact-disclosure">
+          <DisclosureSummary language={language} label={language === "es" ? `Ver ${additionalItems.length} resultados adicionales` : `View ${additionalItems.length} additional results`} />
+          <div className="compact-disclosure-content">{additionalItems.map(row)}</div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -119,20 +129,29 @@ export function CountryContextList({
     }
   } as const;
   const copy = statusLabels[language];
+  const primaryItems = items.slice(0, 3);
+  const additionalItems = items.slice(3);
+  const row = (item: GeographicCountryItem) => (
+    <div className={`country-context-row ${item.status}`} key={`${item.code}-${item.name}`}>
+      <div className="country-context-heading">
+        <strong>{item.name}</strong>
+        <span>{copy[item.status]}</span>
+      </div>
+      <b>{item.records ? `${item.records} ${copy.records}` : copy.noRecords}</b>
+      <div className="country-context-track" aria-hidden="true">
+        <i style={{ width: item.records ? `${Math.max(8, (item.records / max) * 100)}%` : "0%" }} />
+      </div>
+    </div>
+  );
   return (
     <div className="country-context-list">
-      {items.map((item) => (
-        <div className={`country-context-row ${item.status}`} key={`${item.code}-${item.name}`}>
-          <div className="country-context-heading">
-            <strong>{item.name}</strong>
-            <span>{copy[item.status]}</span>
-          </div>
-          <b>{item.records ? `${item.records} ${copy.records}` : copy.noRecords}</b>
-          <div className="country-context-track" aria-hidden="true">
-            <i style={{ width: item.records ? `${Math.max(8, (item.records / max) * 100)}%` : "0%" }} />
-          </div>
-        </div>
-      ))}
+      {primaryItems.map(row)}
+      {additionalItems.length ? (
+        <details className="compact-disclosure">
+          <DisclosureSummary language={language} label={language === "es" ? `Ver ${additionalItems.length} ${additionalItems.length === 1 ? "ubicación adicional" : "ubicaciones adicionales"}` : `View ${additionalItems.length} additional locations`} />
+          <div className="compact-disclosure-content">{additionalItems.map(row)}</div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -142,14 +161,23 @@ export function SectorMatrix({ items, language = "en" }: { items: RankedItem[]; 
   if (!items.length) {
     return <div className="chart-empty">{copy.noSector}</div>;
   }
-  return (
-    <div className="sector-matrix">
-      {items.map((item) => (
+  const primaryItems = items.slice(0, 4);
+  const additionalItems = items.slice(4);
+  const cell = (item: RankedItem) => (
         <div className={`sector-cell ${item.tone ?? "medium"}`} key={item.name}>
           <span>{localizedSectorLabel(item.name, language)}</span>
           <strong>{item.value}</strong>
         </div>
-      ))}
+  );
+  return (
+    <div className="sector-matrix">
+      {primaryItems.map(cell)}
+      {additionalItems.length ? (
+        <details className="compact-disclosure">
+          <DisclosureSummary language={language} label={language === "es" ? `Ver ${additionalItems.length} sectores adicionales` : `View ${additionalItems.length} additional sectors`} />
+          <div className="compact-disclosure-content sector-matrix-more">{additionalItems.map(cell)}</div>
+        </details>
+      ) : null}
     </div>
   );
 }

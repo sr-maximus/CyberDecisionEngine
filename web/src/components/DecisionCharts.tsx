@@ -20,6 +20,9 @@ const decisionCopy = {
     frameworksVisible: "Frameworks visibles",
     noActiveEvidence: "Sin evidencia activa",
     notAssessed: "No evaluada",
+    version: "Versión",
+    catalogState: "Estado en la corrida",
+    mappingState: "Solidez del cruce",
     zoomIn: "Acercar grafo",
     zoomOut: "Alejar grafo",
     reset: "Restablecer grafo",
@@ -47,6 +50,9 @@ const decisionCopy = {
     frameworksVisible: "Visible frameworks",
     noActiveEvidence: "No active evidence",
     notAssessed: "Not assessed",
+    version: "Version",
+    catalogState: "Run status",
+    mappingState: "Mapping strength",
     zoomIn: "Zoom graph in",
     zoomOut: "Zoom graph out",
     reset: "Reset graph",
@@ -61,6 +67,30 @@ const decisionCopy = {
     networkLegend: "Entity legend"
   }
 };
+
+function frameworkStatusLabel(value: string, language: LanguageMode): string {
+  const labels: Record<LanguageMode, Record<string, string>> = {
+    es: {
+      evidence_backed: "Con registros relacionados",
+      no_data: "Sin registros relacionados",
+      preventive_reference: "Referencia preventiva",
+      potentially_relevant: "Potencialmente relacionado",
+      evidence_supported_candidate: "Candidato respaldado por registros",
+      observed_behavior: "Comportamiento observado",
+      validated: "Cruce validado"
+    },
+    en: {
+      evidence_backed: "Related records available",
+      no_data: "No related records",
+      preventive_reference: "Preventive reference",
+      potentially_relevant: "Potentially related",
+      evidence_supported_candidate: "Evidence-supported candidate",
+      observed_behavior: "Observed behavior",
+      validated: "Validated mapping"
+    }
+  };
+  return labels[language][value] ?? value.replace(/_/g, " ");
+}
 
 export function GraphInsight({
   metrics,
@@ -449,6 +479,11 @@ export function FrameworkMapping({
               </div>
               <ShieldCheck size={19} />
             </div>
+            <div className="framework-status-strip" aria-label={`${copy.catalogState}: ${frameworkStatusLabel(selectedFramework.catalogStatus, language)}`}>
+              <span><strong>{copy.version}</strong>{selectedFramework.version}</span>
+              <span><strong>{copy.catalogState}</strong>{frameworkStatusLabel(selectedFramework.catalogStatus, language)}</span>
+              <span><strong>{copy.mappingState}</strong>{frameworkStatusLabel(selectedFramework.mappingStatus, language)}</span>
+            </div>
             <div className="framework-detail-bars">
               <Progress label={selectedFramework.coverageAssessed ? copy.coverage : copy.notAssessed} value={selectedFramework.coverage} kind="coverage" />
               <Progress label={copy.exposure} value={selectedFramework.exposure} kind="exposure" />
@@ -505,6 +540,7 @@ export function FrameworkMapping({
                 <div>
                   <strong>{item.name}</strong>
                   <span>{localizeFrameworkText(item.family, language)}</span>
+                  <small>{copy.version} {item.version} · {frameworkStatusLabel(item.mappingStatus, language)}</small>
                 </div>
               </div>
               <div className="framework-bars">

@@ -6,13 +6,30 @@ from cyberdeck.reporting.html_report import (
     _format_strategic_percent,
     _framework_summary,
     _radar_svg,
+    _risk_heat_svg,
     _risk_digest,
+    _search_row,
     _search_groups,
     _work_plan,
     prepare_context_for_report,
     render_report,
 )
 from cyberdeck.schemas import OrganizationProfile, RiskFinding, RunContext, SourceStatus
+
+
+def test_risk_heat_svg_keeps_the_complete_scale_without_turning_missing_data_into_zero():
+    svg = _risk_heat_svg(
+        [
+            {"index": 1, "name": "Vulnerabilidades", "score": None, "heat": "no_data", "value_status": "no_data"},
+            {"index": 2, "name": "Fraude", "score": 0.056, "heat": "low", "value_status": "evidence_backed"},
+            {"index": 3, "name": "Identidad", "score": None, "heat": "no_data", "value_status": "no_data"},
+        ]
+    )
+
+    assert svg.count('class="risk-sector-background"') == 3
+    assert svg.count('class="risk-sector-value"') == 1
+    assert "Vulnerabilidades: N/D" in svg
+    assert "Fraude: 5.6/100" in svg
 
 
 def test_report_generation(tmp_path):
@@ -140,27 +157,65 @@ def test_report_generation(tmp_path):
     assert len(prepared.connector_coverage["connectors"]) == 1
     out = render_report(context, str(tmp_path / "report.html"))
     html = Path(out).read_text(encoding="utf-8")
+    technical_es_html = Path(tmp_path / "report-technical.html").read_text(encoding="utf-8")
     assert "Fraud demo risk" in html
     assert "CyberDecisionEngine" in html
     assert '<html lang="es">' in html
-    assert "Arquitectura de decisión" in html
+    assert "Decisión en una página" in html
     assert "Alcance y base de comparación" in html
     assert "Alcance sectorial declarado" in html
     assert "primary.example.invalid" in html
     assert "benchmark.example.invalid" in html
-    assert "Opciones de decisión sustentadas por escenarios" in html
+    assert "Escenarios y decisiones recomendadas" in html
     assert "Plan de trabajo de mitigación y revisión de escenarios" not in html
     assert "Sin plan de acción sustentado" in html
     assert "Fuentes y estado de conectores" not in html
+    assert "Fuentes y estado de conectores" not in technical_es_html
+    assert "Proceso de inteligencia trazable" not in html
+    assert "Proceso de inteligencia trazable" not in technical_es_html
+    assert "CDE-EV-" not in html
+    assert "CDE-EV-" not in technical_es_html
+    assert 'class="claim-statement"' in technical_es_html
+    assert ".technical-claims { grid-template-columns: minmax(0, 1fr); }" in technical_es_html
     assert "<h3>Referencias</h3>" not in html
     assert "Cobertura operativa de conectores y continuidad de recolección" not in html
-    assert "Cobertura de módulos de inteligencia" in html
-    assert "Metodología y lectura de porcentajes" in html
-    assert "Inteligencia de vulnerabilidades" in html
+    assert "Cobertura de módulos de inteligencia" not in html
+    assert "Método e interpretación" in html
+    assert "Foco de vulnerabilidades" in html
     assert "Riesgo cuantitativo por escenarios organizacionales" not in html
     assert "ALE antes de controles" not in html
     assert "ROSI" not in html
-    assert "Escenarios multi-framework activados" in html
+    assert "Escenarios y decisiones recomendadas" in html
+    assert html.count("<h2>Matriz de amenazas</h2>") == 1
+    assert html.count(
+        "<h2>Análisis estratégico PESTEL-Porter y matriz integrada</h2>"
+    ) == 1
+    assert technical_es_html.count("<h2>Matriz de amenazas</h2>") == 1
+    assert technical_es_html.count(
+        "<h2>Análisis estratégico PESTEL-Porter y matriz integrada</h2>"
+    ) == 1
+    assert 'class="report-module"' in technical_es_html
+    assert "Radar-calor de ciberriesgos" in html
+    assert "Radar-calor de ciberriesgos" in technical_es_html
+    assert "N/D significa que la evidencia disponible es insuficiente" in html
+    assert "Relaciones, terceros y dominios similares" in html
+    assert "Relaciones, terceros y dominios similares" in technical_es_html
+    assert 'id="decision" class="report-module decision-report-module"' in technical_es_html
+    assert 'id="relationships" class="report-module"' in technical_es_html
+    assert 'class="report-subdetail"' in technical_es_html
+    executive_template = (
+        Path(__file__).parents[1]
+        / "cyberdeck"
+        / "reporting"
+        / "templates"
+        / "executive_report.html.j2"
+    ).read_text(encoding="utf-8")
+    assert "{% for actor in cti.actors %}" in executive_template
+    assert "cti.actors[:12]" not in executive_template
+    assert "report-scroll" in technical_es_html
+    assert "max-height: min(72vh, 760px)" in technical_es_html
+    assert "Run ID" not in html
+    assert "Run ID" not in technical_es_html
     assert "Fecha del informe" in html
     assert "2026-02-03" in html
     assert "2026-02-03 14:45" not in html
@@ -181,17 +236,15 @@ def test_report_generation(tmp_path):
     technical_html = Path(tmp_path / "report-en-technical.html").read_text(encoding="utf-8")
     assert '<html lang="en">' in english_html
     assert "Strategic cyber intelligence report — Synthetic Organization" in english_html
-    assert "Executive Summary" in english_html
-    assert "Decision Architecture" in english_html
-    assert "Scope and Comparison Basis" in english_html
-    assert "Scenario-Supported Decision Options" in english_html
+    assert "Decision in one page" in english_html
+    assert "Scope and comparison basis" in english_html
+    assert "Scenarios and recommended decisions" in english_html
     assert "Mitigation and Scenario Review Work Plan" not in english_html
     assert "No supported action plan" in english_html
-    assert "Intelligence Module Coverage" in english_html
-    assert "Methodology and Reading of Percentages" in english_html
-    assert "Vulnerability intelligence" in english_html
-    assert "The model separates evidence" in english_html
-    assert "Signal pressure" in english_html
+    assert "Intelligence Module Coverage" not in english_html
+    assert "Method and interpretation" in english_html
+    assert "Vulnerability focus" in english_html
+    assert "SignalScore is contextual intensity" in english_html
     assert "attack probability" in english_html
     assert "Estimated relative probability" not in english_html
     assert "Technical cyber intelligence report" in technical_html
@@ -215,8 +268,26 @@ def test_report_generation(tmp_path):
     assert "https://urlscan.io/screenshots/synthetic-record.png" not in technical_html
     assert "Narrative intelligence, disinformation and reputational risk" in technical_html
     assert "Evidence-Activated Multi-Framework Scenarios" in technical_html
+    assert technical_html.count("<h2>Threat matrix</h2>") == 1
+    assert technical_html.count(
+        "<h2>Integrated PESTEL-Porter strategic analysis</h2>"
+    ) == 1
     assert "Resumen Ejecutivo" not in english_html
     assert "Employee Virtual Risk" not in english_html
+
+
+def test_search_row_uses_a_neutral_clickable_label_for_provider_hosted_evidence() -> None:
+    row = _search_row(
+        {
+            "evidence_url": "https://urlscan.io/result/public-reference/",
+            "category": "open_web",
+            "title": "Public reference",
+        },
+        "es",
+    )
+
+    assert row["evidence_url"] == "https://urlscan.io/result/public-reference/"
+    assert row["evidence_url_label"] == "Abrir URL"
 
 
 def test_work_plan_requires_an_evidence_backed_scenario() -> None:
@@ -465,3 +536,22 @@ def test_report_templates_guard_optional_context():
         assert "work_plan = work_plan | default" in source
         assert "methodology_summary = methodology_summary | default" in source
         assert "vuln_intel = metrics.vulnerability_intelligence | default" in source
+
+
+def test_technical_report_translates_domain_variation_taxonomy() -> None:
+    source = Path(
+        "cyberdeck/reporting/templates/technical_report.html.j2"
+    ).read_text(encoding="utf-8")
+    source += Path(
+        "cyberdeck/reporting/templates/relationship_risk_section.html.j2"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "'character_insertion_or_deletion': "
+        "'Inserción o eliminación de carácter'"
+    ) in source
+    assert (
+        "'character_substitution_or_transposition': "
+        "'Sustitución o transposición de carácter'"
+    ) in source
+    assert ").get(variation, variation)" in source

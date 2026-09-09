@@ -1,4 +1,5 @@
 import { AlertTriangle, Bot, CalendarX2, CheckCircle2, Clock3, Globe2, Layers3, Loader2, Network, Save, ScanSearch, ShieldAlert, X } from "lucide-react";
+import { useState } from "react";
 import { ANALYSIS_WINDOWS, analysisWindowConfig } from "../data/analysisWindows";
 import { localizedCountryLabel, localizedSectorLabel } from "../data/catalog";
 import type { AnalysisMode, AnalysisWindow, LanguageMode } from "../types";
@@ -6,6 +7,9 @@ import type { AnalysisMode, AnalysisWindow, LanguageMode } from "../types";
 export interface DomainComposerProps {
   rawDomains: string;
   rawCompetitorDomains: string;
+  rawActivities: string;
+  rawCriticalSuppliers: string;
+  rawDeclaredCompetitors: string;
   organizationName: string;
   domains: string[];
   competitorDomains: string[];
@@ -16,6 +20,10 @@ export interface DomainComposerProps {
   language: LanguageMode;
   mode: AnalysisMode;
   analysisWindow: AnalysisWindow;
+  analysisStartDate: string;
+  analysisEndDate: string;
+  onAnalysisStartDateChange: (value: string) => void;
+  onAnalysisEndDateChange: (value: string) => void;
   scanTimeBudgetMinutes: number;
   reportDisplayAt: string;
   canOverrideReportDate: boolean;
@@ -25,6 +33,9 @@ export interface DomainComposerProps {
   isRunning: boolean;
   onRawDomainsChange: (value: string) => void;
   onRawCompetitorDomainsChange: (value: string) => void;
+  onRawActivitiesChange: (value: string) => void;
+  onRawCriticalSuppliersChange: (value: string) => void;
+  onRawDeclaredCompetitorsChange: (value: string) => void;
   onOrganizationNameChange: (value: string) => void;
   onSectorsChange: (value: string[]) => void;
   onCountriesChange: (value: string[]) => void;
@@ -63,6 +74,9 @@ const copy = {
     assistedHint: "Activa modo profundo, TOR autorizado y colectores permitidos. Respeta límites, caché, backoff y fuentes públicas/autorizadas.",
     assistedConfirm:
       "Se ejecutará una búsqueda profunda segura con fuentes públicas/autorizadas, backoff, caché y TOR contenerizado cuando aplique. No se habilita evasión de bloqueos, captchas ni controles. ¿Continuar?",
+    assistedConfirmTitle: "Confirmar búsqueda profunda",
+    assistedConfirmAction: "OK, iniciar",
+    cancel: "Cancelar",
     running: "Ejecutando",
     organization: "Marca, grupo o conglomerado",
     organizationPlaceholder: "Organizacion, marca o holding",
@@ -70,6 +84,13 @@ const copy = {
     domainsHint: "Opcional para una organización; necesario para analizar superficie externa.",
     competitors: "Dominios de competencia para benchmark",
     competitorsPlaceholder: "competidor.example.invalid, referente.example.invalid",
+    competitorEntities: "Competidores declarados",
+    competitorEntitiesPlaceholder: "Una organización por línea",
+    activities: "Actividades y subsectores",
+    activitiesPlaceholder: "Aviación de pasajeros, carga aérea, energía, minería...",
+    activitiesHint: "Describe las actividades reales. Se usan para búsquedas de actores, terceros y contexto Cyber PESTEL/Porter.",
+    criticalSuppliers: "Terceros y proveedores críticos",
+    criticalSuppliersPlaceholder: "Un proveedor o tercero por línea",
     sectors: "Sector(es) económico(s)",
     countries: "País(es) objetivo",
     mode: "Modo de análisis",
@@ -113,6 +134,9 @@ const copy = {
     assistedHint: "Enables deep mode, authorized TOR and allowlisted collectors with limits, cache, backoff and public/authorized sources.",
     assistedConfirm:
       "A safe deep search will run with public/authorized sources, backoff, cache and containerized TOR when applicable. Block/captcha/control evasion is not enabled. Continue?",
+    assistedConfirmTitle: "Confirm deep search",
+    assistedConfirmAction: "OK, start",
+    cancel: "Cancel",
     running: "Running",
     organization: "Brand, group or conglomerate",
     organizationPlaceholder: "Organization, brand or holding name",
@@ -120,6 +144,13 @@ const copy = {
     domainsHint: "Optional for an organization; required for external-surface analysis.",
     competitors: "Competitor domains for benchmark",
     competitorsPlaceholder: "competitor.example.invalid, benchmark.example.invalid",
+    competitorEntities: "Declared competitors",
+    competitorEntitiesPlaceholder: "One organization per line",
+    activities: "Activities and subsectors",
+    activitiesPlaceholder: "Passenger aviation, air cargo, energy, mining...",
+    activitiesHint: "Describe actual activities. They guide actor, third-party and Cyber PESTEL/Porter context searches.",
+    criticalSuppliers: "Critical third parties and suppliers",
+    criticalSuppliersPlaceholder: "One supplier or third party per line",
     sectors: "Economic sector(s)",
     countries: "Target country/countries",
     mode: "Analysis mode",
@@ -160,6 +191,9 @@ const copy = {
 export function DomainComposer({
   rawDomains,
   rawCompetitorDomains,
+  rawActivities,
+  rawCriticalSuppliers,
+  rawDeclaredCompetitors,
   organizationName,
   domains,
   competitorDomains,
@@ -170,6 +204,10 @@ export function DomainComposer({
   language,
   mode,
   analysisWindow,
+  analysisStartDate,
+  analysisEndDate,
+  onAnalysisStartDateChange,
+  onAnalysisEndDateChange,
   scanTimeBudgetMinutes,
   reportDisplayAt,
   canOverrideReportDate,
@@ -179,6 +217,9 @@ export function DomainComposer({
   isRunning,
   onRawDomainsChange,
   onRawCompetitorDomainsChange,
+  onRawActivitiesChange,
+  onRawCriticalSuppliersChange,
+  onRawDeclaredCompetitorsChange,
   onOrganizationNameChange,
   onSectorsChange,
   onCountriesChange,
@@ -199,10 +240,12 @@ export function DomainComposer({
   riskContext,
   onRiskContextChange
 }: DomainComposerProps) {
+  const [isAssistedConfirmationOpen, setIsAssistedConfirmationOpen] = useState(false);
   const labels = copy[language];
   const currentWindow = analysisWindowConfig(analysisWindow);
   const needsOrganizationName = domains.length > 1 && organizationName.trim().length === 0 && !reusableScopeName;
-  const hasRunnableScope = (domains.length > 0 || organizationName.trim().length > 0) && !needsOrganizationName;
+  const validPeriod = analysisWindow !== "custom" || Boolean(analysisStartDate && analysisEndDate && analysisStartDate <= analysisEndDate && analysisEndDate <= new Date().toISOString().slice(0, 10));
+  const hasRunnableScope = (domains.length > 0 || organizationName.trim().length > 0) && !needsOrganizationName && validPeriod;
   const targetCount = domains.length + (organizationName.trim() ? 1 : 0);
   const scanBudgetOptions = [
     { value: 0, label: language === "es" ? "Hasta completar" : "Until complete" },
@@ -229,9 +272,7 @@ export function DomainComposer({
           <button
             className="secondary-button assisted-search-button"
             disabled={isRunning || !hasRunnableScope}
-            onClick={() => {
-              if (window.confirm(labels.assistedConfirm)) onAssistedRun();
-            }}
+            onClick={() => setIsAssistedConfirmationOpen(true)}
             type="button"
             title={labels.assistedHint}
           >
@@ -240,6 +281,52 @@ export function DomainComposer({
           </button>
         </div>
       </div>
+      {isAssistedConfirmationOpen ? (
+        <div
+          className="in-app-confirmation-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsAssistedConfirmationOpen(false);
+          }}
+        >
+          <div
+            aria-describedby="deep-search-confirmation-description"
+            aria-labelledby="deep-search-confirmation-title"
+            aria-modal="true"
+            className="in-app-confirmation"
+            role="dialog"
+          >
+            <div className="in-app-confirmation-icon" aria-hidden="true">
+              <ScanSearch size={24} />
+            </div>
+            <div className="in-app-confirmation-copy">
+              <h3 id="deep-search-confirmation-title">{labels.assistedConfirmTitle}</h3>
+              <p id="deep-search-confirmation-description">{labels.assistedConfirm}</p>
+            </div>
+            <div className="in-app-confirmation-actions">
+              <button
+                className="secondary-button compact"
+                onClick={() => setIsAssistedConfirmationOpen(false)}
+                type="button"
+              >
+                {labels.cancel}
+              </button>
+              <button
+                autoFocus
+                className="primary-button compact"
+                onClick={() => {
+                  setIsAssistedConfirmationOpen(false);
+                  onAssistedRun();
+                }}
+                type="button"
+              >
+                <ScanSearch size={17} />
+                {labels.assistedConfirmAction}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="guided-alert compact safe-search-alert">
         <AlertTriangle size={17} />
         <div>
@@ -259,7 +346,7 @@ export function DomainComposer({
         />
         <small>{labels.domainsHint}</small>
       </label>
-      {!hasRunnableScope ? (
+      {!(domains.length > 0 || organizationName.trim().length > 0) || needsOrganizationName ? (
         <div className="guided-alert compact scope-alert">
           <AlertTriangle size={17} />
           <div>
@@ -315,6 +402,41 @@ export function DomainComposer({
               </option>
             ))}
           </select>
+        </label>
+      </div>
+
+      <label className="field-control">
+        <span>{labels.activities}</span>
+        <textarea
+          className="domain-input compact"
+          value={rawActivities}
+          onChange={(event) => onRawActivitiesChange(event.target.value)}
+          placeholder={labels.activitiesPlaceholder}
+          rows={2}
+        />
+        <small>{labels.activitiesHint}</small>
+      </label>
+
+      <div className="relationship-scope-grid">
+        <label className="field-control">
+          <span>{labels.criticalSuppliers}</span>
+          <textarea
+            className="domain-input compact"
+            value={rawCriticalSuppliers}
+            onChange={(event) => onRawCriticalSuppliersChange(event.target.value)}
+            placeholder={labels.criticalSuppliersPlaceholder}
+            rows={2}
+          />
+        </label>
+        <label className="field-control">
+          <span>{labels.competitorEntities}</span>
+          <textarea
+            className="domain-input compact"
+            value={rawDeclaredCompetitors}
+            onChange={(event) => onRawDeclaredCompetitorsChange(event.target.value)}
+            placeholder={labels.competitorEntitiesPlaceholder}
+            rows={2}
+          />
         </label>
       </div>
 
@@ -403,6 +525,12 @@ export function DomainComposer({
           </select>
           <small>{labels.scanBudgetHint}</small>
         </label>
+
+        {analysisWindow === "custom" ? <>
+          <label className="window-control period-date-control"><span>{language === "es" ? "Desde (inclusive, UTC)" : "From (inclusive, UTC)"}</span><input type="date" value={analysisStartDate} max={analysisEndDate || new Date().toISOString().slice(0, 10)} onChange={(event) => onAnalysisStartDateChange(event.target.value)} required /></label>
+          <label className="window-control period-date-control"><span>{language === "es" ? "Hasta (inclusive, UTC)" : "To (inclusive, UTC)"}</span><input type="date" value={analysisEndDate} min={analysisStartDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => onAnalysisEndDateChange(event.target.value)} required /></label>
+          {!validPeriod && <p role="status">{language === "es" ? "Selecciona ambas fechas, en orden y sin fechas futuras." : "Select both dates in order, with no future dates."}</p>}
+        </> : null}
 
         <label className="toggle">
           <input

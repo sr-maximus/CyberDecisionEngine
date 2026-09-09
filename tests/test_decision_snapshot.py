@@ -5,6 +5,7 @@ from cyberdeck.decision_intelligence import build_decision_snapshot
 from cyberdeck.reporting.html_report import prepare_context_for_report, render_report
 from cyberdeck.schemas import OrganizationProfile, RunContext, SourceStatus
 from cyberdeck.semantics import CLAIM_EVIDENCE_MODEL_VERSION
+from cyberdeck.snapshot_integrity import verify_snapshot
 from cyberdeck_api.jobs import _hydrate_source_lifecycle, summarize_context
 from cyberdeck_api.models import DomainAnalysisRequest, RunRecord
 
@@ -16,6 +17,7 @@ def test_regression_snapshot_is_the_shared_decision_record(tmp_path, regression_
     context = regression_context.model_copy(deep=True)
     prepared = prepare_context_for_report(context, run_id=RUN_ID)
     snapshot = prepared.decision_snapshot
+    assert verify_snapshot(snapshot)
     assert prepared.claim_evidence_model_version == CLAIM_EVIDENCE_MODEL_VERSION
 
     assert snapshot["report_context"]["primary_domains"] == ["example.com"]
@@ -73,6 +75,7 @@ def test_regression_snapshot_is_the_shared_decision_record(tmp_path, regression_
     metric_rows = {row["record_id"]: row for row in csv_rows if row["record_type"] == "metric"}
 
     assert exported["snapshot_hash"] == snapshot["snapshot_hash"]
+    assert verify_snapshot(exported)
     assert float(metric_rows["unique_records"]["value"]) == snapshot["metrics"]["unique_records"]["value"]
     assert float(metric_rows["healthy_sources"]["value"]) == snapshot["metrics"]["healthy_sources"]["value"]
     executive_html = report.read_text(encoding="utf-8")
@@ -80,9 +83,10 @@ def test_regression_snapshot_is_the_shared_decision_record(tmp_path, regression_
     assert snapshot["snapshot_hash"][:12] in executive_html
     assert snapshot["snapshot_hash"][:12] in technical_html
     assert all(domain in executive_html for domain in snapshot["report_context"]["primary_domains"])
-    assert "1/3" in executive_html
-    assert "Registros asociados" in executive_html
-    assert "Registros asociados" in technical_html
+    assert "Fuentes y estado de conectores" not in executive_html
+    assert "Registros únicos" in executive_html
+    assert "Alcance analizado" in executive_html
+    assert "Alcance analizado" in technical_html
     assert "Referencias completas de evidencia" in technical_html
     assert "https://example.com/evidence/phishing" in technical_html
 
@@ -117,7 +121,7 @@ def test_zero_and_missing_values_are_not_conflated(tmp_path):
     report = render_report(context, str(tmp_path / "empty-run.html"))
     technical_html = report.with_name("empty-run-technical.html").read_text(encoding="utf-8")
     executive_html = report.read_text(encoding="utf-8")
-    assert "Riesgo residual máx.</span><strong>N/D</strong>" in executive_html
+    assert "Riesgo residual máximo</span><strong>N/D</strong>" in executive_html
     assert "Riesgo residual máx.</span><strong>N/D</strong>" in technical_html
     assert "Riesgo residual máximo 0.0" not in technical_html
     assert "Presión de fraude</span><strong>Sin señales validadas</strong>" in technical_html
@@ -260,3 +264,21 @@ def test_historical_run_hydrates_source_lifecycle_from_persisted_coverage(regres
     assert run.summary.decision_snapshot["source_health"]["queried"] == expected["queried_sources"]
     assert run.summary.decision_snapshot["source_health"]["productive"] == expected["productive_sources"]
     assert len(run.summary.decision_snapshot["snapshot_hash"]) == 64
+    assert verify_snapshot(run.summary.decision_snapshot)
+
+
+def test_complete_source_lifecycle_does_not_rewrite_a_modern_snapshot(regression_context):
+    context = prepare_context_for_report(regression_context.model_copy(deep=True), run_id="modern-run")
+    summary = summarize_context(["example.com"], context)
+    run = RunRecord(
+        id="modern-run",
+        status="completed",
+        request=DomainAnalysisRequest(domains=["example.com"], authorized_scope=True),
+        domains=["example.com"],
+        summary=summary,
+    )
+    before = run.summary.decision_snapshot["snapshot_hash"]
+
+    assert _hydrate_source_lifecycle(run) is False
+    assert run.summary.decision_snapshot["snapshot_hash"] == before
+    assert verify_snapshot(run.summary.decision_snapshot)

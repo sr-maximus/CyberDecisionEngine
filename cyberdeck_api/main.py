@@ -1,21 +1,29 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
+import os
 import re
 import time
 from io import BytesIO
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 from urllib.request import Request, urlopen
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
+from cyberdeck.analysis.multidomain import sanitize_public_payload
+from cyberdeck.cti import build_knowledge_manifest, sync_knowledge_sources
+from cyberdeck.cti.framework_catalog import framework_catalog_index, load_framework_family
+from cyberdeck.cti.knowledge import rollback_knowledge_source
 from cyberdeck.settings import PROJECT_ROOT
 from cyberdeck.methodology import load_methodology_registry
 from cyberdeck_api.attack_surface import build_attack_surface
@@ -50,6 +58,7 @@ from cyberdeck_api.models import (
     DomainAnalysisRequest,
     EmployeeRiskRunResponse,
     EvidenceReviewRequest,
+    EvidenceReviewBatchRequest,
     HealthResponse,
     MitreGroup,
     MonitoringAlert,
@@ -60,6 +69,7 @@ from cyberdeck_api.models import (
     MonitoringProfileUpdate,
     PlatformLogEntry,
     ReportCatalogItem,
+    ReportGenerationRequest,
     RunRecord,
     SupportTicket,
     SupportTicketRequest,
@@ -76,6 +86,10 @@ MITRE_ENTERPRISE_STIX_URL = "https://raw.githubusercontent.com/mitre-attack/atta
 MITRE_CACHE_TTL_SECONDS = 60 * 60 * 6
 _mitre_cache: tuple[float, list[MitreGroup]] | None = None
 
+
+class CTIKnowledgeRequest(BaseModel):
+    source_ids: list[str] = Field(default_factory=list)
+
 MITRE_FALLBACK_GROUPS = [
     MitreGroup(id="G0016", name="APT29", aliases=["Cozy Bear", "NOBELIUM"]),
     MitreGroup(id="G0007", name="APT28", aliases=["Fancy Bear", "Sofacy"]),
@@ -90,6 +104,13 @@ MITRE_FALLBACK_GROUPS = [
 ]
 
 
+class PublicJSONResponse(JSONResponse):
+    """Enforce the public presentation boundary for every JSON API response."""
+
+    def render(self, content: Any) -> bytes:
+        return super().render(sanitize_public_payload(content))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await store.load()
@@ -100,6 +121,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await monitoring_store.stop()
+        await store.stop()
 
 
 app = FastAPI(
@@ -107,15 +129,22 @@ app = FastAPI(
     version="0.1.0",
     description="Local defensive cyber intelligence API for domain analysis runs.",
     lifespan=lifespan,
+    default_response_class=PublicJSONResponse,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8080", "http://127.0.0.1:5173", "http://127.0.0.1:8080"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8080",
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 
 reports_dir = PROJECT_ROOT / "reports"
 reports_dir.mkdir(parents=True, exist_ok=True)
@@ -148,14 +177,23 @@ async def create_analysis(request: DomainAnalysisRequest) -> RunRecord:
 
 @app.get("/api/runs", response_model=list[RunRecord])
 async def list_runs() -> list[RunRecord]:
-    return await store.list_runs()
+    return await store.list_run_statuses()
+
+
+@app.get("/api/runs/status", response_model=list[RunRecord])
+async def list_run_statuses() -> list[RunRecord]:
+    return await store.list_run_statuses()
 
 
 @app.get("/api/reports", response_model=list[ReportCatalogItem])
 async def list_reports() -> list[ReportCatalogItem]:
     reports = []
-    for path in sorted(reports_dir.rglob("*.html"), key=lambda item: item.stat().st_mtime, reverse=True):
+    for path in sorted(
+        reports_dir.rglob("*.html"), key=lambda item: item.stat().st_mtime, reverse=True
+    ):
         if path.name.endswith(("_executive.html", "_technical.html")):
+            continue
+        if "-view-" in path.stem:
             continue
         stat = path.stat()
         report_type = "technical" if path.name.endswith("-technical.html") else "executive"
@@ -207,9 +245,13 @@ async def delete_report(report_path: str) -> dict:
 
 
 @app.get("/api/reports/archive")
-async def download_reports_archive(kind: Optional[str] = Query(default=None, pattern="^(executive|technical)$")) -> Response:
+async def download_reports_archive(
+    kind: Optional[str] = Query(default=None, pattern="^(executive|technical)$"),
+) -> Response:
     selected = []
-    for path in sorted(reports_dir.rglob("*.html"), key=lambda item: item.stat().st_mtime, reverse=True):
+    for path in sorted(
+        reports_dir.rglob("*.html"), key=lambda item: item.stat().st_mtime, reverse=True
+    ):
         if path.name.endswith(("_executive.html", "_technical.html")):
             continue
         is_technical = path.name.endswith("-technical.html")
@@ -229,7 +271,9 @@ async def download_reports_archive(kind: Optional[str] = Query(default=None, pat
     return Response(
         buffer.getvalue(),
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="cyberdecisionengine-reports{suffix}.zip"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="cyberdecisionengine-reports{suffix}.zip"'
+        },
     )
 
 
@@ -262,7 +306,9 @@ async def create_monitoring_profile(request: MonitoringProfileRequest) -> Monito
 
 
 @app.patch("/api/monitoring/profiles/{profile_id}", response_model=MonitoringProfile)
-async def update_monitoring_profile(profile_id: str, request: MonitoringProfileUpdate) -> MonitoringProfile:
+async def update_monitoring_profile(
+    profile_id: str, request: MonitoringProfileUpdate
+) -> MonitoringProfile:
     profile = await monitoring_store.update_profile(profile_id, request)
     if profile is None:
         raise HTTPException(status_code=404, detail="Monitoring profile not found.")
@@ -365,16 +411,33 @@ async def scenario_library() -> dict:
 @app.get("/api/ai/config")
 async def ai_config() -> dict:
     config = ai_orchestration_config()
-    runtime = await openclaw_runtime_status()
-    chat_runtime = await ollama_runtime_status("OLLAMA_CHAT_MODEL")
-    config["openclaw_gateway"].update(runtime)
-    config["ollama_chat"].update(chat_runtime)
-    for provider in config["provider_catalog"]:
-        if provider.get("key") == "openclaw_gateway":
-            provider["enabled"] = runtime.get("ready", False)
-            provider["runtime_status"] = runtime.get("runtime_status")
-            provider["model_status"] = runtime.get("model_status")
-    return config
+    orchestration_runtime = await openclaw_runtime_status()
+    local_runtime = await ollama_runtime_status("OLLAMA_CHAT_MODEL")
+    runtime = orchestration_runtime if orchestration_runtime.get("ready") else local_runtime
+    return {
+        "prompt_version": config["prompt_version"],
+        "chat_prompt_version": config["chat_prompt_version"],
+        "token_policy": config["token_policy"],
+        "approval_required": config["approval_required"],
+        "automation_default": config["automation_default"],
+        "analysis_runtime": {
+            "profile": "CyberDecision AI",
+            "ready": bool(runtime.get("ready")),
+            "runtime_status": runtime.get("runtime_status", "unavailable"),
+            "model_status": runtime.get("model_status", "not_checked"),
+        },
+        "agent_architecture": {
+            "mode": "specialist_orchestration",
+            "specialist_execution": "deterministic_parallel_reducers",
+            "synthesis": "controlled_analysis",
+            "interactive_synthesis": "deterministic_specialist_synthesis",
+            "deep_synthesis": "isolated_local_analysis",
+            "post_validation": "deterministic_evidence_verifier",
+            "max_interactive_agents": config["agent_architecture"].get("max_interactive_agents", 3),
+            "max_deep_agents": config["agent_architecture"].get("max_deep_agents", 6),
+        },
+        "assistant_capabilities": config["assistant_capabilities"],
+    }
 
 
 @app.post("/api/ai/package", response_model=AIAnalysisPackage)
@@ -400,17 +463,21 @@ async def ai_chat(request: AIChatRequest) -> AIExecutionResult:
         raise HTTPException(status_code=404, detail="Run not found.")
     if _requests_report_generation(request.message):
         try:
-            run = await store.generate_report(request.run_id)
+            run = await store.request_report(request.run_id, request.language)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        if run is None or run.report is None:
-            raise HTTPException(status_code=409, detail="Report generation did not produce an output.")
-        executive_url = run.report.url
-        technical_url = run.report.technical_url
+        if run is None:
+            raise HTTPException(status_code=404, detail="Run not found.")
+        executive_url = run.report.url if run.report else None
+        technical_url = run.report.technical_url if run.report else None
         answer = (
-            "Los informes ejecutivo y técnico fueron generados desde la corrida seleccionada y están listos para revisión."
+            "La generación de los informes ejecutivo y técnico quedó en cola; puedes seguir el estado sin bloquear la aplicación."
+            if request.language == "es" and not run.report
+            else "Executive and technical report generation is queued; its status can be followed without blocking the application."
+            if not run.report
+            else "Los informes ejecutivo y técnico están listos para revisión."
             if request.language == "es"
-            else "The executive and technical reports were generated from the selected run and are ready for review."
+            else "The executive and technical reports are ready for review."
         )
         return AIExecutionResult(
             id=f"ai-report-{run.id}",
@@ -425,7 +492,9 @@ async def ai_chat(request: AIChatRequest) -> AIExecutionResult:
                 "inferences": [],
                 "decision_options": [],
                 "technical_checks": [],
-                "dashboard_targets": [{"module": "overview", "reason": "report status and run summary"}],
+                "dashboard_targets": [
+                    {"module": "overview", "reason": "report status and run summary"}
+                ],
                 "report_guidance": {
                     "executive": executive_url,
                     "technical": technical_url,
@@ -448,7 +517,9 @@ async def ai_chat(request: AIChatRequest) -> AIExecutionResult:
 
 def _requests_report_generation(message: str) -> bool:
     normalized = message.casefold()
-    action = any(token in normalized for token in ("genera", "generar", "crear", "create", "generate"))
+    action = any(
+        token in normalized for token in ("genera", "generar", "crear", "create", "generate")
+    )
     artifact = any(token in normalized for token in ("informe", "reporte", "report"))
     return action and artifact
 
@@ -475,7 +546,9 @@ async def create_company_license(request: CreateLicenseRequest) -> LicensingOver
 
 
 @app.patch("/api/licensing/licenses/{license_id}", response_model=LicensingOverview)
-async def update_company_license(license_id: str, request: UpdateLicenseRequest) -> LicensingOverview:
+async def update_company_license(
+    license_id: str, request: UpdateLicenseRequest
+) -> LicensingOverview:
     try:
         return await license_store.update_license(license_id, request)
     except ValueError as exc:
@@ -504,11 +577,17 @@ def _fetch_mitre_groups() -> list[MitreGroup]:
         payload = json.loads(response.read().decode("utf-8"))
 
     objects = payload.get("objects", [])
-    relationships = [item for item in objects if item.get("type") == "relationship" and item.get("relationship_type") == "uses"]
+    relationships = [
+        item
+        for item in objects
+        if item.get("type") == "relationship" and item.get("relationship_type") == "uses"
+    ]
     technique_by_id = {
         item.get("id"): _external_id(item)
         for item in objects
-        if item.get("type") == "attack-pattern" and not item.get("revoked") and not item.get("x_mitre_deprecated")
+        if item.get("type") == "attack-pattern"
+        and not item.get("revoked")
+        and not item.get("x_mitre_deprecated")
     }
     techniques_by_group: dict[str, set[str]] = {}
     for relationship in relationships:
@@ -520,7 +599,11 @@ def _fetch_mitre_groups() -> list[MitreGroup]:
 
     groups = []
     for item in objects:
-        if item.get("type") != "intrusion-set" or item.get("revoked") or item.get("x_mitre_deprecated"):
+        if (
+            item.get("type") != "intrusion-set"
+            or item.get("revoked")
+            or item.get("x_mitre_deprecated")
+        ):
             continue
         groups.append(
             MitreGroup(
@@ -541,9 +624,39 @@ def _external_id(item: dict) -> str:
     return ""
 
 
-@app.get("/api/runs/{run_id}", response_model=RunRecord)
-async def get_run(run_id: str) -> RunRecord:
+async def _cti_for_run(run_id: str) -> Dict[str, Any]:
     run = await store.get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    metrics = run.summary.metrics or {}
+    cti = metrics.get("cti") if isinstance(metrics, dict) else None
+    if not cti and run.summary.decision_snapshot:
+        cti = run.summary.decision_snapshot.get("cti_snapshot")
+    if not isinstance(cti, dict) or not cti:
+        raise HTTPException(
+            status_code=409,
+            detail="CTI snapshot is not available for this run.",
+        )
+    return cti
+
+
+def _require_cti_admin_key(provided: str | None) -> None:
+    configured = os.getenv("CDE_ADMIN_API_KEY", "").strip()
+    if not configured:
+        raise HTTPException(
+            status_code=503,
+            detail="CTI knowledge administration is disabled until CDE_ADMIN_API_KEY is configured.",
+        )
+    if not provided or not hmac.compare_digest(provided, configured):
+        raise HTTPException(status_code=403, detail="Invalid administrator credential.")
+
+
+@app.get("/api/runs/{run_id}", response_model=RunRecord)
+async def get_run(
+    run_id: str,
+    view: Literal["full", "dashboard"] = Query(default="full"),
+) -> RunRecord:
+    run = await (store.get_dashboard_run(run_id) if view == "dashboard" else store.get_run(run_id))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found.")
     return run
@@ -555,8 +668,79 @@ async def get_run_snapshot(run_id: str) -> Dict[str, Any]:
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found.")
     if not run.summary.decision_snapshot:
-        raise HTTPException(status_code=409, detail="Decision snapshot is not available for this run.")
+        raise HTTPException(
+            status_code=409, detail="Decision snapshot is not available for this run."
+        )
     return run.summary.decision_snapshot
+
+
+@app.get("/api/cti/runs/{run_id}", response_model=Dict[str, Any])
+async def get_cti_snapshot(run_id: str) -> Dict[str, Any]:
+    return await _cti_for_run(run_id)
+
+
+@app.get("/api/cti/runs/{run_id}/{section}", response_model=Any)
+async def get_cti_section(
+    run_id: str,
+    section: Literal[
+        "overview",
+        "actors",
+        "campaigns",
+        "techniques",
+        "attack_matrix",
+        "attack_flows",
+        "victimology",
+        "detection_coverage",
+        "control_coverage",
+        "graph",
+        "evidence",
+        "quality",
+    ],
+) -> Any:
+    cti = await _cti_for_run(run_id)
+    return cti.get(section, [] if section in {"actors", "campaigns", "techniques", "attack_flows", "evidence"} else {})
+
+
+@app.get("/api/cti/knowledge", response_model=Dict[str, Any])
+async def get_cti_knowledge_manifest() -> Dict[str, Any]:
+    return build_knowledge_manifest()
+
+
+@app.get("/api/cti/framework-catalog", response_model=Dict[str, Any])
+async def get_cti_framework_catalog() -> Dict[str, Any]:
+    return await asyncio.to_thread(framework_catalog_index)
+
+
+@app.get("/api/cti/framework-catalog/{family_id}", response_model=Dict[str, Any])
+async def get_cti_framework_family(family_id: str) -> Dict[str, Any]:
+    try:
+        return await asyncio.to_thread(load_framework_family, family_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Unknown CTI framework family.") from exc
+
+
+@app.post("/api/admin/cti/knowledge/sync", response_model=Dict[str, Any])
+async def sync_cti_knowledge(
+    request: CTIKnowledgeRequest,
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+) -> Dict[str, Any]:
+    _require_cti_admin_key(x_admin_key)
+    return await asyncio.to_thread(sync_knowledge_sources, request.source_ids or None)
+
+
+@app.post("/api/admin/cti/knowledge/rollback", response_model=Dict[str, Any])
+async def rollback_cti_knowledge(
+    request: CTIKnowledgeRequest,
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+) -> Dict[str, Any]:
+    _require_cti_admin_key(x_admin_key)
+    if not request.source_ids:
+        raise HTTPException(status_code=422, detail="At least one source_id is required.")
+    results = [
+        await asyncio.to_thread(rollback_knowledge_source, source_id)
+        for source_id in request.source_ids
+    ]
+    return {"results": results, "manifest": build_knowledge_manifest()}
 
 
 @app.post("/api/runs/{run_id}/rerun", response_model=RunRecord, status_code=202)
@@ -567,15 +751,51 @@ async def rerun(run_id: str) -> RunRecord:
     return run
 
 
-@app.post("/api/runs/{run_id}/report", response_model=RunRecord)
-async def generate_run_report(run_id: str) -> RunRecord:
+@app.post("/api/runs/{run_id}/report", response_model=RunRecord, status_code=202)
+async def generate_run_report(
+    run_id: str, request: Optional[ReportGenerationRequest] = None
+) -> RunRecord:
     try:
-        run = await store.generate_report(run_id)
+        run = await store.request_report(
+            run_id,
+            request.language if request else "es",
+            request.technology_domains if request else [],
+            request.analysis_domains if request else [],
+            request.review_mode if request else "manual",
+            force=request.force if request else False,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found.")
     return run
+
+
+@app.get("/api/runs/{run_id}/evidence")
+async def get_run_evidence(run_id: str) -> Response:
+    try:
+        events = await store.get_evidence(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail="Stored evidence is not available.") from exc
+    if events is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    payload = await asyncio.to_thread(json.dumps, {"events": events, "total": len(events)})
+    return Response(content=payload, media_type="application/json")
+
+
+@app.patch("/api/runs/{run_id}/evidence", response_model=RunRecord)
+async def review_run_evidence_batch(run_id: str, request: EvidenceReviewBatchRequest) -> Response:
+    try:
+        run = await store.review_evidence_batch(
+            run_id, [review.model_dump() for review in request.reviews]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    # Large analytical snapshots must not block health checks and other requests.
+    payload = await asyncio.to_thread(run.model_dump_json)
+    return Response(content=payload, media_type="application/json")
 
 
 @app.patch("/api/runs/{run_id}/evidence/{evidence_id}", response_model=RunRecord)

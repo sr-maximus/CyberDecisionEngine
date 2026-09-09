@@ -50,9 +50,17 @@ class MonitoringStore:
         self._alerts: Dict[str, MonitoringAlert] = {}
         self._logs: list[PlatformLogEntry] = []
         self._tickets: Dict[str, SupportTicket] = {}
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None
+        self._lock_loop: Optional[asyncio.AbstractEventLoop] = None
         self._worker: asyncio.Task[None] | None = None
         self._run_store: RunStore | None = None
+
+    def _active_lock(self) -> asyncio.Lock:
+        loop = asyncio.get_running_loop()
+        if self._lock is None or self._lock_loop is not loop:
+            self._lock = asyncio.Lock()
+            self._lock_loop = loop
+        return self._lock
 
     async def load(self, run_store: RunStore) -> None:
         self._run_store = run_store
@@ -77,7 +85,7 @@ class MonitoringStore:
 
     async def overview(self) -> MonitoringOverview:
         await self._sync_completed_runs()
-        async with self._lock:
+        async with self._active_lock():
             return MonitoringOverview(
                 profiles=sorted(self._profiles.values(), key=lambda item: item.created_at, reverse=True),
                 alerts=sorted(self._alerts.values(), key=lambda item: item.created_at, reverse=True),
@@ -97,7 +105,7 @@ class MonitoringStore:
             created_by=request.created_by,
             next_run_at=utcnow_iso() if request.enabled and request.cadence != "manual" else None,
         )
-        async with self._lock:
+        async with self._active_lock():
             self._profiles[profile.id] = profile
             self._log_locked("info", "monitoring", f"Monitoring profile created: {profile.name}", profile_id=profile.id, user=request.created_by)
             await self._persist_locked()
@@ -106,7 +114,7 @@ class MonitoringStore:
         return profile
 
     async def update_profile(self, profile_id: str, request: MonitoringProfileUpdate) -> Optional[MonitoringProfile]:
-        async with self._lock:
+        async with self._active_lock():
             profile = self._profiles.get(profile_id)
             if profile is None:
                 return None
@@ -127,7 +135,7 @@ class MonitoringStore:
 
     async def create_support_ticket(self, request: SupportTicketRequest) -> SupportTicket:
         ticket = SupportTicket(id=uuid4().hex[:12], **request.model_dump())
-        async with self._lock:
+        async with self._active_lock():
             self._tickets[ticket.id] = ticket
             self._log_locked(
                 "warning" if ticket.severity == "high" else "info",
@@ -140,7 +148,7 @@ class MonitoringStore:
             return ticket
 
     async def update_alert_status(self, alert_id: str, status: str, user: str = "system") -> Optional[MonitoringAlert]:
-        async with self._lock:
+        async with self._active_lock():
             alert = self._alerts.get(alert_id)
             if alert is None:
                 return None
@@ -150,7 +158,7 @@ class MonitoringStore:
             return alert
 
     async def update_support_ticket(self, ticket_id: str, request: SupportTicketUpdate) -> Optional[SupportTicket]:
-        async with self._lock:
+        async with self._active_lock():
             ticket = self._tickets.get(ticket_id)
             if ticket is None:
                 return None
@@ -169,7 +177,7 @@ class MonitoringStore:
         profile_id: Optional[str] = None,
         user: Optional[str] = None,
     ) -> PlatformLogEntry:
-        async with self._lock:
+        async with self._active_lock():
             entry = self._log_locked(level, component, message, run_id=run_id, profile_id=profile_id, user=user)
             await self._persist_locked()
             return entry
@@ -184,7 +192,7 @@ class MonitoringStore:
             await asyncio.sleep(15)
 
     async def _launch_due_profiles(self) -> None:
-        async with self._lock:
+        async with self._active_lock():
             profile_ids = [
                 profile.id
                 for profile in self._profiles.values()
@@ -198,7 +206,7 @@ class MonitoringStore:
     async def _try_launch_profile(self, profile_id: str) -> None:
         if self._run_store is None:
             return
-        async with self._lock:
+        async with self._active_lock():
             profile = self._profiles.get(profile_id)
             if profile is None or profile.status != "active" or profile.cadence == "manual":
                 return
@@ -207,7 +215,7 @@ class MonitoringStore:
             current = await self._run_store.get_run(last_run_id)
             if current and current.status in {"queued", "running"}:
                 return
-        async with self._lock:
+        async with self._active_lock():
             profile = self._profiles.get(profile_id)
             if profile is None:
                 return
@@ -217,7 +225,7 @@ class MonitoringStore:
         try:
             run = await self._run_store.create_run(run_request)
         except Exception as exc:
-            async with self._lock:
+            async with self._active_lock():
                 profile = self._profiles.get(profile_id)
                 if profile:
                     profile.last_error = str(exc)
@@ -225,7 +233,7 @@ class MonitoringStore:
                 self._log_locked("error", "monitoring", f"Unable to launch monitored run: {exc}", profile_id=profile_id)
                 await self._persist_locked()
             return
-        async with self._lock:
+        async with self._active_lock():
             profile = self._profiles[profile_id]
             profile.last_run_id = run.id
             profile.last_started_at = utcnow_iso()
@@ -237,7 +245,7 @@ class MonitoringStore:
     async def _sync_completed_runs(self) -> None:
         if self._run_store is None:
             return
-        async with self._lock:
+        async with self._active_lock():
             profiles = list(self._profiles.values())
         for profile in profiles:
             if not profile.last_run_id or profile.last_run_id in profile.processed_run_ids:
@@ -249,7 +257,7 @@ class MonitoringStore:
 
     async def _process_finished_run(self, profile_id: str, run: RunRecord) -> None:
         alerts = _alerts_from_run(profile_id, run)
-        async with self._lock:
+        async with self._active_lock():
             profile = self._profiles.get(profile_id)
             if profile is None:
                 return

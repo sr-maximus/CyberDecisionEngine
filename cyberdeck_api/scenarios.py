@@ -34,6 +34,13 @@ def load_scenario_library() -> dict[str, Any]:
         "atlas": set(),
         "disarm": set(),
         "f3": set(),
+        "attack_ics": set(),
+        "attack_mobile": set(),
+        "emb3d": set(),
+        "aadapt": set(),
+        "capec": set(),
+        "cwe": set(),
+        "inform": set(),
     }
     for scenario in scenarios:
         frameworks = scenario.get("frameworks", {})
@@ -41,13 +48,33 @@ def load_scenario_library() -> dict[str, Any]:
             item = frameworks.get(key, {})
             if item.get("id"):
                 framework_sets[key].add(item["id"])
+        for mapping in scenario.get("framework_mappings", []):
+            framework_name = str(mapping.get("framework") or "")
+            if "D3FEND" in framework_name:
+                framework_sets["d3fend"].add(str(scenario.get("id") or framework_name))
+            if "ATT&CK ICS" in framework_name:
+                framework_sets["attack_ics"].add(str(scenario.get("id") or framework_name))
+            if "ATT&CK Mobile" in framework_name:
+                framework_sets["attack_mobile"].add(str(scenario.get("id") or framework_name))
+            if "EMB3D" in framework_name:
+                framework_sets["emb3d"].add(str(scenario.get("id") or framework_name))
+            if "AADAPT" in framework_name:
+                framework_sets["aadapt"].add(str(scenario.get("id") or framework_name))
+            if "CAPEC" in framework_name:
+                framework_sets["capec"].add(str(scenario.get("id") or framework_name))
+            if "CWE" in framework_name:
+                framework_sets["cwe"].add(str(scenario.get("id") or framework_name))
+            if "INFORM" in framework_name:
+                framework_sets["inform"].add(str(scenario.get("id") or framework_name))
 
     sorted_scenarios = sorted(
         scenarios,
         key=lambda item: item.get("scores", {}).get("residual_risk", 0),
         reverse=True,
     )
-    reference_template_count = sum(1 for item in scenarios if item.get("status") == "preventive_template")
+    reference_template_count = sum(
+        1 for item in scenarios if item.get("status") == "preventive_template"
+    )
     return {
         # Kept for API compatibility; it now means executable definitions, not catalog combinations.
         "scenario_count": 0,
@@ -66,6 +93,16 @@ def load_scenario_library() -> dict[str, Any]:
             "atlas_tactics": len(framework_sets["atlas"]),
             "disarm_techniques": len(framework_sets["disarm"]),
             "f3_techniques": len(framework_sets["f3"]),
+            "attack_ics_templates": len(framework_sets["attack_ics"]),
+            "attack_mobile_templates": len(framework_sets["attack_mobile"]),
+            "emb3d_templates": len(framework_sets["emb3d"]),
+            "aadapt_templates": len(framework_sets["aadapt"]),
+            "capec_templates": len(framework_sets["capec"]),
+            "cwe_templates": len(framework_sets["cwe"]),
+            "inform_templates": len(framework_sets["inform"]),
+            "multidomain_templates": sum(
+                1 for item in scenarios if str(item.get("id", "")).startswith("CDE-MD-")
+            ),
         },
         "scenarios": sorted_scenarios,
     }

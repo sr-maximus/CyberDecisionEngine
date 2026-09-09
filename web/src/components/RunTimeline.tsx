@@ -1,7 +1,8 @@
 import { Brain, CheckCircle2, CircleDashed, Clock3, FileCheck2, FileText, Globe2, Network, RadioTower, RotateCcw, Search, ShieldCheck, XCircle } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { LanguageMode, RunRecord } from "../types";
 import { formatDateTime } from "../utils/format";
+import { hasReadyReport } from "../utils/reportLifecycle";
 
 interface RunTimelineProps {
   run?: RunRecord;
@@ -20,6 +21,10 @@ const labels = {
     failed: "Fallida",
     completed: "Completada",
     reportGenerated: "Informe generado",
+    reportQueued: "Informe en cola",
+    reportGenerating: "Generando informe",
+    reportFailed: "No fue posible generar el informe",
+    automaticReport: "Si no lo solicitas, el informe se generará automáticamente",
     analysisReady: "Análisis listo",
     generateReport: "Generar informe",
     pending: "Pendiente",
@@ -46,6 +51,10 @@ const labels = {
     failed: "Failed",
     completed: "Completed",
     reportGenerated: "Report generated",
+    reportQueued: "Report queued",
+    reportGenerating: "Generating report",
+    reportFailed: "The report could not be generated",
+    automaticReport: "If you do not request it, the report will be generated automatically",
     analysisReady: "Analysis ready",
     generateReport: "Generate report",
     pending: "Pending",
@@ -66,16 +75,35 @@ const labels = {
 };
 
 export function RunTimeline({ run, onRerun, onGenerateReport, language }: RunTimelineProps) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (run?.status !== "running" && run?.status !== "queued") return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [run?.status]);
   const copy = labels[language];
   const status = run?.status ?? "queued";
   const isDone = status === "completed";
   const isFailed = status === "failed";
+  const reportBusy = run?.report_status === "queued" || run?.report_status === "generating";
+  const reportFailed = run?.report_status === "failed";
+  const reportReady = hasReadyReport(run);
   const visibleProgress = estimatedProgress(run);
   const progressTone = progressToneFor(run, visibleProgress);
   const eta = estimatedRemaining(run, visibleProgress, language);
   const processSteps = buildProcessSteps(run, language, visibleProgress);
   const processSummary = summarizeProcess(processSteps);
-  const currentStage = isDone ? (run?.report ? copy.reportGenerated : copy.analysisReady) : isFailed ? copy.failed : run?.stage || copy.waiting;
+  const currentStage = reportBusy
+    ? run?.report_status === "queued"
+      ? copy.reportQueued
+      : copy.reportGenerating
+    : reportFailed
+      ? copy.reportFailed
+      : isDone
+        ? (reportReady ? copy.reportGenerated : copy.analysisReady)
+        : isFailed
+          ? copy.failed
+          : run?.stage || copy.waiting;
 
   return (
     <aside className="panel timeline-panel">
@@ -91,6 +119,7 @@ export function RunTimeline({ run, onRerun, onGenerateReport, language }: RunTim
         <strong>{visibleProgress}% {copy.percent}</strong>
         <span>{isDone ? currentStage : eta || copy.etaReady}</span>
       </div>
+      {run ? <p className="run-background-note"><Clock3 size={14} /> {language === "es" ? "Tiempo transcurrido" : "Elapsed time"}: <strong>{formatRunDuration((Math.max(Date.parse(run.created_at), isDone || isFailed ? Date.parse(run.updated_at) : now) - Date.parse(run.created_at)) / 1000)}</strong></p> : null}
       <div className={`progress-shell ${progressTone}`} aria-label={copy.progress}>
         <span style={{ width: `${visibleProgress}%` }} />
       </div>
@@ -99,6 +128,12 @@ export function RunTimeline({ run, onRerun, onGenerateReport, language }: RunTim
         <strong>{currentStage}</strong>
       </div>
       {run?.status === "running" || run?.status === "queued" ? <p className="run-background-note">{copy.backgroundSafe}</p> : null}
+      {isDone && !reportReady && !reportBusy && run?.report_auto_due_at ? (
+        <p className="run-background-note report-auto-note">
+          {copy.automaticReport}: <strong>{formatDateTime(run.report_auto_due_at, language)}</strong>.
+        </p>
+      ) : null}
+      {reportFailed && run?.report_error ? <p className="run-report-error">{run.report_error}</p> : null}
 
       <div className="run-process-panel">
         <div className="run-checklist-head">
@@ -132,35 +167,35 @@ export function RunTimeline({ run, onRerun, onGenerateReport, language }: RunTim
           <Clock3 size={17} />
           <div>
             <strong>{copy.queued}</strong>
-            <span>{formatDateTime(run?.created_at)}</span>
+            <span>{formatDateTime(run?.created_at, language)}</span>
           </div>
         </li>
         <li className={status === "running" || isDone ? "done" : ""}>
           <RotateCcw size={17} />
           <div>
             <strong>{run?.stage ?? copy.waiting}</strong>
-            <span>{formatDateTime(run?.updated_at)}</span>
+            <span>{formatDateTime(run?.updated_at, language)}</span>
           </div>
         </li>
         <li className={isDone ? "done" : isFailed ? "failed" : ""}>
           {isFailed ? <XCircle size={17} /> : <CheckCircle2 size={17} />}
           <div>
             <strong>{isFailed ? copy.failed : copy.completed}</strong>
-            <span>{run?.error ?? (isDone ? (run?.report ? copy.reportGenerated : copy.analysisReady) : copy.pending)}</span>
+            <span>{run?.error ?? (isDone ? (reportReady ? copy.reportGenerated : copy.analysisReady) : copy.pending)}</span>
           </div>
         </li>
       </ol>
 
       <div className="run-action-row">
-        {run?.report ? (
+        {reportReady && run?.report ? (
           <a className="report-button" href={run.report.url} target="_blank" rel="noreferrer">
             <FileText size={18} />
             <span>{copy.openReport}</span>
           </a>
         ) : run?.status === "completed" ? (
-          <button className="report-button" type="button" onClick={() => onGenerateReport(run.id)}>
+          <button className="report-button" type="button" disabled={reportBusy} onClick={() => onGenerateReport(run.id)}>
             <FileText size={18} />
-            <span>{copy.generateReport}</span>
+            <span>{reportBusy ? currentStage : copy.generateReport}</span>
           </button>
         ) : null}
         {run && (isDone || isFailed) ? (
@@ -191,7 +226,7 @@ function buildProcessSteps(run: RunRecord | undefined, language: LanguageMode, p
       surface: ["Superficie externa", "DNS, certificados, WHOIS, subdominios, tecnologías y exposición externa."],
       socmint: ["SOCMINT, marca y fraude", "Menciones públicas, redes sociales indexadas, similitud de dominio y narrativa de fraude."],
       darkweb: ["Dark web autorizada", "Revisión segura de índices, filtraciones y señales públicas sin interacción riesgosa."],
-      scenarios: ["Escenarios y frameworks", "MITRE ATT&CK, DEFEND, ATLAS, DISARM, PESTEL, Porter y controles aplicables."],
+      scenarios: ["Escenarios y frameworks", "ATT&CK Enterprise, Mobile e ICS; D3FEND, ATLAS, EMB3D, F3, AADAPT, DISARM, CAPEC, CWE, INFORM, PESTEL, Porter y controles aplicables."],
       report: ["Riesgo e informes HTML", "Cálculo de riesgo, predicción, recomendaciones y generación de informes HTML."]
     },
     en: {
@@ -201,7 +236,7 @@ function buildProcessSteps(run: RunRecord | undefined, language: LanguageMode, p
       surface: ["External surface", "DNS, certificates, WHOIS, subdomains, technologies and external exposure."],
       socmint: ["SOCMINT, brand and fraud", "Public mentions, indexed social networks, domain similarity and fraud narratives."],
       darkweb: ["Authorized dark web", "Safe review of indexes, leaks and public signals without risky interaction."],
-      scenarios: ["Scenarios and frameworks", "MITRE ATT&CK, DEFEND, ATLAS, DISARM, PESTEL, Porter and applicable controls."],
+      scenarios: ["Scenarios and frameworks", "ATT&CK Enterprise, Mobile and ICS; D3FEND, ATLAS, EMB3D, F3, AADAPT, DISARM, CAPEC, CWE, INFORM, PESTEL, Porter and applicable controls."],
       report: ["Risk and HTML reports", "Risk scoring, prediction, recommendations and HTML report generation."]
     }
   }[language];
@@ -231,28 +266,32 @@ function buildProcessSteps(run: RunRecord | undefined, language: LanguageMode, p
       id === "report"
         ? run?.report
           ? "done"
+          : run?.report_status === "failed"
+            ? "issue"
+            : run?.report_status === "queued" || run?.report_status === "generating"
+              ? "current"
           : doneAll
             ? "current"
             : progress >= Math.max(0, threshold - 12) || active
               ? "current"
               : "pending"
-        : failed && progress >= threshold
+        : failed
           ? "issue"
-          : doneAll || progress >= threshold
+          : doneAll || (id === "scope" && progress >= threshold)
             ? "done"
-            : progress >= Math.max(0, threshold - 12) || active
+            : (recordPatterns.length > 0 && run?.status === "running" && progress >= 30) || progress >= Math.max(0, threshold - 12) || active
               ? "current"
               : "pending";
     return { id, label, detail: `${detail}${suffix}`, status, icon };
   };
   return [
     step("scope", copy.scope[0], copy.scope[1], 8, <Globe2 size={16} />, Boolean(run), []),
-    step("dorks", copy.dorks[0], copy.dorks[1], 30, <Search size={16} />, hasSource([/internet|search|osint|google|duckduckgo/i]) || hasEvent([/query|dork|filetype|site:/i]), [/internet|search|osint|google|duckduckgo/i]),
+    step("dorks", copy.dorks[0], copy.dorks[1], 30, <Search size={16} />, hasSource([/internet|search|osint|public|busqueda/i]) || hasEvent([/query|dork|filetype|site:/i]), [/internet|search|osint|public|busqueda/i]),
     step("sources", copy.sources[0], copy.sources[1], 44, <RadioTower size={16} />, hasSource([/hacker|news|gdelt|rss|cisa|nvd|kev|epss|github/i]) || hasEvent([/hacker|news|gdelt|rss|cve|kev|epss|vulnerab/i]), [/hacker|news|gdelt|rss|cisa|nvd|kev|epss|github/i]),
-    step("surface", copy.surface[0], copy.surface[1], 56, <ShieldCheck size={16} />, hasSource([/surface|dns|whois|ssl|certificate|subdomain|port|http|technology|kali/i]) || hasEvent([/dns|whois|ssl|certificate|subdomain|port|surface/i]), [/surface|dns|whois|ssl|certificate|subdomain|port|http|technology|kali/i]),
+    step("surface", copy.surface[0], copy.surface[1], 56, <ShieldCheck size={16} />, hasSource([/surface|dns|whois|ssl|certificate|subdomain|port|http|technology/i]) || hasEvent([/dns|whois|ssl|certificate|subdomain|port|surface/i]), [/surface|dns|whois|ssl|certificate|subdomain|port|http|technology/i]),
     step("socmint", copy.socmint[0], copy.socmint[1], 66, <Network size={16} />, hasSource([/socmint|social|brand|fraud|facebook|instagram|tiktok|linkedin|twitter|\bx\b/i]) || hasEvent([/socmint|social|brand|fraud|facebook|instagram|tiktok|linkedin|twitter|\bx\b/i]), [/socmint|social|brand|fraud|facebook|instagram|tiktok|linkedin|twitter|\bx\b/i]),
     step("darkweb", copy.darkweb[0], copy.darkweb[1], 74, <ShieldCheck size={16} />, hasSource([/dark|tor|onion|leak|ransom/i]) || hasEvent([/dark|tor|onion|leak|ransom/i]), [/dark|tor|onion|leak|ransom/i]),
-    step("scenarios", copy.scenarios[0], copy.scenarios[1], 86, <Brain size={16} />, findings.length > 0 || hasEvent([/mitre|ttp|attack|defend|atlas|disarm|pestel|porter|framework/i]), []),
+    step("scenarios", copy.scenarios[0], copy.scenarios[1], 86, <Brain size={16} />, findings.length > 0 || hasEvent([/mitre|ttp|attack|d3fend|atlas|emb3d|f3|aadapt|disarm|capec|cwe|inform|pestel|porter|framework/i]), []),
     step("report", copy.report[0], copy.report[1], 96, <FileText size={16} />, Boolean(run?.report), [])
   ];
 }
@@ -286,20 +325,13 @@ function runStatusText(status: RunRecord["status"], language: LanguageMode): str
 function estimatedProgress(run?: RunRecord): number {
   if (!run) return 0;
   if (run.status === "completed" || run.status === "failed") return 100;
-  const base = run.progress ?? 0;
-  if (run.status !== "running") return base;
-  const created = Date.parse(run.created_at);
-  if (!Number.isFinite(created)) return base;
-  const elapsedSeconds = Math.max(0, (Date.now() - created) / 1000);
-  const expectedSeconds = expectedDuration(run);
-  const estimated = Math.min(92, Math.round(8 + (elapsedSeconds / expectedSeconds) * 84));
-  return Math.max(base, estimated);
+  return run.progress ?? 0;
 }
 
 function progressToneFor(run: RunRecord | undefined, progress: number): string {
   if (!run) return "idle";
   if (run.status === "failed") return "failed";
-  if (run.status === "completed") return run.report ? "completed" : "analysis-ready";
+  if (run.status === "completed") return hasReadyReport(run) ? "completed" : "analysis-ready";
   if (progress >= 85) return "finalizing";
   if (progress >= 35) return "running";
   return "queued";
@@ -323,9 +355,14 @@ function estimatedRemaining(run: RunRecord | undefined, progress: number, langua
   const elapsedSeconds = Math.max(0, (Date.now() - created) / 1000);
   const total = expectedDuration(run);
   const remaining = Math.max(0, Math.round(total - elapsedSeconds));
-  if (progress >= 92 || remaining <= 8) return language === "es" ? "Finalizando" : "Finishing";
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
+  if (remaining <= 8) return language === "es" ? "Estimación superada; proceso activo" : "Estimate exceeded; processing continues";
   const suffix = language === "es" ? "estimado restante" : "estimated remaining";
-  return minutes > 0 ? `${minutes}m ${seconds}s ${suffix}` : `${seconds}s ${suffix}`;
+  return `${formatRunDuration(remaining)} ${suffix}`;
+}
+
+function formatRunDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  return `${hours ? `${hours}h ` : ""}${minutes}m ${total % 60}s`;
 }

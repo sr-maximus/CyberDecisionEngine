@@ -1,8 +1,16 @@
+import json
 from pathlib import Path
 
 from cyberdeck.reporting.data_export import export_evidence
-from cyberdeck.reporting.validator import ValidationIssue, _validate_strategic_exports, validate_report_bundle
+from cyberdeck.reporting.validator import (
+    ValidationIssue,
+    _validate_public_artifact_boundary,
+    _validate_rendered_files,
+    _validate_strategic_exports,
+    validate_report_bundle,
+)
 from cyberdeck.schemas import OrganizationProfile, RunContext, ThreatEvent
+from cyberdeck.snapshot_integrity import seal_snapshot
 
 
 def _context() -> RunContext:
@@ -13,7 +21,7 @@ def _context() -> RunContext:
         source="Public source",
         evidence_url="https://example.org/evidence/1",
     )
-    return RunContext(
+    context = RunContext(
         organization=OrganizationProfile(
             name="Example Org",
             sector="Technology",
@@ -25,10 +33,9 @@ def _context() -> RunContext:
         mode="snapshot",
         lookback_days=30,
         raw_events=[event],
-        decision_snapshot={
+        decision_snapshot=seal_snapshot({
             "run_id": "run-validator",
             "engine_version": "test",
-            "snapshot_hash": "snapshot-validator",
             "report_context": {
                 "run_id": "run-validator",
                 "snapshot_version": "test",
@@ -47,22 +54,24 @@ def _context() -> RunContext:
                     "evidence_ids": [],
                 }
             },
-        },
+        }),
     )
+    return context
 
 
 def test_report_validator_accepts_consistent_html_json_and_csv(tmp_path: Path) -> None:
     context = _context()
     executive = tmp_path / "run-validator-example.html"
     technical = tmp_path / "run-validator-example-technical.html"
+    snapshot_hash = context.decision_snapshot["snapshot_hash"]
     executive.write_text(
-        '<html><meta name="cde:snapshot-hash" content="snapshot-validator"><body>'
+        f'<html><meta name="cde:snapshot-hash" content="{snapshot_hash}"><body>'
         + "Executive report " * 40
         + "</body></html>",
         encoding="utf-8",
     )
     technical.write_text(
-        '<html><meta name="cde:snapshot-hash" content="snapshot-validator"><body>'
+        f'<html><meta name="cde:snapshot-hash" content="{snapshot_hash}"><body>'
         + "Technical report " * 40
         + "</body></html>",
         encoding="utf-8",
@@ -75,20 +84,78 @@ def test_report_validator_accepts_consistent_html_json_and_csv(tmp_path: Path) -
     assert result.counts["context_records"] == 1
     assert result.counts["json_records"] == 1
     assert result.counts["csv_records"] == 1
+    assert all(not Path(artifact).is_absolute() for artifact in result.artifacts.values())
+
+
+def test_rendered_file_validation_distinguishes_web_url_paths_from_local_paths(tmp_path: Path) -> None:
+    executive = tmp_path / "run-validator-example.html"
+    technical = tmp_path / "run-validator-example-technical.html"
+    public_url = "https://example.org/app/zendesk/session/sso/saml"
+    safe_body = '<meta name="cde:snapshot-hash" content="snapshot-validator">' + public_url + " report" * 100
+    executive.write_text(safe_body, encoding="utf-8")
+    technical.write_text(safe_body, encoding="utf-8")
+    issues: list[ValidationIssue] = []
+
+    _validate_rendered_files(executive, technical, "snapshot-validator", issues)
+
+    assert not any(issue.code == "LOCAL_PATH_EXPOSURE" for issue in issues)
+
+    technical.write_text(safe_body + " /app/private/report-cache.json", encoding="utf-8")
+    issues = []
+    _validate_rendered_files(executive, technical, "snapshot-validator", issues)
+
+    assert any(issue.code == "LOCAL_PATH_EXPOSURE" for issue in issues)
+
+
+def test_rendered_file_validation_rejects_visible_internal_metadata_but_allows_head_integrity_meta(
+    tmp_path: Path,
+) -> None:
+    executive = tmp_path / "run-validator-example.html"
+    technical = tmp_path / "run-validator-example-technical.html"
+    safe_head = '<meta name="cde:snapshot-hash" content="snapshot-validator">'
+    executive.write_text(
+        f"<html><head>{safe_head}</head><body>"
+        + "Strategic report " * 60
+        + "</body></html>",
+        encoding="utf-8",
+    )
+    technical.write_text(
+        f"<html><head>{safe_head}</head><body>"
+        + "Technical report " * 60
+        + " Run ID: internal-123"
+        + "</body></html>",
+        encoding="utf-8",
+    )
+    issues: list[ValidationIssue] = []
+
+    _validate_rendered_files(
+        executive,
+        technical,
+        "snapshot-validator",
+        issues,
+    )
+
+    assert any(issue.code == "VISIBLE_INTERNAL_METADATA" for issue in issues)
+    assert not any(
+        issue.code == "VISIBLE_INTERNAL_METADATA"
+        and issue.location.startswith(executive.name)
+        for issue in issues
+    )
 
 
 def test_report_validator_rejects_export_count_mismatch(tmp_path: Path) -> None:
     context = _context()
     executive = tmp_path / "run-validator-example.html"
     technical = tmp_path / "run-validator-example-technical.html"
+    snapshot_hash = context.decision_snapshot["snapshot_hash"]
     executive.write_text(
-        '<html><meta name="cde:snapshot-hash" content="snapshot-validator"><body>'
+        f'<html><meta name="cde:snapshot-hash" content="{snapshot_hash}"><body>'
         + "Executive report " * 40
         + "</body></html>",
         encoding="utf-8",
     )
     technical.write_text(
-        '<html><meta name="cde:snapshot-hash" content="snapshot-validator"><body>'
+        f'<html><meta name="cde:snapshot-hash" content="{snapshot_hash}"><body>'
         + "Technical report " * 40
         + "</body></html>",
         encoding="utf-8",
@@ -100,6 +167,27 @@ def test_report_validator_rejects_export_count_mismatch(tmp_path: Path) -> None:
 
     assert result.status == "rejected"
     assert any(issue.code == "EXPORT_COUNT_MISMATCH" for issue in result.issues)
+
+
+def test_report_validator_rejects_a_tampered_snapshot(tmp_path: Path) -> None:
+    context = _context()
+    context.decision_snapshot["metrics"]["records"]["value"] = 2
+    executive = tmp_path / "run-validator-example.html"
+    technical = tmp_path / "run-validator-example-technical.html"
+    declared_hash = context.decision_snapshot["snapshot_hash"]
+    body = (
+        f'<html><meta name="cde:snapshot-hash" content="{declared_hash}"><body>'
+        + "Report body " * 80
+        + "</body></html>"
+    )
+    executive.write_text(body, encoding="utf-8")
+    technical.write_text(body, encoding="utf-8")
+    export_evidence(context, executive)
+
+    result = validate_report_bundle(context, executive, technical)
+
+    assert result.status == "rejected"
+    assert any(issue.code == "SNAPSHOT_HASH_INVALID" for issue in result.issues)
 
 
 def test_report_validator_rejects_html_from_another_snapshot(tmp_path: Path) -> None:
@@ -114,6 +202,67 @@ def test_report_validator_rejects_html_from_another_snapshot(tmp_path: Path) -> 
 
     assert result.status == "rejected"
     assert any(issue.code == "REPORT_SNAPSHOT_MISMATCH" for issue in result.issues)
+
+
+def test_report_validator_rejects_internal_provider_or_evidence_id(tmp_path: Path) -> None:
+    context = _context()
+    executive = tmp_path / "run-validator-example.html"
+    technical = tmp_path / "run-validator-example-technical.html"
+    safe_body = (
+        '<html><meta name="cde:snapshot-hash" content="snapshot-validator"><body>'
+        + "Executive report " * 40
+        + "</body></html>"
+    )
+    executive.write_text(safe_body, encoding="utf-8")
+    technical.write_text(safe_body + " SpiderFoot SPIDERFOOT-6516029", encoding="utf-8")
+    export_evidence(context, executive)
+
+    result = validate_report_bundle(context, executive, technical)
+
+    assert result.status == "rejected"
+    assert any(issue.code == "INTERNAL_PROVIDER_EXPOSURE" for issue in result.issues)
+    assert any(issue.code == "INTERNAL_EVIDENCE_ID_EXPOSURE" for issue in result.issues)
+
+
+def test_report_validator_allows_provider_hostname_only_inside_evidence_url(tmp_path: Path) -> None:
+    executive = tmp_path / "run.html"
+    technical = tmp_path / "run-technical.html"
+    body = (
+        '<html><body><a href="https://urlscan.io/result/public-reference/">'
+        "https://urlscan.io/result/public-reference/</a></body></html>"
+    )
+    executive.write_text(body, encoding="utf-8")
+    technical.write_text(body, encoding="utf-8")
+    issues: list[ValidationIssue] = []
+
+    _validate_public_artifact_boundary(executive, technical, issues)
+
+    assert not any(issue.code == "INTERNAL_PROVIDER_EXPOSURE" for issue in issues)
+
+
+def test_report_validator_rejects_duplicate_or_unresolved_public_evidence_ids(tmp_path: Path) -> None:
+    context = _context()
+    executive = tmp_path / "run-validator-example.html"
+    technical = tmp_path / "run-validator-example-technical.html"
+    body = (
+        '<html><meta name="cde:snapshot-hash" content="snapshot-validator"><body>'
+        + "Report " * 100
+        + "</body></html>"
+    )
+    executive.write_text(body, encoding="utf-8")
+    technical.write_text(body, encoding="utf-8")
+    export_evidence(context, executive)
+    evidence_path = executive.with_name(f"{executive.stem}_evidence.json")
+    payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    payload["records"].append(dict(payload["records"][0]))
+    payload["claims"] = [{"evidence_ids": ["CDE-EV-0000000000000000"]}]
+    evidence_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_report_bundle(context, executive, technical)
+
+    assert result.status == "rejected"
+    assert any(issue.code == "PUBLIC_EVIDENCE_ID_DUPLICATE" for issue in result.issues)
+    assert any(issue.code == "PUBLIC_EVIDENCE_REFERENCE_UNRESOLVED" for issue in result.issues)
 
 
 def test_report_validator_rejects_strategic_score_without_evidence_and_missing_visuals(tmp_path: Path) -> None:

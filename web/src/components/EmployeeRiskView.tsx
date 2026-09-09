@@ -36,7 +36,7 @@ const copy = {
     template: "Descargar plantilla CSV",
     file: "Archivo de empleados CSV/XLSX",
     manual: "Resultados manuales opcionales",
-    searchClient: "Cliente de búsqueda",
+    searchClient: "Modo de recolección",
     results: "Resultados por query",
     keywords: "Keywords por dimensión",
     queries: "Queries por empleado",
@@ -85,7 +85,7 @@ const copy = {
     template: "Download CSV template",
     file: "Employee CSV/XLSX file",
     manual: "Optional manual results",
-    searchClient: "Search client",
+    searchClient: "Collection mode",
     results: "Results per query",
     keywords: "Keywords per dimension",
     queries: "Queries per employee",
@@ -144,7 +144,7 @@ export function EmployeeRiskView({ language, onReportReady }: { language: Langua
     access_level: "3",
     access_category: "general"
   });
-  const [searchClient, setSearchClient] = useState("multi_noapi");
+  const [searchClient, setSearchClient] = useState("automatic");
   const [resultsPerQuery, setResultsPerQuery] = useState(3);
   const [maxKeywords, setMaxKeywords] = useState(8);
   const [maxQueries, setMaxQueries] = useState(10);
@@ -317,12 +317,8 @@ export function EmployeeRiskView({ language, onReportReady }: { language: Langua
             <label>
               <span>{t.searchClient}</span>
               <select value={searchClient} onChange={(event) => setSearchClient(event.target.value)}>
-                <option value="multi_noapi">multi_noapi</option>
-                <option value="duckduckgo_lite">duckduckgo_lite</option>
-                <option value="bing_html">bing_html</option>
-                <option value="mock">mock</option>
-                <option value="bing">bing API</option>
-                <option value="google_cse">google_cse API</option>
+                <option value="automatic">{language === "es" ? "Automática" : "Automatic"}</option>
+                <option value="public_web">{language === "es" ? "Web pública" : "Public web"}</option>
               </select>
             </label>
             <NumberControl label={t.results} value={resultsPerQuery} min={1} max={20} onChange={setResultsPerQuery} />

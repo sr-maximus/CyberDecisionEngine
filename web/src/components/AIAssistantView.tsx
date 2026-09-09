@@ -38,7 +38,7 @@ import type {
 interface AIAssistantViewProps {
   run?: RunRecord;
   language: LanguageMode;
-  onGenerateReport?: (runId: string) => Promise<void>;
+  onGenerateReport?: (runId: string) => void;
   onOpenView?: (view: ViewKey) => void;
 }
 
@@ -138,11 +138,11 @@ export function AIAssistantView({
   const [error, setError] = useState<string | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
 
-  const runtime = config?.openclaw_gateway ?? config?.ollama_chat ?? {};
+  const runtime = config?.analysis_runtime ?? {};
   const runtimeReady = runtime.ready === true;
   const runtimeStatus = String(runtime.runtime_status ?? "unknown");
   const modelStatus = String(runtime.model_status ?? "unknown");
-  const modelName = String(runtime.model ?? "cyberdecision-cti");
+  const modelName = String(runtime.profile ?? "CyberDecision AI");
   const subject = run
     ? run.request.person_name || run.request.organization_name || run.domains.join(", ")
     : "";
@@ -219,9 +219,21 @@ export function AIAssistantView({
     try {
       if (reportCommand) {
         if (onGenerateReport) {
-          await onGenerateReport(run.id);
+          onGenerateReport(run.id);
+          setMessages((current) => [
+            ...current,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: language === "es"
+                ? "Abrí la selección de revisión previa. Elige revisión manual o asistida para solicitar los informes."
+                : "I opened the pre-report review selector. Choose manual or assisted review to request the reports.",
+              createdAt: new Date().toISOString()
+            }
+          ]);
+          return;
         } else {
-          await generateRunReport(run.id);
+          await generateRunReport(run.id, language);
         }
         setMessages((current) => [
           ...current,
@@ -291,7 +303,7 @@ export function AIAssistantView({
         analysis_mode: "deep"
       });
       if (result.status === "failed") {
-        throw new Error(result.limitations.join(" ") || (language === "es" ? "OpenClaw no completó el análisis." : "OpenClaw did not complete the analysis."));
+        throw new Error(result.limitations.join(" ") || (language === "es" ? "El motor analítico no completó el análisis." : "The analytical engine did not complete the analysis."));
       }
       setMessages((current) => [
         ...current,
@@ -316,9 +328,9 @@ export function AIAssistantView({
     setError(null);
     try {
       if (onGenerateReport) {
-        await onGenerateReport(run.id);
+        onGenerateReport(run.id);
       } else {
-        await generateRunReport(run.id);
+        await generateRunReport(run.id, language);
       }
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : String(exc));
@@ -350,7 +362,7 @@ export function AIAssistantView({
   }
 
   return (
-    <div className="view-stack ai-audit-view">
+    <div className="view-stack ai-audit-view decision-subview">
       <section className="panel ai-audit-hero">
         <div className="ai-audit-heading">
           <span className="ai-icon-box"><BrainCircuit size={23} /></span>
@@ -581,8 +593,8 @@ export function AIAssistantView({
               <span>{language === "es" ? "Trazabilidad del motor IA" : "AI engine traceability"}</span>
             </summary>
             <dl>
-              <div><dt>Gateway</dt><dd>OpenClaw</dd></div>
-              <div><dt>Modelo</dt><dd>{modelName}</dd></div>
+              <div><dt>{language === "es" ? "Motor" : "Engine"}</dt><dd>{language === "es" ? "Asistencia analítica controlada" : "Controlled analytical assistance"}</dd></div>
+              <div><dt>{language === "es" ? "Perfil" : "Profile"}</dt><dd>{modelName}</dd></div>
               <div><dt>Prompt</dt><dd>{config?.chat_prompt_version ?? config?.prompt_version ?? "N/D"}</dd></div>
               <div><dt>Modo</dt><dd>analysis_only</dd></div>
               <div><dt>Run ID</dt><dd>{run.id}</dd></div>

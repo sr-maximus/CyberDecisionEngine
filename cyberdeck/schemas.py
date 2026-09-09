@@ -74,6 +74,41 @@ class ScenarioStatus(str, Enum):
     DISCARDED = "discarded"
 
 
+class TechnologyDomain(str, Enum):
+    IT = "it"
+    IOT = "iot"
+    IIOT = "iiot"
+    OT = "ot"
+    UNKNOWN = "unknown"
+
+
+class AnalysisDomain(str, Enum):
+    CYBER = "cyber"
+    FRAUD = "fraud"
+    BRAND = "brand"
+    DISINFORMATION = "disinformation"
+    AI_SECURITY = "ai_security"
+
+
+class PublicAttributionStatus(str, Enum):
+    UNATTRIBUTED = "unattributed"
+    POSSIBLE = "possible"
+    RELATED = "related"
+    OBSERVED_PUBLIC = "observed_public"
+    CORROBORATED_PUBLIC = "corroborated_public"
+    DISPUTED = "disputed"
+    FALSE_POSITIVE = "false_positive"
+
+
+class FrameworkMappingStatus(str, Enum):
+    PREVENTIVE_REFERENCE = "preventive_reference"
+    POTENTIALLY_RELEVANT = "potentially_relevant"
+    EVIDENCE_SUPPORTED_CANDIDATE = "evidence_supported_candidate"
+    OBSERVED_BEHAVIOR = "observed_behavior"
+    VALIDATED = "validated"
+    NOT_APPLICABLE = "not_applicable"
+
+
 class SourceStatus(BaseModel):
     name: str
     status: str
@@ -220,6 +255,7 @@ class ThreatEvent(BaseModel):
     evidence_url: Optional[str] = None
     evidence_type: EvidenceType = EvidenceType.OTHER
     observed_at: str = Field(default_factory=utcnow_iso)
+    published_at: Optional[str] = None
     demo: bool = False
     canonical_id: Optional[str] = None
     content_hash: Optional[str] = None
@@ -243,6 +279,42 @@ class ThreatEvent(BaseModel):
     human_reviewed: bool = False
     contradiction_count: int = 0
     captures: List[EvidenceCapture] = Field(default_factory=list)
+    primary_technology_domain: TechnologyDomain = TechnologyDomain.UNKNOWN
+    technology_domains: List[TechnologyDomain] = Field(default_factory=list)
+    technology_domain_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    technology_domain_basis: List[str] = Field(default_factory=list)
+    analysis_domains: List[AnalysisDomain] = Field(default_factory=list)
+    asset_class: Optional[str] = None
+    vendor: Optional[str] = None
+    product: Optional[str] = None
+    model: Optional[str] = None
+    firmware: Optional[str] = None
+    version: Optional[str] = None
+    cpe: Optional[str] = None
+    protocols: List[str] = Field(default_factory=list)
+    public_observation_type: str = "public_record"
+    public_attribution_status: PublicAttributionStatus = PublicAttributionStatus.UNATTRIBUTED
+    attribution_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    attribution_basis: List[str] = Field(default_factory=list)
+    first_seen: Optional[str] = None
+    last_seen: Optional[str] = None
+    freshness_status: str = "unknown"
+    framework_refs: List[str] = Field(default_factory=list)
+    technique_refs: List[str] = Field(default_factory=list)
+    scenario_refs: List[str] = Field(default_factory=list)
+    fraud_refs: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+    internal_provider_id: Optional[str] = None
+    internal_connector_id: Optional[str] = None
+    internal_source_record_id: Optional[str] = None
+    internal_collection_url: Optional[str] = None
+    internal_raw_metadata: Dict[str, Any] = Field(default_factory=dict)
+    public_capability_id: str = "public_web_intelligence"
+    public_capability_label: str = "CyberDecisionEngine — Inteligencia web pública"
+    public_source_class: str = "public_web"
+    public_evidence_id: Optional[str] = None
+    original_publisher: Optional[str] = None
+    original_artifact_url: Optional[str] = None
 
     @model_validator(mode="after")
     def synchronize_confidence(self) -> "ThreatEvent":
@@ -356,6 +428,18 @@ class RiskFinding(BaseModel):
     closure_evidence: List[str] = Field(default_factory=list)
     incident_confirmed: bool = False
     vulnerability_status: str = "not_applicable"
+    primary_technology_domain: TechnologyDomain = TechnologyDomain.UNKNOWN
+    technology_domains: List[TechnologyDomain] = Field(default_factory=list)
+    technology_domain_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    technology_domain_basis: List[str] = Field(default_factory=list)
+    analysis_domains: List[AnalysisDomain] = Field(default_factory=list)
+    asset_class: Optional[str] = None
+    framework_refs: List[str] = Field(default_factory=list)
+    technique_refs: List[str] = Field(default_factory=list)
+    scenario_refs: List[str] = Field(default_factory=list)
+    fraud_refs: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+    residual_risk_status: str = "calculated"
 
 
 class OrganizationProfile(BaseModel):
@@ -371,6 +455,8 @@ class OrganizationProfile(BaseModel):
     authorized_scope: bool = False
     allow_tor: bool = False
     analysis_window: str = "30d"
+    analysis_start_date: Optional[str] = None
+    analysis_end_date: Optional[str] = None
     lookback_hours: int = 720
     lookback_days: int = 30
     scan_time_budget_minutes: int = 0
@@ -407,6 +493,7 @@ class RunContext(BaseModel):
     report_display_at: Optional[str] = None
     source_statuses: List[SourceStatus] = Field(default_factory=list)
     raw_events: List[ThreatEvent] = Field(default_factory=list)
+    excluded_period_events: List[ThreatEvent] = Field(default_factory=list)
     risk_findings: List[RiskFinding] = Field(default_factory=list)
     metrics: Dict[str, Any] = Field(default_factory=dict)
     references: List[Dict[str, str]] = Field(default_factory=list)
@@ -423,3 +510,4 @@ class RunContext(BaseModel):
     contradicting_evidence: List[Dict[str, Any]] = Field(default_factory=list)
     interpretations: List[Dict[str, Any]] = Field(default_factory=list)
     decisions: List[Dict[str, Any]] = Field(default_factory=list)
+    multidomain_intelligence: Dict[str, Any] = Field(default_factory=dict)

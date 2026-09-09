@@ -1,0 +1,8 @@
+{% set review_counts = metrics.evidence_summary | default({}) %}
+{% if review_counts.get('validated_evidence', 0) or review_counts.get('false_positives', 0) %}
+<div class="report-note">
+  <strong>{{ "Evidence review and risk" if report_lang == "en" else "Revisión de evidencia y riesgo" }}</strong>
+  <p>{{ review_counts.get('validated_evidence', 0) }} {{ "validated records" if report_lang == "en" else "registros validados" }} · {{ review_counts.get('false_positives', 0) }} {{ "false positives excluded" if report_lang == "en" else "falsos positivos excluidos" }} · {{ review_counts.get('validated_findings', 0) }} {{ "supported risk findings" if report_lang == "en" else "hallazgos de riesgo sustentados" }}.</p>
+  {% if not review_counts.get('validated_findings', 0) %}<p>{{ "Reviewed evidence provides context but does not yet support an applicable risk finding. No quantitative risk is assigned solely because a source was validated. This is not a conclusion that the organization has no risk." if report_lang == "en" else "La evidencia revisada aporta contexto, pero aún no sustenta un hallazgo de riesgo aplicable. No se asigna riesgo cuantitativo solo por validar una fuente. Esto no significa que la organización carezca de riesgos." }}</p>{% endif %}
+</div>
+{% endif %}

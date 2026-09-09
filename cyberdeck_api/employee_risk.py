@@ -19,6 +19,7 @@ INPUT_ROOT = PROJECT_ROOT / "data" / "employee_risk_runs"
 REPORT_ROOT = PROJECT_ROOT / "reports" / "employee-risk"
 ALLOWED_INPUT_SUFFIXES = {".csv", ".xlsx"}
 ALLOWED_SEARCH_CLIENTS = {"mock", "duckduckgo_lite", "ddg", "bing_html", "multi_noapi", "noapi", "bing", "google_cse"}
+PUBLIC_SEARCH_CLIENT_ALIASES = {"automatic": "multi_noapi", "public_web": "multi_noapi"}
 
 
 def run_employee_risk_module(
@@ -37,8 +38,9 @@ def run_employee_risk_module(
 ) -> EmployeeRiskRunResponse:
     if not MODULE_DIR.is_dir():
         raise FileNotFoundError("Employee risk module is not installed.")
+    search_client = PUBLIC_SEARCH_CLIENT_ALIASES.get(search_client, search_client)
     if search_client not in ALLOWED_SEARCH_CLIENTS:
-        raise ValueError("Unsupported search client.")
+        raise ValueError("Unsupported collection mode.")
 
     run_id = uuid.uuid4().hex[:12]
     input_dir = INPUT_ROOT / run_id

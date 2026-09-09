@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import json
 import re
 from dataclasses import asdict, dataclass, field
@@ -8,10 +9,49 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from cyberdeck.analysis.multidomain import INTERNAL_PROVIDER_PATTERNS
 from cyberdeck.schemas import RunContext
+from cyberdeck.snapshot_integrity import verify_snapshot
 
 
-REPORT_VALIDATOR_VERSION = "1.0.0"
+REPORT_VALIDATOR_VERSION = "1.3.0"
+_PUBLIC_ARTIFACT_FORBIDDEN_PATTERN = re.compile(
+    "|".join(
+        re.escape(pattern)
+        for pattern in sorted(INTERNAL_PROVIDER_PATTERNS, key=len, reverse=True)
+    ),
+    flags=re.IGNORECASE,
+)
+_INTERNAL_EVIDENCE_ID_PATTERN = re.compile(
+    r"(?i)(?:spiderfoot|collector|sidecar|urlscan|shodan|censys)[-_][a-z0-9-]{4,}"
+)
+_HTTP_URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", flags=re.IGNORECASE)
+_VISIBLE_INTERNAL_MARKERS = {
+    "Run ID": re.compile(r"\brun\s+id\b", flags=re.IGNORECASE),
+    "engine label": re.compile(r"\b(?:engine|motor)\s*:", flags=re.IGNORECASE),
+    "snapshot label": re.compile(r"\bsnapshot(?:\s+(?:version|hash))?\b", flags=re.IGNORECASE),
+    "CTI implementation label": re.compile(
+        r"\b(?:cti-snapshot|contextual-threat-relevance|evidence-pipeline)\b",
+        flags=re.IGNORECASE,
+    ),
+}
+
+
+def _visible_body_text(document: str) -> str:
+    body_match = re.search(
+        r"<body\b[^>]*>(.*?)</body>",
+        document,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    body = body_match.group(1) if body_match else document
+    body = re.sub(
+        r"<(?:script|style)\b[^>]*>.*?</(?:script|style)>",
+        " ",
+        body,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    body = re.sub(r"<[^>]+>", " ", body)
+    return re.sub(r"\s+", " ", html.unescape(body)).strip()
 
 
 @dataclass(frozen=True)
@@ -56,10 +96,23 @@ def validate_report_bundle(
     _validate_evidence(context, issues)
     _validate_claims(context, issues)
     _validate_metrics(snapshot, issues)
+    _validate_cti_snapshot(snapshot, issues)
+    if not verify_snapshot(snapshot):
+        issues.append(
+            ValidationIssue(
+                "SNAPSHOT_HASH_INVALID",
+                "critical",
+                "The decision snapshot digest does not match its published content.",
+                "decision_snapshot",
+            )
+        )
     _validate_strategic_contract(context, executive_path, issues)
     snapshot_hash = str(snapshot.get("snapshot_hash") or "")
     _validate_rendered_files(executive_path, technical_path, snapshot_hash, issues)
+    _validate_cti_rendering(snapshot, executive_path, technical_path, issues)
     counts = _validate_exports(context, executive_path, snapshot_hash, issues)
+    _validate_public_export_references(executive_path, issues)
+    _validate_public_artifact_boundary(executive_path, technical_path, issues)
 
     result = ReportValidationResult(
         run_id=run_id,
@@ -67,29 +120,157 @@ def validate_report_bundle(
         issues=issues,
         counts=counts,
         artifacts={
-            "executive_html": str(executive_path),
-            "technical_html": str(technical_path),
-            "evidence_json": str(executive_path.with_name(f"{executive_path.stem}_evidence.json")),
-            "evidence_csv": str(executive_path.with_name(f"{executive_path.stem}_evidence.csv")),
-            "decision_snapshot": str(executive_path.with_name(f"{executive_path.stem}_decision_snapshot.json")),
-            "decision_snapshot_csv": str(
-                executive_path.with_name(f"{executive_path.stem}_decision_snapshot.csv")
-            ),
-            "strategic_json": str(
-                executive_path.with_name(f"{executive_path.stem}_strategic_scores.json")
-            ),
-            "strategic_csv": str(
-                executive_path.with_name(f"{executive_path.stem}_strategic_scores.csv")
-            ),
+            "executive_html": executive_path.name,
+            "technical_html": technical_path.name,
+            "evidence_json": executive_path.with_name(f"{executive_path.stem}_evidence.json").name,
+            "evidence_csv": executive_path.with_name(f"{executive_path.stem}_evidence.csv").name,
+            "decision_snapshot": executive_path.with_name(f"{executive_path.stem}_decision_snapshot.json").name,
+            "decision_snapshot_csv": executive_path.with_name(
+                f"{executive_path.stem}_decision_snapshot.csv"
+            ).name,
+            "strategic_json": executive_path.with_name(f"{executive_path.stem}_strategic_scores.json").name,
+            "strategic_csv": executive_path.with_name(f"{executive_path.stem}_strategic_scores.csv").name,
         },
     )
     validation_path = executive_path.with_name(f"{executive_path.stem}_validation.json")
-    result.artifacts["validation"] = str(validation_path)
+    result.artifacts["validation"] = validation_path.name
     validation_path.write_text(
         json.dumps(result.model_dump(), indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
     return result
+
+
+def _validate_public_artifact_boundary(
+    executive_path: Path,
+    technical_path: Path,
+    issues: list[ValidationIssue],
+) -> None:
+    artifact_paths = [
+        executive_path,
+        technical_path,
+        executive_path.with_name(f"{executive_path.stem}_evidence.json"),
+        executive_path.with_name(f"{executive_path.stem}_evidence.csv"),
+        executive_path.with_name(f"{executive_path.stem}_decision_snapshot.json"),
+        executive_path.with_name(f"{executive_path.stem}_decision_snapshot.csv"),
+        executive_path.with_name(f"{executive_path.stem}_strategic_scores.json"),
+        executive_path.with_name(f"{executive_path.stem}_strategic_scores.csv"),
+    ]
+    for path in artifact_paths:
+        if not path.is_file():
+            continue
+        body = path.read_text(encoding="utf-8", errors="replace")
+        prose_without_urls = _HTTP_URL_PATTERN.sub("", body)
+        if _PUBLIC_ARTIFACT_FORBIDDEN_PATTERN.search(prose_without_urls):
+            issues.append(
+                ValidationIssue(
+                    "INTERNAL_PROVIDER_EXPOSURE",
+                    "critical",
+                    "A public artifact exposes an internal collection or analysis provider.",
+                    path.name,
+                )
+            )
+        if _INTERNAL_EVIDENCE_ID_PATTERN.search(body):
+            issues.append(
+                ValidationIssue(
+                    "INTERNAL_EVIDENCE_ID_EXPOSURE",
+                    "critical",
+                    "A public artifact exposes an internal evidence identifier.",
+                    path.name,
+                )
+            )
+
+
+def _validate_public_export_references(
+    executive_path: Path,
+    issues: list[ValidationIssue],
+) -> None:
+    evidence_path = executive_path.with_name(f"{executive_path.stem}_evidence.json")
+    evidence_csv_path = executive_path.with_name(f"{executive_path.stem}_evidence.csv")
+    strategic_path = executive_path.with_name(f"{executive_path.stem}_strategic_scores.json")
+    try:
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+        records = payload.get("records", []) or []
+        record_ids = [str(item.get("id") or "") for item in records]
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return
+
+    public_pattern = re.compile(r"^CDE-EV-[A-F0-9]{16}$")
+    if any(not public_pattern.fullmatch(item) for item in record_ids):
+        issues.append(
+            ValidationIssue(
+                "PUBLIC_EVIDENCE_ID_INVALID",
+                "critical",
+                "The evidence export contains an invalid public evidence identifier.",
+                evidence_path.name,
+            )
+        )
+    if len(record_ids) != len(set(record_ids)):
+        issues.append(
+            ValidationIssue(
+                "PUBLIC_EVIDENCE_ID_DUPLICATE",
+                "critical",
+                "The evidence export contains duplicate public evidence identifiers.",
+                evidence_path.name,
+            )
+        )
+    record_id_set = set(record_ids)
+
+    try:
+        with evidence_csv_path.open(encoding="utf-8", newline="") as handle:
+            csv_ids = [str(row.get("id") or "") for row in csv.DictReader(handle)]
+    except OSError:
+        csv_ids = []
+    if record_ids != csv_ids:
+        issues.append(
+            ValidationIssue(
+                "PUBLIC_EVIDENCE_JSON_CSV_MISMATCH",
+                "critical",
+                "JSON and CSV evidence exports do not contain the same ordered public identifiers.",
+                evidence_csv_path.name,
+            )
+        )
+
+    reference_groups: dict[str, set[str]] = {
+        "evidence_items": {
+            str(item.get("evidence_id") or "")
+            for item in payload.get("evidence_items", []) or []
+            if item.get("evidence_id")
+        },
+        "claim_evidence_links": {
+            str(item.get("evidence_id") or "")
+            for item in payload.get("claim_evidence_links", []) or []
+            if item.get("evidence_id")
+        },
+        "claims": {
+            str(evidence_id)
+            for claim in payload.get("claims", []) or []
+            for evidence_id in claim.get("evidence_ids", []) or []
+            if evidence_id
+        },
+    }
+    try:
+        strategic = json.loads(strategic_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        strategic = {}
+    reference_groups["strategic_scores"] = {
+        str(evidence_id)
+        for model_name in ("pestel", "porter")
+        for dimension in (strategic.get(model_name, {}) or {}).get("dimensions", []) or []
+        for evidence_id in dimension.get("evidence_ids", []) or []
+        if evidence_id
+    }
+    for group, references in reference_groups.items():
+        unresolved = references - record_id_set
+        if unresolved:
+            issues.append(
+                ValidationIssue(
+                    "PUBLIC_EVIDENCE_REFERENCE_UNRESOLVED",
+                    "critical",
+                    f"{group} contains {len(unresolved)} public evidence references absent from the evidence export.",
+                    group,
+                )
+            )
 
 
 def _validate_strategic_contract(context: RunContext, executive_path: Path, issues: list[ValidationIssue]) -> None:
@@ -295,6 +476,181 @@ def _validate_metrics(snapshot: dict[str, Any], issues: list[ValidationIssue]) -
             )
 
 
+def _validate_cti_snapshot(
+    snapshot: dict[str, Any], issues: list[ValidationIssue]
+) -> None:
+    cti = snapshot.get("cti_snapshot", {}) or {}
+    if not cti:
+        return
+    overview = cti.get("overview", {}) or {}
+    actors = cti.get("actors", []) or []
+    campaigns = cti.get("campaigns", []) or []
+    techniques = cti.get("techniques", []) or []
+    expected_counts = {
+        "actor_count": len(actors),
+        "campaign_count": len(campaigns),
+        "technique_count": len(techniques),
+    }
+    for key, expected in expected_counts.items():
+        if int(overview.get(key, 0) or 0) != expected:
+            issues.append(
+                ValidationIssue(
+                    "CTI_COUNT_MISMATCH",
+                    "critical",
+                    "A CTI overview count differs from the canonical entity collection.",
+                    f"decision_snapshot.cti_snapshot.overview.{key}",
+                )
+            )
+
+    valid_states = {"OBSERVED", "INFERRED", "RELATED", "REFERENCE"}
+    state_counts = {state: 0 for state in valid_states}
+    evidence_ids = {
+        str(row.get("evidence_id"))
+        for row in (cti.get("evidence", []) or [])
+        if isinstance(row, dict) and row.get("evidence_id")
+    }
+    observed_actors = {
+        str(actor.get("name") or "").casefold()
+        for actor in actors
+        if actor.get("state") == "OBSERVED"
+        and int(actor.get("observed_attack_count", 0) or 0) > 0
+        and actor.get("evidence_ids")
+    }
+    for collection_name, rows in (
+        ("actors", actors),
+        ("campaigns", campaigns),
+        ("techniques", techniques),
+    ):
+        for index, row in enumerate(rows):
+            if not isinstance(row, dict):
+                continue
+            state = str(row.get("state") or "REFERENCE")
+            state_counts[state if state in valid_states else "REFERENCE"] += 1
+            linked_ids = {str(value) for value in row.get("evidence_ids", []) if value}
+            if not linked_ids.issubset(evidence_ids):
+                issues.append(
+                    ValidationIssue(
+                        "CTI_EVIDENCE_ORPHAN",
+                        "critical",
+                        "A CTI entity references evidence absent from the CTI evidence index.",
+                        f"decision_snapshot.cti_snapshot.{collection_name}.{index}",
+                    )
+                )
+            if state == "OBSERVED":
+                telemetry_supported = bool(linked_ids)
+                if collection_name == "actors":
+                    telemetry_supported = telemetry_supported and int(
+                        row.get("observed_attack_count", 0) or 0
+                    ) > 0
+                elif collection_name == "campaigns":
+                    telemetry_supported = telemetry_supported and any(
+                        str(name).casefold() in observed_actors
+                        for name in row.get("actors", [])
+                    )
+                else:
+                    telemetry_supported = False
+                if not telemetry_supported:
+                    issues.append(
+                        ValidationIssue(
+                            "CTI_OBSERVED_WITHOUT_TELEMETRY",
+                            "critical",
+                            "OBSERVED was used without traceable confirmed adversary telemetry.",
+                            f"decision_snapshot.cti_snapshot.{collection_name}.{index}",
+                        )
+                    )
+
+    published_state_counts = (cti.get("quality", {}) or {}).get("state_counts", {}) or {}
+    for state, expected in state_counts.items():
+        if int(published_state_counts.get(state, 0) or 0) != expected:
+            issues.append(
+                ValidationIssue(
+                    "CTI_COUNT_MISMATCH",
+                    "critical",
+                    "CTI state totals differ from the canonical entity states.",
+                    f"decision_snapshot.cti_snapshot.quality.state_counts.{state}",
+                )
+            )
+
+    weights = (cti.get("relevance_model", {}) or {}).get("weights", {}) or {}
+    try:
+        weight_total = sum(float(value) for value in weights.values())
+    except (TypeError, ValueError):
+        weight_total = -1.0
+    if not weights or abs(weight_total - 1.0) > 0.001:
+        issues.append(
+            ValidationIssue(
+                "CTI_SCORE_INVALID",
+                "critical",
+                "CTI relevance weights are missing or do not sum to one.",
+                "decision_snapshot.cti_snapshot.relevance_model.weights",
+            )
+        )
+    for index, actor in enumerate(actors):
+        try:
+            score = float(actor.get("relevance_score"))
+        except (TypeError, ValueError):
+            score = -1.0
+        if score < 0 or score > 100:
+            issues.append(
+                ValidationIssue(
+                    "CTI_SCORE_INVALID",
+                    "critical",
+                    "An actor contextual relevance score is outside 0..100.",
+                    f"decision_snapshot.cti_snapshot.actors.{index}.relevance_score",
+                )
+            )
+
+
+def _validate_cti_rendering(
+    snapshot: dict[str, Any],
+    executive_path: Path,
+    technical_path: Path,
+    issues: list[ValidationIssue],
+) -> None:
+    cti = snapshot.get("cti_snapshot", {}) or {}
+    if not cti:
+        return
+    overview = cti.get("overview", {}) or {}
+    expected = {
+        "actor": int(overview.get("actor_count", 0) or 0),
+        "campaign": int(overview.get("campaign_count", 0) or 0),
+        "technique": int(overview.get("technique_count", 0) or 0),
+    }
+    for path in (executive_path, technical_path):
+        if not path.is_file():
+            continue
+        body = path.read_text(encoding="utf-8", errors="replace")
+        for key, value in expected.items():
+            match = re.search(rf'data-cti-{key}-count=["\'](\d+)["\']', body)
+            if match is None or int(match.group(1)) != value:
+                issues.append(
+                    ValidationIssue(
+                        "CTI_RENDER_MISMATCH",
+                        "critical",
+                        "Rendered CTI counts differ from the decision snapshot.",
+                        f"{path.name}:data-cti-{key}-count",
+                    )
+                )
+            row_class = {
+                "actor": "threat-entity-row" if path == executive_path else "threat-report-row",
+                "campaign": "cti-campaign-row",
+                "technique": "cti-technique-row",
+            }[key]
+            rendered_rows = len(
+                re.findall(
+                    rf'class=["\'][^"\']*\b{re.escape(row_class)}\b[^"\']*["\']',
+                    body,
+                )
+            )
+            if rendered_rows != value:
+                issues.append(
+                    ValidationIssue(
+                        "CTI_DETAIL_RENDER_MISMATCH",
+                        "critical",
+                        "Rendered CTI detail does not contain the complete summarized inventory.",
+                        f"{path.name}:{row_class}:{rendered_rows}/{value}",
+                    )
+                )
 def _validate_rendered_files(
     executive_path: Path,
     technical_path: Path,
@@ -330,7 +686,19 @@ def _validate_rendered_files(
             issues.append(
                 ValidationIssue("SECRET_EXPOSURE", "critical", "A possible secret is present in the report.", path.name)
             )
-        if local_path_pattern.search(body):
+        visible_text = _visible_body_text(body)
+        for label, pattern in _VISIBLE_INTERNAL_MARKERS.items():
+            if pattern.search(visible_text):
+                issues.append(
+                    ValidationIssue(
+                        "VISIBLE_INTERNAL_METADATA",
+                        "high",
+                        "Internal implementation metadata is visible in the report body.",
+                        f"{path.name}:{label}",
+                    )
+                )
+        body_without_web_urls = re.sub(r"https?://[^\s<\"']+", "", body, flags=re.IGNORECASE)
+        if local_path_pattern.search(body_without_web_urls):
             issues.append(
                 ValidationIssue("LOCAL_PATH_EXPOSURE", "high", "A local filesystem path is present in the report.", path.name)
             )

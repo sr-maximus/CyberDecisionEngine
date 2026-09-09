@@ -18,10 +18,10 @@ import {
   SearchCode,
   Settings2,
   ShieldCheck,
+  ShieldEllipsis,
   Sun,
   UserCog,
-  UserRoundSearch,
-  Waypoints
+  UserRoundSearch
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { roleLabelsByLanguage } from "../data/auth";
@@ -50,8 +50,9 @@ const allRoles: UserRole[] = ["super_admin", "admin", "analyst", "executive", "v
 const nav: Array<{ key: ViewKey; group: "strategy" | "intel" | "ops"; label: Record<LanguageMode, string>; icon: typeof ShieldCheck; roles: UserRole[] }> = [
   { key: "overview", group: "strategy", label: { es: "Visión general", en: "Overview" }, icon: Gauge, roles: allRoles },
   { key: "dashboards", group: "strategy", label: { es: "Tablero estratégico", en: "Strategic Dashboard" }, icon: ChartNoAxesCombined, roles: allRoles },
-  { key: "scenarios", group: "strategy", label: { es: "Escenarios de decisión", en: "Decision Scenarios" }, icon: Waypoints, roles: executiveRoles },
-  { key: "ai", group: "strategy", label: { es: "Asistente estratégico", en: "Strategic Assistant" }, icon: BrainCircuit, roles: executiveRoles },
+  { key: "cti", group: "intel", label: { es: "CTI orientada por amenazas", en: "Threat-informed CTI" }, icon: ShieldEllipsis, roles: executiveRoles },
+  { key: "evidence", group: "ops", label: { es: "Evidencia y revisión", en: "Evidence and review" }, icon: ShieldCheck, roles: allRoles },
+  { key: "scenarios", group: "strategy", label: { es: "Decisiones y asistente", en: "Decisions & assistant" }, icon: BrainCircuit, roles: executiveRoles },
   { key: "attackSurface", group: "strategy", label: { es: "Superficie de ataque", en: "Attack Surface" }, icon: ScanSearch, roles: executiveRoles },
   { key: "brand", group: "strategy", label: { es: "Marca y Fraude", en: "Brand & Fraud" }, icon: Fingerprint, roles: executiveRoles },
   { key: "employeeRisk", group: "intel", label: { es: "Riesgo Empleados", en: "Employee Risk" }, icon: UserRoundSearch, roles: analystRoles },
@@ -93,6 +94,10 @@ export function AppShell({
     if (item.key === "osint") {
       return currentUser.licenseModules.includes("osint") || currentUser.licenseModules.includes("socmint");
     }
+    if (item.key === "cti") {
+      return currentUser.licenseModules.includes("cti") || currentUser.licenseModules.includes("dashboards");
+    }
+    if (item.key === "evidence") return currentUser.licenseModules.some((module) => ["evidence", "dashboards", "osint", "cti"].includes(module));
     return currentUser.licenseModules.includes(item.key);
   });
   const shellCopy = {
@@ -152,7 +157,7 @@ export function AppShell({
                 <span>{group.label[language]}</span>
                 {items.map((item) => (
                   <button
-                    className={activeView === item.key || (item.key === "osint" && activeView === "socmint") ? "nav-item active" : "nav-item"}
+                    className={activeView === item.key || (item.key === "osint" && activeView === "socmint") || (item.key === "scenarios" && activeView === "ai") ? "nav-item active" : "nav-item"}
                     key={item.key}
                     onClick={() => onViewChange(item.key)}
                     title={item.label[language]}

@@ -208,6 +208,9 @@ def _classify_event(event: ThreatEvent, scope_terms: Sequence[str]) -> ThreatEve
     elif event.incident_confirmed:
         event.evidence_status = EvidenceStatus.CONFIRMED
         event.record_kind = RecordKind.CONFIRMED_INCIDENT
+    elif event.human_reviewed and validation.get("human_review", {}).get("status") == "validated":
+        event.evidence_status = EvidenceStatus.VALIDATED
+        event.record_kind = RecordKind.VALIDATED_TECHNICAL_EVIDENCE
     elif validated_result and event.relationship_to_scope == "direct":
         event.evidence_status = EvidenceStatus.VALIDATED
         event.record_kind = RecordKind.VALIDATED_TECHNICAL_EVIDENCE

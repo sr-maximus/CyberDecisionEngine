@@ -165,23 +165,22 @@ def _event_text(event: ThreatEvent) -> str:
 
 def _countries_in_text(text: str) -> list[dict[str, str]]:
     normalized = _normalize(text)
-    found = []
-    for country in _country_catalog():
-        names = {_normalize(country["en"]), _normalize(country["es"])}
-        code = country["code"].lower()
-        explicit_code = re.search(
-            rf"\b(?:country|country_code|geo_country|location_country):\s*{re.escape(code)}\b",
-            normalized,
-        )
-        named_country = any(
-            name
-            and len(name) > 3
-            and re.search(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])", normalized)
-            for name in names
-        )
-        if explicit_code or named_country:
-            found.append(country)
-    return found
+    countries_by_code, countries_by_name, explicit_code_pattern, country_name_pattern = (
+        _country_matcher()
+    )
+    found_codes = {
+        match.group("code").upper()
+        for match in explicit_code_pattern.finditer(normalized)
+        if match.group("code").upper() in countries_by_code
+    }
+    for match in country_name_pattern.finditer(normalized):
+        for country in countries_by_name.get(match.group(0), ()):
+            found_codes.add(country["code"].upper())
+    return [
+        country
+        for country in _country_catalog()
+        if country["code"].upper() in found_codes
+    ]
 
 
 def _build_country_inventory(
@@ -297,6 +296,37 @@ def _country_catalog() -> list[dict[str, str]]:
         for row in payload
         if isinstance(row, dict) and row.get("code")
     ]
+
+
+@lru_cache(maxsize=1)
+def _country_matcher() -> tuple[
+    dict[str, dict[str, str]],
+    dict[str, tuple[dict[str, str], ...]],
+    re.Pattern[str],
+    re.Pattern[str],
+]:
+    countries_by_code: dict[str, dict[str, str]] = {}
+    mutable_names: dict[str, list[dict[str, str]]] = {}
+    for country in _country_catalog():
+        countries_by_code[country["code"].upper()] = country
+        for name in {_normalize(country["en"]), _normalize(country["es"])}:
+            if name and len(name) > 3:
+                mutable_names.setdefault(name, []).append(country)
+    countries_by_name = {
+        name: tuple(countries)
+        for name, countries in mutable_names.items()
+    }
+    explicit_code_pattern = re.compile(
+        r"\b(?:country|country_code|geo_country|location_country):\s*(?P<code>[a-z]{2})\b"
+    )
+    names = "|".join(
+        re.escape(name)
+        for name in sorted(countries_by_name, key=len, reverse=True)
+    )
+    country_name_pattern = re.compile(
+        rf"(?<![a-z0-9])(?:{names})(?![a-z0-9])" if names else r"(?!x)x"
+    )
+    return countries_by_code, countries_by_name, explicit_code_pattern, country_name_pattern
 
 
 def _normalize(value: str) -> str:

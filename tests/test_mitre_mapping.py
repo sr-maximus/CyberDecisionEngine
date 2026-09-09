@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from cyberdeck.analysis.mitre_mapping import _attack_catalog, build_atlas_profile
+from cyberdeck.analysis.mitre_mapping import _attack_catalog, build_atlas_profile, build_mitre_profile
 from cyberdeck.schemas import EvidenceStatus, ThreatEvent
 
 
@@ -50,6 +50,27 @@ def test_attack_catalog_uses_current_stix_tactics_and_relationships():
     assert "Stealth" in relationships["T1078"]
 
 
+def test_surface_control_is_not_presented_as_attack_technique():
+    profile = build_mitre_profile(
+        [
+            ThreatEvent(
+                id="surface-control",
+                title="DMARC no observado",
+                category="attack_surface",
+                source="surface",
+                technique="T1589",
+                tags=["external_surface", "email_security"],
+                evidence_status=EvidenceStatus.DIRECT,
+                attack_mapping_status="potentially_relevant_technique",
+            )
+        ]
+    )
+
+    assert profile["coverage_count"] == 0
+    assert profile["technique_counts"] == {}
+    assert profile["suppressed_control_reference_count"] == 1
+
+
 def test_scenario_library_is_preventive_and_has_no_synthetic_probability():
     payload = json.loads(Path("data/scenarios/cyber_scenario_library.json").read_text(encoding="utf-8"))
 
@@ -77,3 +98,18 @@ def test_scenario_api_does_not_present_reference_templates_as_executable():
     assert result["executable_scenario_count"] == 0
     assert result["tested_scenario_count"] == 0
     assert result["object_type"] == "reference_template"
+    for key in (
+        "attack_techniques",
+        "attack_ics_templates",
+        "attack_mobile_templates",
+        "d3fend_controls",
+        "atlas_tactics",
+        "disarm_techniques",
+        "f3_techniques",
+        "emb3d_templates",
+        "aadapt_templates",
+        "capec_templates",
+        "cwe_templates",
+        "inform_templates",
+    ):
+        assert result["framework_counts"][key] > 0

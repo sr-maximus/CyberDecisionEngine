@@ -5,6 +5,8 @@ import { getAttackSurface } from "../api";
 import type { AttackSurfaceDomain, AttackSurfaceResponse, LanguageMode, RunRecord } from "../types";
 import { formatDateTime } from "../utils/format";
 import { cleanEvidenceText, cleanEvidenceTitle } from "../utils/sourceLabels";
+import { TechnologyFootprintPanel } from "./TechnologyFootprintPanel";
+import { RelationshipRiskPanel } from "./RelationshipRiskPanel";
 
 interface AttackSurfaceViewProps {
   run?: RunRecord;
@@ -161,7 +163,7 @@ export function AttackSurfaceView({ run, competitorDomains, language }: AttackSu
           <span>CyberDecisionEngine</span>
           <h2>{copy.title}</h2>
           <p>{copy.subtitle}</p>
-          <em>{surface ? formatDateTime(surface.generated_at) : copy.loading}</em>
+          <em>{surface ? formatDateTime(surface.generated_at, language) : copy.loading}</em>
         </div>
         <button className="primary-button" onClick={() => refresh(true)} disabled={loading}>
           {loading ? <Loader2 className="spin" size={17} /> : <RadioTower size={17} />}
@@ -177,6 +179,14 @@ export function AttackSurfaceView({ run, competitorDomains, language }: AttackSu
         <Metric icon={<KeyRound size={18} />} label={copy.certErrors} value={certErrorsMetric} />
         <Metric icon={<AlertTriangle size={18} />} label={copy.toolFindings} value={toolFindingsMetric} />
       </section>
+
+      <TechnologyFootprintPanel
+        intelligence={run?.summary.multidomain_intelligence ?? run?.summary.decision_snapshot?.multidomain_intelligence}
+        language={language}
+        compact
+      />
+
+      <RelationshipRiskPanel run={run} language={language} mode="domain_abuse" />
 
       <section className="dashboard-grid attack-surface-grid">
         <article className="panel chart-card span-4 benchmark-card">

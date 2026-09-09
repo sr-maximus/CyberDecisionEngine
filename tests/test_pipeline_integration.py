@@ -108,6 +108,28 @@ def test_pipeline_handles_multiple_domains_duplicates_false_positive_and_real_fi
     assert context.risk_findings[0].likelihood_inputs["sector_context"] == 0
 
 
+def test_pipeline_historical_period_retains_undated_without_false_duplicates(monkeypatch, tmp_path):
+    from cyberdeck.reporting.html_report import prepare_context_for_report
+    original = _org_file
+
+    def dated_org(path, domains):
+        output = original(path, domains)
+        payload = yaml.safe_load(output.read_text())
+        payload["organization"].update(analysis_window="custom", analysis_start_date="2026-01-01", analysis_end_date="2026-06-30")
+        output.write_text(yaml.safe_dump(payload), encoding="utf-8")
+        return output
+
+    monkeypatch.setitem(globals(), "_org_file", dated_org)
+    events = [ThreatEvent(id=str(index), title=f"Distinct source record {index}", category="web_search", source="fixture", published_at=stamp, evidence_url=f"https://example.com/{index}") for index, stamp in enumerate(["2026-01-01", "2026-07-01", None])]
+    context = _run_with(monkeypatch, tmp_path, [CollectionResult(SourceStatus(name="fixture", status="ok", records=3), events)], ["example.com"])
+    prepared = prepare_context_for_report(context)
+    assert len(prepared.raw_events) == 2
+    assert len(prepared.excluded_period_events) == 1
+    assert prepared.processing_summary["duplicates_removed"] == 0
+    assert prepared.metrics["analysis_period"]["undated_records"] == 1
+    assert prepared.metrics["analysis_period"]["out_of_period_records"] == 1
+
+
 def test_pipeline_preserves_timeout_no_api_and_no_result_states_without_inventing_findings(monkeypatch, tmp_path):
     context = _run_with(
         monkeypatch,

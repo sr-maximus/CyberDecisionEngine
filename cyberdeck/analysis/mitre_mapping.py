@@ -119,12 +119,22 @@ ATLAS_SIGNAL_PATTERN = re.compile(
 
 def build_mitre_profile(events: Iterable[ThreatEvent]) -> Dict[str, object]:
     attack_tactics, technique_names, technique_tactics = _attack_catalog()
-    event_list = [
+    technique_events = [
         event
         for event in events
         if event.technique
         and event.evidence_status in {EvidenceStatus.DIRECT, EvidenceStatus.VALIDATED, EvidenceStatus.CONFIRMED}
     ]
+    suppressed_control_references = [
+        event
+        for event in technique_events
+        if event.attack_mapping_status != "observed_adversary_behavior"
+        and (
+            "external_surface" in {tag.casefold() for tag in event.tags}
+            or event.category in {"attack_surface", "attack_surface_web_artifact"}
+        )
+    ]
+    event_list = [event for event in technique_events if event not in suppressed_control_references]
     technique_counter = Counter(event.technique or "unmapped" for event in event_list)
     tactic_rows = []
     for tactic in attack_tactics:
@@ -158,7 +168,8 @@ def build_mitre_profile(events: Iterable[ThreatEvent]) -> Dict[str, object]:
         "observed_behavior_count": sum(
             1 for event in event_list if event.attack_mapping_status == "observed_adversary_behavior"
         ),
-        "purpose": "ATT&CK organiza tecnicas potencialmente relevantes a partir de evidencia directa. Solo se declara comportamiento adversario observado cuando existe telemetria tecnica validada; el resto es orientacion preventiva.",
+        "suppressed_control_reference_count": len(suppressed_control_references),
+        "purpose": "ATT&CK organiza TTP sustentadas por evidencia. Los controles debiles y el inventario de superficie se analizan como exposicion, no como comportamiento adversario; solo se declara comportamiento observado con telemetria validada.",
     }
 
 
@@ -212,6 +223,33 @@ def _attack_catalog() -> tuple[list[str], Dict[str, str], Dict[str, list[str]]]:
     except (OSError, TypeError, ValueError, json.JSONDecodeError):
         pass
     return ATTACK_TACTICS, TECHNIQUE_NAMES, TECHNIQUE_TACTICS
+
+
+def describe_attack_technique(technique: str) -> Dict[str, object]:
+    """Return the local ATT&CK descriptor and its traceable D3FEND options."""
+    identifier = str(technique or "").strip().upper()
+    if not re.fullmatch(r"T\d{4}(?:\.\d{3})?", identifier):
+        return {
+            "id": identifier,
+            "name": identifier,
+            "tactics": [],
+            "d3fend": [],
+            "catalog_match": False,
+        }
+    _, names, tactics_by_technique = _attack_catalog()
+    parent = identifier.split(".", 1)[0]
+    d3fend = _d3fend_for_technique(identifier)
+    if not d3fend and parent != identifier:
+        d3fend = _d3fend_for_technique(parent)
+    return {
+        "id": identifier,
+        "name": names.get(identifier) or names.get(parent) or identifier,
+        "tactics": tactics_by_technique.get(identifier)
+        or tactics_by_technique.get(parent)
+        or [],
+        "d3fend": d3fend,
+        "catalog_match": identifier in names or parent in names,
+    }
 
 
 def build_d3fend_profile(events: Iterable[ThreatEvent]) -> Dict[str, object]:

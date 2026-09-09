@@ -140,7 +140,7 @@ def _event_from_finding(domain: str, finding: dict[str, Any]) -> ThreatEvent:
         severity=severity,
         epss=0.02,
         cvss=0.0,
-        actor="external_exposure",
+        actor=None,
         technique=_technique_for_finding(finding_type),
         tags=["external_surface", finding_type, "technical_query", f"domain:{domain}", f"asset:{asset}"],
         evidence_url=evidence_url,
@@ -259,14 +259,10 @@ def _severity_value(label: str) -> float:
     }.get(label.lower(), 0.42)
 
 
-def _technique_for_finding(finding_type: str) -> str:
-    if finding_type == "email_security":
-        return "T1589"
-    if finding_type == "tls":
-        return "T1595"
-    if finding_type == "subdomain":
-        return "T1590"
-    return "T1592"
+def _technique_for_finding(finding_type: str) -> str | None:
+    # A public control or asset observation is not adversary behavior. ATT&CK
+    # mapping is added later only when the evidence explicitly supports a TTP.
+    return None
 
 
 def _stable_id(prefix: str, *parts: str) -> str:

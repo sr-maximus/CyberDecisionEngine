@@ -14,6 +14,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, Field
 
+from cyberdeck.analysis.multidomain import public_evidence_reference, sanitize_public_payload
 from cyberdeck.schemas import OrganizationProfile, ThreatEvent
 from cyberdeck.settings import PROJECT_ROOT
 
@@ -652,7 +653,10 @@ def build_strategic_queries(graph: EntityResolutionGraph, organization: Organiza
 def export_strategic_scores(strategic: Dict[str, Any], report_path: Path) -> Dict[str, str]:
     json_path = report_path.with_name(f"{report_path.stem}_strategic_scores.json")
     csv_path = report_path.with_name(f"{report_path.stem}_strategic_scores.csv")
-    json_path.write_text(json.dumps(strategic, ensure_ascii=False, indent=2), encoding="utf-8")
+    public_strategic = sanitize_public_payload(strategic)
+    json_path.write_text(
+        json.dumps(public_strategic, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     with csv_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,
@@ -673,7 +677,7 @@ def export_strategic_scores(strategic: Dict[str, Any], report_path: Path) -> Dic
         )
         writer.writeheader()
         for model_name in ("pestel", "porter"):
-            for dimension in strategic.get(model_name, {}).get("dimensions", []):
+            for dimension in public_strategic.get(model_name, {}).get("dimensions", []):
                 writer.writerow({
                     "model": model_name,
                     "dimension": dimension.get("key"),
@@ -762,16 +766,17 @@ def _build_articles(
     for event in events:
         if event.demo or not event.evidence_url:
             continue
+        evidence_id = event.public_evidence_id or public_evidence_reference(event)
         content_title = _event_content_title(event.title)
         content_summary = str(event.technical_validation.get("summary") or "")
         matches = graph.resolve(f"{content_title} {content_summary}", event.evidence_url, event.tags)
         accepted = [match for match in matches if match.match_confidence > 0]
         if not accepted:
-            rejected.append({"evidence_id": event.id, "title": event.title, "reason": "unrelated_or_ambiguous_entity", "ambiguity_detected": any(match.ambiguity_detected for match in matches)})
+            rejected.append({"evidence_id": evidence_id, "title": event.title, "reason": "unrelated_or_ambiguous_entity", "ambiguity_detected": any(match.ambiguity_detected for match in matches)})
             continue
         event_type = _classify_event_type(event, taxonomy)
         if not event_type:
-            rejected.append({"evidence_id": event.id, "title": event.title, "reason": "no_strategic_event_type", "ambiguity_detected": False})
+            rejected.append({"evidence_id": evidence_id, "title": event.title, "reason": "no_strategic_event_type", "ambiguity_detected": False})
             continue
         canonical_url = _canonical_url(event.evidence_url)
         source = _source_for(event, canonical_url, organization, source_registry)
@@ -781,9 +786,8 @@ def _build_articles(
         direction = _event_direction(event)
         age_days = max(0, int(event.age_days or 0))
         half_life = _half_life(event_type, taxonomy)
-        article_id = event.canonical_id or event.id
         article = NewsArticle(
-            article_id=article_id,
+            article_id=evidence_id,
             canonical_url=canonical_url,
             original_url=event.evidence_url,
             source_id=source.source_id,
@@ -795,7 +799,7 @@ def _build_articles(
             collected_at=collected_at,
             language=organization.language,
             country=organization.country or None,
-            raw_reference=event.id,
+            raw_reference=evidence_id,
             matched_entities=accepted,
             directness=relationship,
             event_type=event_type,

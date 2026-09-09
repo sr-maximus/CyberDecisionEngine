@@ -54,7 +54,7 @@ export function AnalysisContextBar({
   const subject = resolveSubject(run, draftOrganizationName, domains, language);
   const subjectType = run?.request.subject_type ?? draftSubjectType;
   const windowLabel = windowDisplay(run?.request.analysis_window ?? draftAnalysisWindow, language);
-  const updated = run ? `${copy.updated} ${formatDateTime(run.updated_at)}` : copy.pending;
+  const updated = run ? `${copy.updated} ${formatDateTime(run.updated_at, language)}` : copy.pending;
   const runStatus = run ? localizedRunStatus(run.status, language) : copy.noRun;
   const explicitSubject = run?.request.person_name || run?.request.organization_name || draftOrganizationName.trim();
   const subjectLabel = explicitSubject ? (subjectType === "person" ? copy.person : copy.organization) : domains.length === 1 ? copy.singleDomain : copy.subject;

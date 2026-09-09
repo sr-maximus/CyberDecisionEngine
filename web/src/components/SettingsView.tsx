@@ -1,4 +1,4 @@
-import { AlertTriangle, BadgeCheck, KeyRound, Languages, LockKeyhole, Moon, Plus, Save, ShieldAlert, ShieldCheck, Sun, ToggleLeft, UserCog, UsersRound } from "lucide-react";
+import { AlertTriangle, BadgeCheck, KeyRound, Languages, LockKeyhole, Moon, Plus, Save, ShieldAlert, ShieldCheck, Sun, ToggleLeft, UserCog, UsersRound, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   attachTemporaryMfaCode,
@@ -11,8 +11,10 @@ import {
   unlockUser
 } from "../data/auth";
 import { LicenseAdminPanel } from "./LicenseAdminPanel";
+import { KnowledgeCatalogAdminPanel } from "./KnowledgeCatalogAdminPanel";
 import { SourceHealth } from "./SourceHealth";
 import type { LanguageMode, LocalUser, SourceStatus, ThemeMode, UserRole } from "../types";
+import { cleanEvidenceText } from "../utils/sourceLabels";
 
 interface SourceConfig {
   name: string;
@@ -35,28 +37,14 @@ interface SettingsViewProps {
 }
 
 const defaultSources: SourceConfig[] = [
-  { name: "NVD", type: "Vulnerability", status: "Enabled", keyRef: "NVD_API_KEY" },
-  { name: "MISP", type: "CTI", status: "Optional", keyRef: "MISP_API_KEY" },
-  { name: "STIX/TAXII", type: "CTI", status: "Optional", keyRef: "TAXII_DISCOVERY_URL / USER / PASSWORD" },
-  { name: "AlienVault OTX", type: "CTI", status: "Optional", keyRef: "OTX_API_KEY" },
-  { name: "urlscan.io", type: "Brand Risk", status: "Enabled", keyRef: "URLSCAN_API_KEY opcional" },
-  { name: "Shodan Passive", type: "Exposure", status: "Optional", keyRef: "SHODAN_API_KEY" },
-  { name: "Censys Passive", type: "Exposure", status: "Optional", keyRef: "CENSYS_API_ID / SECRET" },
-  { name: "VirusTotal", type: "Exposure", status: "Optional", keyRef: "VIRUSTOTAL_API_KEY" },
-  { name: "GreyNoise", type: "Exposure", status: "Optional", keyRef: "GREYNOISE_API_KEY" },
-  { name: "AbuseIPDB", type: "Exposure", status: "Optional", keyRef: "ABUSEIPDB_API_KEY" },
-  { name: "CIRCL Passive DNS", type: "Attack Surface", status: "Optional", keyRef: "CIRCL_PDNS_USERNAME / PASSWORD" },
-  { name: "Have I Been Pwned", type: "Fraud", status: "Domain verified", keyRef: "HIBP_API_KEY" },
-  { name: "Google News RSS", type: "Brand Risk", status: "Enabled", keyRef: "NO_KEY_REQUIRED" },
-  { name: "Ransomware public index", type: "Dark Web", status: "Safe index", keyRef: "NO_TOR_REQUIRED" },
-  { name: "Authorized Dark Web Import", type: "Dark Web", status: "Optional", keyRef: "DARKWEB_IMPORT_PATH" },
-  { name: "Tor runtime check", type: "Dark Web", status: "Guarded", keyRef: "ALLOW_TOR" },
-  { name: "X Public API", type: "SOCMINT", status: "Needs key", keyRef: "X_BEARER_TOKEN" },
-  { name: "Facebook Graph", type: "SOCMINT", status: "Needs key", keyRef: "FACEBOOK_ACCESS_TOKEN" },
-  { name: "Instagram Basic Display", type: "SOCMINT", status: "Needs key", keyRef: "INSTAGRAM_ACCESS_TOKEN" },
-  { name: "TikTok Research API", type: "SOCMINT", status: "Needs key", keyRef: "TIKTOK_CLIENT_KEY" },
-  { name: "RDAP", type: "Attack Surface", status: "Enabled", keyRef: "NO_KEY_REQUIRED" },
-  { name: "TLS Certificate Check", type: "Attack Surface", status: "Enabled", keyRef: "NO_KEY_REQUIRED" }
+  { name: "public_web", type: "Brand Risk", status: "Enabled", keyRef: "" },
+  { name: "external_surface", type: "Attack Surface", status: "Enabled", keyRef: "" },
+  { name: "vulnerability_intelligence", type: "Vulnerability", status: "Enabled", keyRef: "" },
+  { name: "threat_intelligence", type: "CTI", status: "Optional", keyRef: "" },
+  { name: "cyberphysical_intelligence", type: "Exposure", status: "Optional", keyRef: "" },
+  { name: "fraud_intelligence", type: "Fraud", status: "Optional", keyRef: "" },
+  { name: "historical_intelligence", type: "SOCMINT", status: "Optional", keyRef: "" },
+  { name: "deep_intelligence", type: "Dark Web", status: "Guarded", keyRef: "" }
 ];
 
 const copy = {
@@ -91,6 +79,14 @@ const copy = {
     incomplete: "Completa usuario, nombre y contraseña.",
     weakPassword: "La contraseña debe tener al menos 12 caracteres.",
     sourceRequired: "Agrega nombre de fuente para registrar la configuración.",
+    selectedConnector: "Conector seleccionado",
+    observedStatus: "Estado observado",
+    executionMode: "Modo de ejecución",
+    connectorDiagnostic: "Diagnóstico de la corrida",
+    editCapability: "Editar capacidad",
+    registerCapability: "Registrar capacidad",
+    saveSource: "Guardar configuración",
+    cancelEdit: "Cancelar edición",
     accessSecurity: "Seguridad de acceso",
     accessSecurityText: "Gobierna doble factor, bloqueos por intentos y restablecimiento de contraseñas locales.",
     mfaOn: "MFA activo",
@@ -150,6 +146,14 @@ const copy = {
     incomplete: "Complete username, name and password.",
     weakPassword: "Password must be at least 12 characters.",
     sourceRequired: "Add a source name to register the configuration.",
+    selectedConnector: "Selected connector",
+    observedStatus: "Observed status",
+    executionMode: "Execution mode",
+    connectorDiagnostic: "Run diagnostic",
+    editCapability: "Edit capability",
+    registerCapability: "Register capability",
+    saveSource: "Save configuration",
+    cancelEdit: "Cancel edit",
     accessSecurity: "Access security",
     accessSecurityText: "Govern two-factor verification, failed-attempt lockout and local password reset.",
     mfaOn: "MFA enabled",
@@ -194,7 +198,15 @@ const sourceDisplay: Record<LanguageMode, Record<string, string>> = {
     Optional: "Opcional",
     "Safe index": "Indice seguro",
     Guarded: "Controlado",
-    "Needs key": "Requiere key"
+    "Needs key": "Requiere key",
+    public_web: "Inteligencia web publica",
+    external_surface: "Exposicion tecnologica publica",
+    vulnerability_intelligence: "Inteligencia de vulnerabilidades",
+    threat_intelligence: "Inteligencia de amenazas",
+    cyberphysical_intelligence: "Inteligencia ciberfisica",
+    fraud_intelligence: "Inteligencia de fraude",
+    historical_intelligence: "Inteligencia historica",
+    deep_intelligence: "Evidencia publica corroborada"
   },
   en: {
     Vulnerability: "Vulnerability",
@@ -209,12 +221,52 @@ const sourceDisplay: Record<LanguageMode, Record<string, string>> = {
     Optional: "Optional",
     "Safe index": "Safe index",
     Guarded: "Guarded",
-    "Needs key": "Needs key"
+    "Needs key": "Needs key",
+    public_web: "Public web intelligence",
+    external_surface: "Public technology exposure",
+    vulnerability_intelligence: "Vulnerability intelligence",
+    threat_intelligence: "Threat intelligence",
+    cyberphysical_intelligence: "Cyber-physical intelligence",
+    fraud_intelligence: "Fraud intelligence",
+    historical_intelligence: "Historical intelligence",
+    deep_intelligence: "Corroborated public evidence"
   }
 };
 
+const sourceCapabilityByType: Record<string, string> = {
+  Vulnerability: "vulnerability_intelligence",
+  CTI: "threat_intelligence",
+  Exposure: "cyberphysical_intelligence",
+  "Attack Surface": "external_surface",
+  "Brand Risk": "public_web",
+  Fraud: "fraud_intelligence",
+  SOCMINT: "historical_intelligence",
+  "Dark Web": "deep_intelligence"
+};
+
+function sourceTypeForStatus(source: SourceStatus): string {
+  const value = `${source.name} ${source.mode}`.toLowerCase();
+  if (/vulnerab|\bcve\b|\bkev\b/.test(value)) return "Vulnerability";
+  if (/dark|\btor\b|ransom/.test(value)) return "Dark Web";
+  if (/fraud|brand|phish|typo|squat/.test(value)) return "Fraud";
+  if (/threat|\bcti\b|actor|campaign|ttp/.test(value)) return "CTI";
+  if (/cyberphysical|\bics\b|\bot\b|\biot\b/.test(value)) return "Exposure";
+  if (/surface|attack|dns|tls|whois|domain|exposure/.test(value)) return "Attack Surface";
+  if (/socmint|social|histor/.test(value)) return "SOCMINT";
+  return "Brand Risk";
+}
+
 function sourceLabel(value: string, language: LanguageMode) {
   return sourceDisplay[language][value] ?? value;
+}
+
+function normalizeSourceConfig(source: SourceConfig): SourceConfig {
+  return {
+    name: sourceCapabilityByType[source.type] ?? "public_web",
+    type: source.type,
+    status: source.status,
+    keyRef: source.keyRef ? "configured" : ""
+  };
 }
 
 export function SettingsView({
@@ -232,12 +284,20 @@ export function SettingsView({
   const labels = copy[language];
   const [sources, setSources] = useState<SourceConfig[]>(() => {
     const saved = window.localStorage.getItem("cyberdecision.sources");
-    return saved ? JSON.parse(saved) : defaultSources;
+    if (!saved) return defaultSources;
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.map(normalizeSourceConfig) : defaultSources;
+    } catch {
+      return defaultSources;
+    }
   });
   const [draft, setDraft] = useState<SourceConfig>({ name: "", type: "SOCMINT", status: "Needs key", keyRef: "" });
   const [userDraft, setUserDraft] = useState({ username: "", fullName: "", password: "", role: "analyst" as UserRole });
   const [userMessage, setUserMessage] = useState<string | null>(null);
   const [sourceMessage, setSourceMessage] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<SourceStatus | null>(null);
+  const [editingSourceIndex, setEditingSourceIndex] = useState<number | null>(null);
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
   const [passwordDraft, setPasswordDraft] = useState({ current: "", next: "", confirm: "" });
 
@@ -245,12 +305,42 @@ export function SettingsView({
     window.localStorage.setItem("cyberdecision.sources", JSON.stringify(sources));
   }, [sources]);
 
-  function addSource() {
+  function saveSource() {
     if (!draft.name.trim()) {
       setSourceMessage(labels.sourceRequired);
       return;
     }
-    setSources((current) => [...current, draft]);
+    const normalized = normalizeSourceConfig(draft);
+    setSources((current) => editingSourceIndex === null
+      ? [...current, normalized]
+      : current.map((source, index) => (index === editingSourceIndex ? normalized : source)));
+    setDraft({ name: "", type: "SOCMINT", status: "Needs key", keyRef: "" });
+    setEditingSourceIndex(null);
+    setSourceMessage(null);
+  }
+
+  function openSourceConfiguration(source?: SourceStatus) {
+    setSelectedSource(source ?? null);
+    document.getElementById("settings-source-configuration")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function editSourceConfiguration(source: SourceStatus) {
+    const type = sourceTypeForStatus(source);
+    const capability = sourceCapabilityByType[type];
+    const index = sources.findIndex((configuredSource) => configuredSource.name === capability || configuredSource.type === type);
+    setSelectedSource(source);
+    setEditingSourceIndex(index >= 0 ? index : null);
+    setDraft(index >= 0 ? sources[index] : {
+      name: source.name,
+      type,
+      status: source.configured === false || source.unconfigured ? "Needs key" : "Optional",
+      keyRef: ""
+    });
+    requestAnimationFrame(() => document.getElementById("settings-source-form")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }
+
+  function cancelSourceEdit() {
+    setEditingSourceIndex(null);
     setDraft({ name: "", type: "SOCMINT", status: "Needs key", keyRef: "" });
     setSourceMessage(null);
   }
@@ -388,6 +478,13 @@ export function SettingsView({
         runId={sourceRunId}
         updatedAt={sourceUpdatedAt}
         className="settings-source-coverage"
+        administrative
+        onOpenConfiguration={openSourceConfiguration}
+      />
+
+      <KnowledgeCatalogAdminPanel
+        language={language}
+        canAdminister={["super_admin", "admin"].includes(currentUser.role)}
       />
 
       <article className="panel chart-card settings-card settings-card-profile">
@@ -540,7 +637,7 @@ export function SettingsView({
         </div>
       </article>
 
-      <article className="panel chart-card settings-card settings-card-sources">
+      <article id="settings-source-configuration" className="panel chart-card settings-card settings-card-sources">
         <div className="panel-title-row compact">
           <div>
             <h2>{labels.sources}</h2>
@@ -548,21 +645,49 @@ export function SettingsView({
           </div>
           <Save size={18} />
         </div>
+        {selectedSource ? (
+          <div className="source-diagnostic" role="status">
+            <div>
+              <span>{labels.selectedConnector}</span>
+              <strong>{selectedSource.name}</strong>
+            </div>
+            <div>
+              <span>{labels.observedStatus}</span>
+              <strong>{selectedSource.status}</strong>
+            </div>
+            <div>
+              <span>{labels.executionMode}</span>
+              <strong>{selectedSource.mode || "N/D"}</strong>
+            </div>
+            <p><strong>{labels.connectorDiagnostic}:</strong> {selectedSource.warning ? cleanEvidenceText(selectedSource.warning) : (language === "es" ? "Sin advertencias reportadas en la corrida seleccionada." : "No warnings reported for the selected run.")}</p>
+            <button type="button" className="secondary-button compact" onClick={() => editSourceConfiguration(selectedSource)}>
+              <Wrench size={15} />
+              <span>{sources.some((source) => source.name === sourceCapabilityByType[sourceTypeForStatus(selectedSource)]) ? labels.editCapability : labels.registerCapability}</span>
+            </button>
+          </div>
+        ) : null}
         <div className="settings-grid">
-          {sources.map((source) => (
-            <div className="source-config-row" key={`${source.name}-${source.keyRef}`}>
+          {sources.map((source, index) => (
+            <div className={`source-config-row ${selectedSource && source.name === sourceCapabilityByType[sourceTypeForStatus(selectedSource)] ? "selected" : ""}`.trim()} key={`${source.name}-${source.keyRef}-${index}`}>
               <KeyRound size={18} />
               <div>
-                <strong>{source.name}</strong>
-                <span>{sourceLabel(source.type, language)} - {source.keyRef || labels.noKeyRef}</span>
+                <strong>{sourceLabel(source.name, language)}</strong>
+                <span>{sourceLabel(source.type, language)} - {source.keyRef ? (language === "es" ? "Referencia interna configurada" : "Internal reference configured") : labels.noKeyRef}</span>
               </div>
               <em>{sourceLabel(source.status, language)}</em>
+              <button type="button" className="source-config-action" onClick={() => {
+                setEditingSourceIndex(index);
+                setDraft(source);
+                document.getElementById("settings-source-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }} aria-label={`${labels.editCapability}: ${sourceLabel(source.name, language)}`}>
+                <Wrench size={14} />
+              </button>
             </div>
           ))}
         </div>
       </article>
 
-      <article className="panel chart-card settings-card settings-card-source-form">
+      <article id="settings-source-form" className="panel chart-card settings-card settings-card-source-form">
         <div className="panel-title-row compact">
           <div>
             <h2>{labels.addSource}</h2>
@@ -578,10 +703,11 @@ export function SettingsView({
             ))}
           </select>
           <input value={draft.keyRef} onChange={(event) => setDraft({ ...draft, keyRef: event.target.value })} placeholder={labels.keyRef} />
-          <button className="primary-button" onClick={addSource}>
+          <button className="primary-button" onClick={saveSource}>
             <ToggleLeft size={17} />
-            <span>{labels.addSource}</span>
+            <span>{editingSourceIndex === null ? labels.addSource : labels.saveSource}</span>
           </button>
+          {editingSourceIndex !== null ? <button className="secondary-button" type="button" onClick={cancelSourceEdit}><span>{labels.cancelEdit}</span></button> : null}
           {sourceMessage ? <div className="guided-alert compact"><AlertTriangle size={17} /><p>{sourceMessage}</p></div> : null}
         </div>
       </article>

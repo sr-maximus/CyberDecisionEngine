@@ -88,3 +88,19 @@ def test_report_delete_blocks_path_traversal():
     response = client.delete("/api/reports/%2E%2E/pyproject.toml")
 
     assert response.status_code == 404
+
+
+def test_cti_knowledge_admin_is_disabled_without_server_key(monkeypatch):
+    monkeypatch.delenv("CDE_ADMIN_API_KEY", raising=False)
+
+    response = client.post("/api/admin/cti/knowledge/sync", json={})
+
+    assert response.status_code == 503
+
+
+def test_cti_knowledge_admin_rejects_missing_request_key(monkeypatch):
+    monkeypatch.setenv("CDE_ADMIN_API_KEY", "configured-only-in-test")
+
+    response = client.post("/api/admin/cti/knowledge/sync", json={})
+
+    assert response.status_code == 403

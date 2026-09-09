@@ -28,6 +28,7 @@ class SocmintPublicCollector(Collector):
         if not self.keywords:
             return CollectionResult(SourceStatus(name=self.name, status="skipped", records=0, mode="real", warning="No SOCMINT keywords configured."), [])
         events: List[ThreatEvent] = []
+        self.partial_events = events
         seen: set[str] = set()
         warnings: List[str] = []
         async with httpx.AsyncClient(
@@ -104,6 +105,7 @@ def _parse_reddit(query: str, xml_text: str, limit: int) -> List[ThreatEvent]:
                 tags=["socmint_public", "reddit_rss", *tags],
                 evidence_url=link,
                 observed_at=_date_or_now(updated),
+                published_at=updated,
                 demo=False,
             )
         )
@@ -137,6 +139,7 @@ def _parse_hacker_news_public(query: str, payload: dict, limit: int) -> List[Thr
                 tags=["socmint_public", "hacker_news_public", *tags],
                 evidence_url=link,
                 observed_at=_date_or_now(updated),
+                published_at=updated,
                 demo=False,
             )
         )

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Literal
 
@@ -39,6 +40,10 @@ DEEP_PASSIVE_MODULES = [
     "sfp_abusech",
 ]
 SCAN_CONCURRENCY = max(1, min(3, int(os.getenv("SPIDERFOOT_SCAN_CONCURRENCY", "2"))))
+DEFAULT_SCAN_TIMEOUT_SECONDS = 86400
+MAX_SCAN_TIMEOUT_SECONDS = 86400
+SCAN_IDLE_TIMEOUT_SECONDS = 900
+SCAN_POLL_SECONDS = 5
 
 app = FastAPI(title="CyberDecisionEngine SpiderFoot Sidecar", version="1.0.0")
 
@@ -84,7 +89,7 @@ async def health() -> dict[str, Any]:
 async def scan(request: SpiderFootScanRequest) -> dict[str, Any]:
     warnings: list[str] = []
     domains = []
-    per_domain_timeout = request.timeout_seconds
+    per_domain_timeout = min(request.timeout_seconds or DEFAULT_SCAN_TIMEOUT_SECONDS, MAX_SCAN_TIMEOUT_SECONDS)
     semaphore = asyncio.Semaphore(SCAN_CONCURRENCY)
     domains = await asyncio.gather(
         *[
@@ -157,7 +162,7 @@ async def _scan_domain(
     warnings: list[str] = []
     if run["timeout"]:
         warnings.append(f"SpiderFoot timeout for {domain}; partial records were used.")
-    if run["returncode"] not in (0, None) and not records:
+    if run["returncode"] not in (0, None):
         warnings.append(f"SpiderFoot exited with code {run['returncode']} for {domain}.")
     if parse_warning:
         warnings.append(parse_warning)
@@ -215,7 +220,21 @@ def _run_command_sync(command: list[str], timeout_seconds: int) -> dict[str, Any
                 start_new_session=True,
             )
             try:
-                returncode = process.wait(timeout=timeout_seconds) if timeout_seconds > 0 else process.wait()
+                deadline = time.monotonic() + min(timeout_seconds or DEFAULT_SCAN_TIMEOUT_SECONDS, MAX_SCAN_TIMEOUT_SECONDS)
+                last_output_at = time.monotonic()
+                output_size = 0
+                while True:
+                    remaining = min(deadline - time.monotonic(), SCAN_IDLE_TIMEOUT_SECONDS - (time.monotonic() - last_output_at))
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(command, timeout_seconds)
+                    try:
+                        returncode = process.wait(timeout=min(SCAN_POLL_SECONDS, remaining))
+                        break
+                    except subprocess.TimeoutExpired:
+                        size = stdout_path.stat().st_size + stderr_path.stat().st_size
+                        if size != output_size:
+                            output_size = size
+                            last_output_at = time.monotonic()
             except subprocess.TimeoutExpired:
                 timed_out = True
                 try:

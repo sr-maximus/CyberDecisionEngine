@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import os
 import re
@@ -37,6 +37,9 @@ class WebSearchCollector(Collector):
         timeout_seconds: float = 8.0,
         collection_timeout_seconds: float = 80.0,
         provider_query_limits: Optional[dict] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        progress_callback=None,
     ):
         self.queries = [query for query in queries if query]
         # Zero means no fixed result cap. The finite query list, provider
@@ -57,6 +60,25 @@ class WebSearchCollector(Collector):
             else max(self.timeout_seconds + 5.0, requested_collection_timeout)
         )
         self.provider_query_limits = _provider_query_limits(self.max_queries, provider_query_limits)
+        self.start_date = start_date
+        self.end_date = end_date
+        self.progress_callback = progress_callback
+
+    def _dated_query(self, query: str) -> str:
+        if not self.start_date or not self.end_date:
+            return query
+        start = datetime.fromisoformat(self.start_date) - timedelta(days=1)
+        end = datetime.fromisoformat(self.end_date) + timedelta(days=1)
+        return f"{query} after:{start.date()} before:{end.date()}"
+
+    def _date_params(self, provider: str) -> dict:
+        if not self.start_date or not self.end_date:
+            return {}
+        start = datetime.fromisoformat(self.start_date).replace(tzinfo=timezone.utc)
+        end = datetime.fromisoformat(self.end_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
+        if provider == "hacker_news":
+            return {"numericFilters": f"created_at_i>={int(start.timestamp())},created_at_i<{int(end.timestamp())}"}
+        return {"startdatetime": start.strftime("%Y%m%d%H%M%S"), "enddatetime": (end - timedelta(seconds=1)).strftime("%Y%m%d%H%M%S")}
 
     async def collect(self) -> CollectionResult:
         if not self.enabled:
@@ -64,6 +86,7 @@ class WebSearchCollector(Collector):
         if not self.queries:
             return CollectionResult(SourceStatus(name=self.name, status="skipped", records=0, mode="real", warning="No hay consultas de busqueda publica configuradas."))
         events: List[ThreatEvent] = []
+        self.partial_events = events
         seen: set[str] = set()
         warnings: List[str] = []
         notes: List[str] = []
@@ -75,7 +98,7 @@ class WebSearchCollector(Collector):
         budget_exhausted = False
         async with httpx.AsyncClient(timeout=self.timeout_seconds, follow_redirects=True, headers={"User-Agent": "CyberDecisionEngine/1.0"}) as client:
             queries = self.queries if self.max_queries <= 0 else self.queries[: self.max_queries]
-            for query in queries:
+            for query_index, query in enumerate(queries):
                 if self.max_records > 0 and len(events) >= self.max_records:
                     break
                 if deadline is not None and loop.time() >= deadline:
@@ -99,7 +122,7 @@ class WebSearchCollector(Collector):
                             made_request = True
                             response = await client.get(
                                 "https://news.google.com/rss/search",
-                                params={"q": query, "hl": "es-419"},
+                                params={"q": self._dated_query(query), "hl": "es-419"},
                             )
                             response.raise_for_status()
                             _extend_unique(events, _parse_google_news(query, response.text, remaining), seen, self.max_records)
@@ -127,7 +150,7 @@ class WebSearchCollector(Collector):
                             made_request = True
                             response = await client.get(
                                 "https://hn.algolia.com/api/v1/search_by_date",
-                                params={"query": query, "tags": "story", "hitsPerPage": min(10, remaining)},
+                                params={"query": query, "tags": "story", "hitsPerPage": min(10, remaining), **self._date_params("hacker_news")},
                             )
                             response.raise_for_status()
                             _extend_unique(events, _parse_hacker_news(query, response.json(), remaining), seen, self.max_records)
@@ -135,7 +158,7 @@ class WebSearchCollector(Collector):
                             made_request = True
                             response = await client.get(
                                 "https://api.gdeltproject.org/api/v2/doc/doc",
-                                params={"query": query, "mode": "ArtList", "format": "json", "maxrecords": min(20, remaining), "sort": "HybridRel"},
+                                params={"query": query, "mode": "ArtList", "format": "json", "maxrecords": min(20, remaining), "sort": "HybridRel", **self._date_params("gdelt")},
                             )
                             response.raise_for_status()
                             _extend_unique(events, _parse_gdelt(query, response.json(), remaining), seen, self.max_records)
@@ -146,7 +169,7 @@ class WebSearchCollector(Collector):
                             made_request = True
                             response = await client.get(
                                 "https://www.googleapis.com/customsearch/v1",
-                                params={"q": query, "key": self.google_cse_api_key, "cx": self.google_cse_cx, "num": min(10, remaining)},
+                                params={"q": self._dated_query(query), "key": self.google_cse_api_key, "cx": self.google_cse_cx, "num": min(10, remaining)},
                             )
                             response.raise_for_status()
                             _extend_unique(events, _parse_google_cse(query, response.json(), remaining), seen, self.max_records)
@@ -184,6 +207,8 @@ class WebSearchCollector(Collector):
                                     budget_exhausted = True
                                     break
                                 await asyncio.sleep(min(self.request_delay_seconds, remaining_budget))
+                if self.progress_callback:
+                    await self.progress_callback(f"Busqueda publica: {query_index + 1}/{len(queries)} consultas; {len(events)} registros recolectados", 36)
         if budget_exhausted:
             warnings.append(f"Search budget reached after {int(self.collection_timeout_seconds or 0)} seconds; partial public results were returned.")
         status = "ok" if events and not warnings else "partial" if events else "skipped"
@@ -219,6 +244,7 @@ def _parse_google_news(query: str, xml_text: str, limit: int) -> List[ThreatEven
                 tags=["internet_search", "google_news_rss", *tags],
                 evidence_url=link,
                 observed_at=_date_or_now(published),
+                published_at=published,
                 demo=False,
                 technical_validation={"summary": description, "query": query, "provider": "google_news_rss"},
             )
@@ -253,6 +279,7 @@ def _parse_hacker_news(query: str, payload: dict, limit: int) -> List[ThreatEven
                 tags=["internet_search", "hacker_news_public", *tags],
                 evidence_url=link,
                 observed_at=_date_or_now(published),
+                published_at=published,
                 demo=False,
                 technical_validation={"summary": hit.get("story_text") or "", "query": query, "provider": "hacker_news_public"},
             )
@@ -434,6 +461,7 @@ def _search_event(
         tags=["internet_search", provider_tag, *tags, *public_entity_tags],
         evidence_url=link,
         observed_at=_date_or_now(published),
+        published_at=published,
         demo=False,
         technical_validation={
             "summary": snippet,

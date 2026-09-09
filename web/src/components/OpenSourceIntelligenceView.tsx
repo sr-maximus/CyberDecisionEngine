@@ -6,7 +6,6 @@ import type { LanguageMode, RunRecord, ThreatEvent } from "../types";
 import { buildDashboardModel, sourceEvents } from "../utils/dashboard";
 import { displaySourceName } from "../utils/sourceLabels";
 import { BarRanking } from "./ChartPrimitives";
-import { GraphInsight } from "./DecisionCharts";
 import { SocmintView } from "./SocmintView";
 import { SourceIntelligenceView } from "./SourceIntelligenceView";
 
@@ -127,7 +126,7 @@ export function OpenSourceIntelligenceView({
           </section>
 
           <section className="dashboard-grid public-intelligence-grid">
-            <article className={`panel chart-card public-channel-card ${socialModel.socmintAvailable ? "span-4" : "span-12 public-channel-card-wide"}`}>
+            <article className="panel chart-card compact-card span-6 public-channel-card">
               <PanelTitle title={labels.coverage} subtitle={labels.coverageSubtitle} />
               <BarRanking
                 items={[
@@ -138,37 +137,24 @@ export function OpenSourceIntelligenceView({
               />
             </article>
 
-            {socialModel.socmintAvailable ? (
-              <article className="panel chart-card span-8 public-relationship-card">
-                <PanelTitle title={labels.relationships} subtitle={labels.relationshipsSubtitle} />
-                <GraphInsight
-                  metrics={socialModel.graphMetrics}
-                  nodes={socialModel.socmintNodes}
-                  links={socialModel.socmintLinks}
-                  language={language}
-                  hideConfidenceMetric
-                />
-              </article>
-            ) : null}
-
-            <article className={`panel chart-card compact-card ${socialModel.socmintAvailable ? "span-6" : "span-12"}`}>
+            <article className="panel chart-card compact-card span-6">
               <PanelTitle title={labels.themes} subtitle={labels.themesSubtitle} />
               <BarRanking items={model.categories} language={language} />
             </article>
 
             {socialModel.socmintAvailable ? (
-              <article className="panel chart-card span-6 compact-card">
+              <article className="panel chart-card span-4 compact-card">
                 <PanelTitle title={labels.platforms} subtitle={labels.platformsSubtitle} />
                 <BarRanking items={socialModel.platformMentions} language={language} />
               </article>
             ) : null}
 
-            <article className="panel chart-card span-6 compact-card">
+            <article className={`panel chart-card compact-card ${socialModel.socmintAvailable ? "span-4" : "span-6"}`}>
               <PanelTitle title={labels.composition} subtitle={labels.compositionSubtitle} />
               <BarRanking items={evidenceComposition} language={language} />
             </article>
 
-            <article className="panel chart-card span-6 compact-card">
+            <article className={`panel chart-card compact-card ${socialModel.socmintAvailable ? "span-4" : "span-6"}`}>
               <PanelTitle title={labels.sourceContribution} subtitle={labels.sourceContributionSubtitle} />
               <BarRanking items={sourceContribution} language={language} />
             </article>

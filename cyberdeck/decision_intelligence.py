@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
@@ -10,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from cyberdeck.analysis.risk_engine import PCIDER_MODEL_VERSION
 from cyberdeck.schemas import EvidenceStatus, RunContext
+from cyberdeck.snapshot_integrity import SNAPSHOT_HASH_ALGORITHM, seal_snapshot, verify_snapshot
 
 
 ValueStatus = Literal[
@@ -25,7 +25,8 @@ ValueStatus = Literal[
     "error",
 ]
 
-SNAPSHOT_VERSION = "1.4.0"
+SNAPSHOT_VERSION = "1.5.0"
+SNAPSHOT_SCHEMA_VERSION = "decision-intelligence-snapshot-v1.4"
 
 
 class DecisionMetric(BaseModel):
@@ -188,7 +189,7 @@ class StrategicDriver(BaseModel):
 
 
 class DecisionIntelligenceSnapshot(BaseModel):
-    schema_version: str = "decision-intelligence-snapshot-v1.1"
+    schema_version: str = SNAPSHOT_SCHEMA_VERSION
     report_context: SnapshotReportContext
     analyzed_entities: List[Dict[str, Any]]
     analyzed_domains: List[str]
@@ -221,10 +222,15 @@ class DecisionIntelligenceSnapshot(BaseModel):
     metric_definitions: Dict[str, Dict[str, Any]]
     reference_integrity: Dict[str, Any]
     pcider_alignment: Dict[str, Any] = Field(default_factory=dict)
+    multidomain_intelligence: Dict[str, Any] = Field(default_factory=dict)
+    public_technology_footprint: Dict[str, Any] = Field(default_factory=dict)
+    cti_snapshot: Dict[str, Any] = Field(default_factory=dict)
+    knowledge_versions: Dict[str, Any] = Field(default_factory=dict)
     formula_versions: Dict[str, str]
     generated_at: str
     run_id: str
     engine_version: str
+    snapshot_hash_algorithm: str = SNAPSHOT_HASH_ALGORITHM
     snapshot_hash: str = ""
 
 
@@ -552,6 +558,13 @@ def build_decision_snapshot(context: RunContext, run_id: str = "") -> DecisionIn
             "confidence": finding.confidence_score,
             "domain": _matching_domain(" ".join([finding.title, *finding.evidence]), domains),
             "evidence_ids": finding_reference_ids.get(index, []),
+            "primary_technology_domain": finding.primary_technology_domain.value,
+            "technology_domains": [item.value for item in finding.technology_domains],
+            "analysis_domains": [item.value for item in finding.analysis_domains],
+            "framework_refs": finding.framework_refs,
+            "scenario_refs": finding.scenario_refs,
+            "fraud_refs": finding.fraud_refs,
+            "residual_risk_status": finding.residual_risk_status,
         }
         for index, finding in enumerate(findings)
     ]
@@ -653,6 +666,17 @@ def build_decision_snapshot(context: RunContext, run_id: str = "") -> DecisionIn
                 "no_calibrated_attack_probability_claim": True,
             },
         },
+        multidomain_intelligence=context.multidomain_intelligence
+        or context.metrics.get("multidomain_intelligence", {}),
+        public_technology_footprint=(
+            context.multidomain_intelligence.get("technology_footprint", {})
+            if context.multidomain_intelligence
+            else context.metrics.get("public_technology_footprint", {})
+        ),
+        cti_snapshot=context.metrics.get("cti", {}) or {},
+        knowledge_versions=(context.metrics.get("cti", {}) or {}).get(
+            "knowledge_versions", {}
+        ),
         formula_versions={
             "pcider": PCIDER_MODEL_VERSION,
             "contextual_likelihood": f"P-CIDER {PCIDER_MODEL_VERSION}",
@@ -660,6 +684,10 @@ def build_decision_snapshot(context: RunContext, run_id: str = "") -> DecisionIn
             "evidence_assurance": "1.0.0",
             "residual_risk": f"P-CIDER {PCIDER_MODEL_VERSION}",
             "scenario_deduplication": "1.0.0",
+            "cti_contextual_relevance": str(
+                (context.metrics.get("cti", {}) or {}).get("model_version")
+                or "contextual-threat-relevance-v1.0.0"
+            ),
             "strategic_news": str(
                 (context.metrics.get("strategic_news") or {}).get("registry_versions", {}).get("model")
                 or (context.metrics.get("strategic_news") or {}).get("version")
@@ -670,9 +698,7 @@ def build_decision_snapshot(context: RunContext, run_id: str = "") -> DecisionIn
         run_id=run_id,
         engine_version="evidence-pipeline-v3",
     )
-    canonical = snapshot.model_dump_json(exclude={"snapshot_hash"})
-    snapshot.snapshot_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return snapshot
+    return DecisionIntelligenceSnapshot(**seal_snapshot(snapshot))
 
 
 def snapshot_from_context(context: RunContext, run_id: str = "") -> DecisionIntelligenceSnapshot:
@@ -680,7 +706,9 @@ def snapshot_from_context(context: RunContext, run_id: str = "") -> DecisionInte
     if (
         existing
         and existing.get("report_context", {}).get("snapshot_version") == SNAPSHOT_VERSION
+        and existing.get("schema_version") == SNAPSHOT_SCHEMA_VERSION
         and (not run_id or existing.get("report_context", {}).get("run_id") == run_id)
+        and verify_snapshot(existing)
     ):
         try:
             return DecisionIntelligenceSnapshot(**existing)

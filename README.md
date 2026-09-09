@@ -51,8 +51,8 @@ Invariantes aplicados:
 - Solo inteligencia defensiva, pasiva, publica o autorizada.
 - No ejecuta exploits, fuerza bruta, intrusion, evasion ni scraping contra terminos de uso.
 - No recolecta credenciales, tarjetas, documentos personales ni contenido ilicito.
-- Dark Web queda deshabilitado por defecto y solo acepta CSV/JSON/TAXII/MISP autorizados con evidencias redactadas.
-- Shodan, Censys, VirusTotal, GreyNoise y AbuseIPDB son conectores pasivos opcionales por API key.
+- El canal profundo queda deshabilitado por defecto y solo procesa fuentes autorizadas con evidencias redactadas.
+- Las capacidades externas opcionales se desacoplan del motor y su ausencia nunca bloquea el análisis determinista.
 - Todo analisis organizacional exige `authorized_scope: true` en el perfil YAML.
 - Consola e informe aplican redaccion de secretos y datos sensibles.
 
@@ -104,7 +104,7 @@ La arquitectura recomendada para Mac local y posterior despliegue en servidor de
 - `cyberdecisionengine-web`: React/Nginx.
 - `cyberdecisionengine-api`: FastAPI + motor de analisis.
 - `cyberdecisionengine-postgres`: Postgres para historial de corridas y cache de eventos.
-- Sidecars internos: `osint-tools`, `kali-surface`, `spiderfoot` y `tor-proxy`.
+- Servicios internos aislados: recolección pública, superficie externa y canal profundo autorizado.
 
 ```bash
 cp .env.example .env
@@ -131,68 +131,39 @@ Documentación operativa y de auditoría:
 
 La API mantiene el guardrail de seguridad: todo analisis exige `authorized_scope=true`. Los runs generan perfiles YAML temporales y contexto atomico bajo `data/web_runs/`; el contexto completo se replica en Postgres. Los reportes HTML bajo `reports/web/` se generan solo cuando el usuario los solicita.
 
-### Sidecars OSINT y superficie de ataque
+### Capacidades de recolección
 
-La arquitectura local incluye sidecars para traer evidencia publica sin mezclar herramientas pesadas dentro de la API principal.
+La experiencia pública presenta capacidades, no nombres de herramientas:
 
-```bash
-scripts/osint_tools.sh start
-scripts/osint_tools.sh test
-scripts/kali_surface.sh start
-scripts/kali_surface.sh test
-```
+- inteligencia de vulnerabilidades;
+- búsqueda pública;
+- índice público;
+- índice de canal profundo autorizado;
+- correlación OSINT;
+- superficie externa;
+- SOCMINT público;
+- inteligencia de amenazas;
+- evidencia web validada;
+- caché local de evidencias.
 
-- `osint-tools`: instala Sherlock para presencia publica de marcas/usuarios en plataformas sociales. `socialscan` queda instalado pero la enumeracion de cuentas/email esta deshabilitada por defecto con `ALLOW_ACCOUNT_ENUMERATION=false`.
-- `kali-surface`: usa una imagen Kali minima con `subfinder`, `dnsrecon`, `dig`, `httpx-toolkit`, `whatweb` y `sslscan` para superficie de ataque. `amass`, `theHarvester`, `wafw00f` y `nuclei` quedan instalados o disponibles, pero las funciones lentas, privilegiadas o policy-gated no se ejecutan por defecto.
-- `spiderfoot`: queda como motor OSINT interno sin UI publicada. La API lo llama por `SPIDERFOOT_URL=http://spiderfoot:7020`, ejecuta `sf.py` en modo pasivo profundo por demanda, espera la recoleccion completa dentro del timeout configurado, serializa una ejecucion a la vez para evitar corrupcion de cache, filtra registros crudos por defecto y solo incorpora eventos observados por la herramienta.
-- `urlscan.io`: consulta busquedas archivadas/publicas por marca o dominio y agrega URLs de evidencia. `URLSCAN_API_KEY` es opcional para mejorar cuota; la app no envia escaneos por defecto.
-- `AlienVault OTX`: consulta pulsos CTI por dominio cuando `OTX_API_KEY` esta configurado. Si no hay key, la fuente queda marcada como opcional sin inventar eventos.
+Cada capacidad registra si estaba disponible, si fue consultada, si produjo
+registros y qué limitaciones tuvo. Los servicios viven en redes internas sin
+puertos públicos, aplican límites de recursos y degradan de forma explícita si
+una integración opcional no está configurada.
 
-Comandos utiles:
+### Inteligencia multidominio
 
-```bash
-scripts/osint_tools.sh search authorized-organization
-scripts/kali_surface.sh scan organization.example.invalid
-scripts/spiderfoot_sidecar.sh start
-scripts/spiderfoot_sidecar.sh scan organization.example.invalid
-```
+La misma corrida clasifica evidencia en `IT`, `IoT`, `IIoT`, `OT` o
+`Sin clasificar`, y en los ámbitos `Cyber`, `Fraude`, `Marca`,
+`Desinformación` e `IA`. Los filtros son proyecciones reproducibles del snapshot:
+no recollectan, no alteran la corrida fuente y se propagan a dashboard,
+grafos, informes y exportaciones.
 
-Estos contenedores no publican APIs al host; la API consume `OSINT_TOOLS_URL=http://osint-tools:7001`, `KALI_SURFACE_URL=http://kali-surface:7010` y `SPIDERFOOT_URL=http://spiderfoot:7020` por redes Docker internas. Si un sidecar no esta activo, la fuente se marca como `skipped` y el analisis continua sin inventar datos.
-
-### TOR sidecar defensivo
-
-La arquitectura incluye un sidecar opcional `tor-proxy` para revisiones Dark Web autorizadas. No se levanta por defecto, no publica puertos al host y solo queda accesible para la API por la red interna `tor_net` usando `socks5h://tor-proxy:9050`.
-
-```bash
-scripts/tor_window.sh start
-scripts/tor_window.sh test
-scripts/tor_window.sh logs
-scripts/tor_window.sh stop
-```
-
-Controles aplicados:
-
-- Sidecar interno sin puerto publicado al host; la ejecucion efectiva exige `allow_tor=true`.
-- Sin puertos publicados en `localhost`.
-- Contenedor read-only, `tmpfs` efimero, `cap_drop: ALL`, `no-new-privileges`, limites de memoria, CPU y procesos.
-- TOR configurado como cliente SOCKS, no relay, no exit node, sin ControlPort.
-- La API solo reporta el runtime TOR como disponible si `allow_tor=true` y el proxy interno responde.
-- No interactua con mercados, no descarga payloads, no compra datos y no evade controles. Para produccion se recomienda allowlist de consultas, limites de tiempo y revision legal.
-
-VPN gratuita no queda habilitada por defecto. Para cyberinteligencia empresarial es preferible SOCKS/TOR controlado o una VPN corporativa/proveedor confiable con politicas claras; una VPN gratuita agrega riesgo de privacidad, logging y manipulacion de trafico.
-
-### Cuentas y API keys recomendadas
-
-Las cuentas externas no se crean automaticamente desde la app porque requieren identidad, aprobacion de terminos, dominio/correo empresarial y, a veces, plan pago. Configura las keys en `.env` y reinicia Docker:
-
-- CTI: `MISP_URL` + `MISP_API_KEY` y `TAXII_DISCOVERY_URL` + credenciales TAXII/STIX.
-- Superficie/asset intelligence: `SHODAN_API_KEY`, `CENSYS_API_ID`, `CENSYS_API_SECRET`, `URLSCAN_API_KEY`, `OTX_API_KEY`, `CIRCL_PDNS_USERNAME`, `CIRCL_PDNS_PASSWORD`.
-- Enriquecimiento: `VIRUSTOTAL_API_KEY`, `GREYNOISE_API_KEY`, `ABUSEIPDB_API_KEY`.
-- Fraude/exposicion de identidad: `HIBP_API_KEY`, solo para dominios verificados por el propietario.
-
-OpenCTI es un backend de conocimiento opcional, no una fuente ni un requisito. Su modo predeterminado es `OPENCTI_MODE=disabled`; consulta la decisión y los modos de integración en `docs/OPENCTI_DECISION.md`.
-
-Fuentes oficiales de referencia: MISP API, OASIS STIX/TAXII 2.1, Shodan Developer API, Censys Search API, urlscan.io API, AlienVault OTX DirectConnect, GreyNoise API, VirusTotal API, Have I Been Pwned API y CIRCL Passive DNS.
+La **Huella Tecnológica Pública** muestra únicamente lo observado externamente.
+No constituye inventario interno ni confirma firmware, CVE aplicable o
+compromiso. El catálogo incorpora 1.138 plantillas preventivas, incluidas 22
+plantillas multidominio; ninguna se presenta como escenario activo sin evidencia
+de la corrida que satisfaga sus puertas de atribución y corroboración.
 
 Si necesitas evitar conflictos de puertos con otras apps, ajusta `.env`:
 
@@ -304,8 +275,8 @@ El README, el motor y el informe se basan en fuentes oficiales y literatura reco
 - MITRE D3FEND: https://d3fend.mitre.org/
 - MITRE ATLAS: https://atlas.mitre.org/
 - OASIS STIX/TAXII: https://oasis-open.github.io/cti-documentation/
-- MISP Project: https://www.misp-project.org/
-- OpenCTI, evaluado únicamente como backend opcional de interoperabilidad: https://filigran.io/solutions/open-cti/
+- MITRE ATT&CK for ICS: https://attack.mitre.org/matrices/ics/
+- MITRE EMB3D: https://emb3d.mitre.org/
 - FBI IC3 annual reports: https://www.ic3.gov/annualreport/reports
 - ENISA Threat Landscape Finance Sector: https://www.enisa.europa.eu/publications/enisa-threat-landscape-finance-sector
 - FFIEC Cybersecurity resources: https://www.ffiec.gov/resources/cybersecurity-awareness
@@ -315,3 +286,11 @@ El README, el motor y el informe se basan en fuentes oficiales y literatura reco
 ## Alcance
 
 CyberDecisionEngine no calcula una probabilidad calibrada de ataque. Calcula un indice de presion de senales, plausibilidad contextual, impacto, riesgo residual y postura externa con limitaciones explicitas. Su valor esta en convertir evidencia publica dispersa en decisiones defensivas trazables.
+
+## VPS privado
+
+El perfil [deploy/vps](deploy/vps/README.md) prepara una instalación vacía sobre
+Debian 13 y Docker Compose, con acceso por túnel SSH, API y PostgreSQL sin puertos
+públicos, secretos externos al repositorio y volúmenes independientes. No incorpora
+informes, recolecciones ni cuentas del operador. No sustituye autenticación y
+autorización de backend para una futura oferta pública multiusuario.

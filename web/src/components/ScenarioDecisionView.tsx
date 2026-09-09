@@ -6,8 +6,26 @@ import type { DisinformationScenario, LanguageMode, RunRecord, ScenarioLibraryRe
 import { BarRanking } from "./ChartPrimitives";
 
 type FrameworkKey = "attack" | "d3fend" | "atlas" | "disarm" | "f3";
+type FrameworkAlignmentKey =
+  | FrameworkKey
+  | "attackMobile"
+  | "attackIcs"
+  | "emb3d"
+  | "aadapt"
+  | "capec"
+  | "cwe"
+  | "inform"
+  | "pestel"
+  | "porter";
 type ScenarioFamily = "exploit" | "identity" | "fraud" | "influence" | "ai" | "continuity" | "general";
 type DecisionLens = { criteria: string; question: string; decision: string };
+
+interface FrameworkAlignment {
+  key: FrameworkAlignmentKey;
+  name: string;
+  count: number;
+  state: "scenario_supported" | "evidence_crosswalk" | "strategic_context" | "preventive_reference";
+}
 
 const ALL_SCOPE = "__all__";
 const GROUP_SCOPE = "__group__";
@@ -61,6 +79,13 @@ const labels = {
     domainSubtitle: "Relación entre dominios consultados, evidencia y escenarios aplicables",
     frameworkMap: "Frameworks mapeados",
     frameworkSubtitle: "Cantidad de identificadores únicos presentes en los escenarios aplicables",
+    alignmentTitle: "Alineación integral del escenario",
+    alignmentSubtitle: "Distingue activadores, cruces técnicos, contexto estratégico y referencia preventiva",
+    scenarioSupported: "activador sustentado",
+    evidenceCrosswalk: "cruce con evidencia",
+    strategicContext: "contexto estratégico",
+    preventiveReference: "referencia sin evidencia activa",
+    records: "referencias/evidencias",
     scenarioTitle: "Panel de posibilidades para decisión",
     scenarioSubtitle: "Opciones estratégicas y técnicas para evaluar, no órdenes automáticas de ejecución",
     noRun: "Ejecuta una búsqueda de dominios para construir escenarios presentes.",
@@ -86,7 +111,16 @@ const labels = {
     d3fend: "D3FEND",
     atlas: "ATLAS",
     disarm: "DISARM",
-    f3: "F3"
+    f3: "F3",
+    attackMobile: "ATT&CK Mobile",
+    attackIcs: "ATT&CK ICS",
+    emb3d: "EMB3D",
+    aadapt: "AADAPT",
+    capec: "CAPEC",
+    cwe: "CWE",
+    inform: "INFORM",
+    pestel: "PESTEL",
+    porter: "Porter"
   },
   en: {
     title: "Actionable decision scenarios",
@@ -99,6 +133,13 @@ const labels = {
     domainSubtitle: "Relationship between searched domains, evidence and applicable scenarios",
     frameworkMap: "Mapped frameworks",
     frameworkSubtitle: "Unique identifiers represented in applicable scenarios",
+    alignmentTitle: "Full scenario alignment",
+    alignmentSubtitle: "Separates activators, technical crosswalks, strategic context and preventive reference",
+    scenarioSupported: "evidence-supported activator",
+    evidenceCrosswalk: "evidence crosswalk",
+    strategicContext: "strategic context",
+    preventiveReference: "reference without active evidence",
+    records: "references/evidence",
     scenarioTitle: "Decision possibilities board",
     scenarioSubtitle: "Strategic and technical options to evaluate, not automatic execution orders",
     noRun: "Run a domain search to build present scenarios.",
@@ -124,7 +165,16 @@ const labels = {
     d3fend: "D3FEND",
     atlas: "ATLAS",
     disarm: "DISARM",
-    f3: "F3"
+    f3: "F3",
+    attackMobile: "ATT&CK Mobile",
+    attackIcs: "ATT&CK ICS",
+    emb3d: "EMB3D",
+    aadapt: "AADAPT",
+    capec: "CAPEC",
+    cwe: "CWE",
+    inform: "INFORM",
+    pestel: "PESTEL",
+    porter: "Porter"
   }
 };
 
@@ -325,9 +375,13 @@ export function ScenarioDecisionView({ run, language }: { run?: RunRecord; langu
     () => visibleMatches.find((match) => match.scenario.id === selectedScenarioId) ?? visibleMatches[0],
     [selectedScenarioId, visibleMatches]
   );
-  const frameworkItems = frameworkCoverage(filteredMatches).map((item) => ({ name: t[item.key], value: item.value, tone: "medium" as const }));
+  const coreFrameworkCoverage = frameworkCoverage(filteredMatches);
+  const frameworkAlignment = buildFrameworkAlignment(run, coreFrameworkCoverage, language);
+  const frameworkItems = frameworkAlignment
+    .filter((item) => item.count > 0)
+    .map((item) => ({ name: item.name, value: item.count, tone: "medium" as const }));
   const domainCards = filterDomainCardsByScopes(buildDomainCards(run, matches, evidence), selectedScopes);
-  const frameworkTotal = frameworkItems.reduce((sum, item) => sum + item.value, 0);
+  const frameworkTotal = frameworkAlignment.filter((item) => item.state !== "preventive_reference").length;
 
   useEffect(() => {
     setSelectedScopes([ALL_SCOPE]);
@@ -350,7 +404,7 @@ export function ScenarioDecisionView({ run, language }: { run?: RunRecord; langu
   }
 
   return (
-    <div className="view-stack">
+    <div className="view-stack decision-subview">
       <section className="panel module-hero scenario-hero">
         <div>
           <BrainCircuit size={24} />
@@ -359,7 +413,7 @@ export function ScenarioDecisionView({ run, language }: { run?: RunRecord; langu
         </div>
         <div className="privacy-note scenario-note">
           <GitBranch size={18} />
-          <span>{library?.reference_template_count ?? 0} {language === "en" ? "framework-derived analytical scenarios" : "escenarios analíticos derivados de marcos"} · ATT&CK + ATLAS + DISARM + F3 · D3FEND {language === "en" ? "as defensive crosswalk" : "como cruce defensivo"}</span>
+          <span>{library?.reference_template_count ?? 0} {language === "en" ? "evidence-gated templates" : "plantillas con compuertas de evidencia"} · ATT&CK Enterprise/Mobile/ICS · D3FEND · ATLAS · EMB3D · F3 · AADAPT · DISARM · CAPEC · CWE · INFORM · PESTEL · Porter</span>
         </div>
       </section>
 
@@ -369,7 +423,7 @@ export function ScenarioDecisionView({ run, language }: { run?: RunRecord; langu
         <Metric icon={<Crosshair size={18} />} label={t.evidence} value={String(evidence.length)} />
         <Metric icon={<BrainCircuit size={18} />} label={t.visibleScenarios} value={String(filteredMatches.length)} />
         <Metric icon={<Target size={18} />} label={t.domains} value={String(run?.domains.length ?? 0)} />
-        <Metric icon={<Layers3 size={18} />} label={t.frameworks} value={String(frameworkTotal)} />
+        <Metric icon={<Layers3 size={18} />} label={t.frameworks} value={`${frameworkTotal}/${frameworkAlignment.length}`} />
       </section>
 
       {!run ? <div className="panel chart-card chart-empty">{t.noRun}</div> : null}
@@ -419,7 +473,22 @@ export function ScenarioDecisionView({ run, language }: { run?: RunRecord; langu
                 </div>
                 <GitBranch size={18} />
               </div>
-              <BarRanking items={frameworkItems} language={language} />
+              {frameworkItems.length ? <BarRanking items={frameworkItems} language={language} /> : null}
+              <div className="scenario-framework-alignment" aria-label={t.alignmentTitle}>
+                <div className="scenario-framework-alignment-head">
+                  <strong>{t.alignmentTitle}</strong>
+                  <span>{t.alignmentSubtitle}</span>
+                </div>
+                <div className="scenario-framework-alignment-grid">
+                  {frameworkAlignment.map((item) => (
+                    <article className={`state-${item.state}`} key={item.key}>
+                      <span>{item.name}</span>
+                      <strong>{frameworkAlignmentStateLabel(item.state, t)}</strong>
+                      <em>{item.count} {t.records}</em>
+                    </article>
+                  ))}
+                </div>
+              </div>
             </article>
           </section>
 
@@ -744,6 +813,95 @@ function frameworkCoverage(matches: ScenarioMatch[]): Array<{ key: FrameworkKey;
     if (match.scenario.frameworks.f3?.id) sets.f3.add(match.scenario.frameworks.f3.id);
   });
   return (Object.keys(sets) as FrameworkKey[]).map((key) => ({ key, value: sets[key].size }));
+}
+
+function buildFrameworkAlignment(
+  run: RunRecord | undefined,
+  coreCoverage: Array<{ key: FrameworkKey; value: number }>,
+  language: LanguageMode
+): FrameworkAlignment[] {
+  const mapping = recordValue(run?.summary.metrics?.framework_mapping);
+  const rows = Array.isArray(mapping.mappings) ? mapping.mappings.filter(isRecordValue) : [];
+  const coreCounts = new Map(coreCoverage.map((item) => [item.key, item.value]));
+  const specs: Array<{
+    key: FrameworkAlignmentKey;
+    framework?: string;
+    strategyMetric?: "pestel" | "porter";
+  }> = [
+    { key: "attack", framework: "MITRE ATT&CK Enterprise" },
+    { key: "attackMobile", framework: "MITRE ATT&CK Mobile" },
+    { key: "attackIcs", framework: "MITRE ATT&CK ICS" },
+    { key: "d3fend", framework: "MITRE D3FEND" },
+    { key: "atlas", framework: "MITRE ATLAS" },
+    { key: "emb3d", framework: "MITRE EMB3D" },
+    { key: "f3", framework: "MITRE F3" },
+    { key: "aadapt", framework: "MITRE AADAPT" },
+    { key: "disarm", framework: "DISARM" },
+    { key: "capec", framework: "MITRE CAPEC" },
+    { key: "cwe", framework: "MITRE CWE" },
+    { key: "inform", framework: "MITRE INFORM" },
+    { key: "pestel", strategyMetric: "pestel" },
+    { key: "porter", strategyMetric: "porter" }
+  ];
+  const scenarioActivatorKeys = new Set<FrameworkAlignmentKey>(["attack", "atlas", "disarm", "f3"]);
+
+  return specs.map((spec) => {
+    const coreCount = coreCounts.get(spec.key as FrameworkKey) ?? 0;
+    const mappingCount = spec.framework ? frameworkEvidenceCount(rows, spec.framework) : 0;
+    const strategyCount = spec.strategyMetric
+      ? strategyEvidenceCount(recordValue(run?.summary.metrics?.[spec.strategyMetric]))
+      : 0;
+    const count = Math.max(coreCount, mappingCount, strategyCount);
+    const state: FrameworkAlignment["state"] = spec.strategyMetric && count > 0
+      ? "strategic_context"
+      : scenarioActivatorKeys.has(spec.key) && coreCount > 0
+        ? "scenario_supported"
+        : count > 0
+          ? "evidence_crosswalk"
+          : "preventive_reference";
+    return {
+      key: spec.key,
+      name: labels[language][spec.key],
+      count,
+      state
+    };
+  });
+}
+
+function frameworkEvidenceCount(rows: Record<string, unknown>[], framework: string): number {
+  const matching = rows.filter((row) => String(row.framework || "") === framework);
+  const evidenceIds = new Set(
+    matching.flatMap((row) => Array.isArray(row.evidence_ids) ? row.evidence_ids.map(String) : [])
+  );
+  if (evidenceIds.size) return evidenceIds.size;
+  return Math.max(0, ...matching.map((row) => Number(row.record_count || 0)).filter(Number.isFinite));
+}
+
+function strategyEvidenceCount(metric: Record<string, unknown>): number {
+  const dimensions = Array.isArray(metric.dimensions) ? metric.dimensions.filter(isRecordValue) : [];
+  const evidenceIds = new Set(
+    dimensions.flatMap((row) => Array.isArray(row.evidence_ids) ? row.evidence_ids.map(String) : [])
+  );
+  if (evidenceIds.size) return evidenceIds.size;
+  return dimensions.reduce((sum, row) => sum + Math.max(0, Number(row.cluster_count || 0)), 0);
+}
+
+function frameworkAlignmentStateLabel(
+  state: FrameworkAlignment["state"],
+  copy: { scenarioSupported: string; evidenceCrosswalk: string; strategicContext: string; preventiveReference: string }
+): string {
+  if (state === "scenario_supported") return copy.scenarioSupported;
+  if (state === "evidence_crosswalk") return copy.evidenceCrosswalk;
+  if (state === "strategic_context") return copy.strategicContext;
+  return copy.preventiveReference;
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return isRecordValue(value) ? value : {};
+}
+
+function isRecordValue(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function scenarioDisplayTitle(match: ScenarioMatch, language: LanguageMode): string {

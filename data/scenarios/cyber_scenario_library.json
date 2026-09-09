@@ -1,24 +1,32 @@
 {
   "generated_by": "CyberDecisionEngine",
-  "version": "2026.07.evidence-gated-framework-derived-v2",
-  "scenario_count": 1116,
+  "version": "2026.08.evidence-gated-multidomain-v3",
+  "scenario_count": 1141,
   "catalog_counts": {
     "MITRE ATT&CK": 697,
     "DISARM": 280,
     "MITRE ATLAS": 16,
     "MITRE F3": 123,
-    "MITRE D3FEND controls": 8
+    "MITRE D3FEND controls": 8,
+    "CyberDecisionEngine multidomain evidence-gated templates": 25
   },
   "sources": [
     "MITRE ATT&CK Enterprise STIX",
     "MITRE D3FEND minimal local mapping",
     "MITRE ATLAS minimal local mapping",
     "DISARM Foundation DISARM 2.0 Observations Framework",
-    "MITRE Fight Fraud Framework (F3) v1.1"
+    "MITRE Fight Fraud Framework (F3) v1.1",
+    "MITRE ATT&CK ICS",
+    "MITRE ATT&CK Mobile",
+    "MITRE EMB3D 2.0.2",
+    "MITRE AADAPT",
+    "MITRE CAPEC",
+    "MITRE CWE",
+    "MITRE INFORM"
   ],
   "math_model": {
-    "es": "La biblioteca deriva una plantilla por técnica o conducta publicada en ATT&CK, ATLAS, DISARM y F3, sin combinaciones aleatorias ni riesgo precalculado. D3FEND y los marcos de gobierno se cruzan como controles de referencia. La corrida solo activa una plantilla cuando evidencia directa, validada o confirmada satisface el criterio explícito.",
-    "en": "The library derives one template per published ATT&CK, ATLAS, DISARM and F3 technique or behavior, without random combinations or precomputed risk. D3FEND and governance frameworks are cross-referenced as control references. A run activates a template only when direct, validated or confirmed evidence satisfies the explicit criterion.",
+    "es": "La biblioteca deriva plantillas de ATT&CK Enterprise, Mobile e ICS, ATLAS, DISARM, F3 y AADAPT, y cruza D3FEND, EMB3D, CAPEC, CWE e INFORM como contexto técnico, defensivo o de madurez. No crea combinaciones aleatorias ni riesgo precalculado. La corrida solo activa una plantilla cuando evidencia directa, validada o confirmada satisface el criterio explícito.",
+    "en": "The library derives templates from ATT&CK Enterprise, Mobile and ICS, ATLAS, DISARM, F3 and AADAPT, and cross-references D3FEND, EMB3D, CAPEC, CWE and INFORM as technical, defensive or maturity context. It creates neither random combinations nor precomputed risk. A run activates a template only when direct, validated or confirmed evidence satisfies the explicit criterion.",
     "formula": "scenario_support = assured_current_run_evidence_only"
   },
   "scenarios": [
@@ -58028,6 +58036,2824 @@
       "recommendation_en": "If direct or validated current-run evidence activates MITRE F3 F1048, compare the behavior with the affected asset and mapped reference controls before deciding treatment.",
       "strategic_question_es": "¿La evidencia de la corrida satisface el criterio explícito del marco y mantiene relación directa con el dominio, activo o entidad del alcance?",
       "strategic_question_en": "Does current-run evidence satisfy the framework's explicit criterion and retain a direct relationship to the in-scope domain, asset or entity?"
+    },
+    {
+      "id": "CDE-MD-001",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Servicio tecnológico públicamente observado",
+      "title_en": "Publicly observed technology service",
+      "technology_domains": [
+        "it"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CWE",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CAPEC",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-002",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Dispositivo IoT públicamente observado",
+      "title_en": "Publicly observed IoT device",
+      "technology_domains": [
+        "iot"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE EMB3D",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CWE",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CAPEC",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-003",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Servicio industrial u OT públicamente observado",
+      "title_en": "Publicly observed industrial or OT service",
+      "technology_domains": [
+        "iiot",
+        "ot"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK ICS",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE EMB3D",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK ICS",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-004",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Interfaz de administración remota expuesta",
+      "title_en": "Exposed remote administration interface",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE D3FEND",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": "MITRE D3FEND"
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-005",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Producto observado con advisory relacionado",
+      "title_en": "Observed product with related advisory",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "CWE",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CAPEC",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-006",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Producto y versión con vulnerabilidad aplicable",
+      "title_en": "Product and version with applicable vulnerability",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "CVE",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CWE",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CAPEC",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-007",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Producto observado presente en KEV",
+      "title_en": "Observed product present in KEV",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "CISA KEV",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE ATT&CK",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-008",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Tecnología obsoleta o sin soporte",
+      "title_en": "Obsolete or unsupported technology",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "NIST CSF 2.0",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "CIS Controls",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-009",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Proveedor comprometido relacionado",
+      "title_en": "Related compromised supplier",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "NIST CSF 2.0",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-010",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "IoT como posible punto de entrada a IT",
+      "title_en": "IoT as a possible entry point to IT",
+      "technology_domains": [
+        "iot",
+        "it"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [
+        "shared_observed_entity"
+      ],
+      "framework_mappings": [
+        {
+          "framework": "MITRE EMB3D",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-011",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Transición potencial IT hacia OT",
+      "title_en": "Potential IT-to-OT transition",
+      "technology_domains": [
+        "it",
+        "ot"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [
+        "shared_observed_entity"
+      ],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE ATT&CK ICS",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-012",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Campaña ATT&CK ICS relevante por sector",
+      "title_en": "Sector-relevant ATT&CK ICS campaign",
+      "technology_domains": [
+        "ot"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK ICS",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK ICS",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-013",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Amenaza EMB3D relevante",
+      "title_en": "Relevant EMB3D threat",
+      "technology_domains": [
+        "iot",
+        "iiot",
+        "ot"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE EMB3D",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-014",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Exposición de BMS, CCTV o control de acceso",
+      "title_en": "BMS, CCTV, or access-control exposure",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE EMB3D",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE ATT&CK ICS",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK ICS",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-015",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Pérdida potencial de vista o control",
+      "title_en": "Potential loss of view or control",
+      "technology_domains": [
+        "ot"
+      ],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK ICS",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE D3FEND",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK ICS",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": "MITRE D3FEND"
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-016",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Suplantación de marca",
+      "title_en": "Brand impersonation",
+      "technology_domains": [],
+      "analysis_domains": [
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "DISARM",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [
+        "brand_impersonation"
+      ],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-017",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Dominio o aplicación falsa",
+      "title_en": "Fake domain or application",
+      "technology_domains": [],
+      "analysis_domains": [
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [
+        "fake_domain",
+        "fake_app"
+      ],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-018",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "BEC o suplantación de proveedor",
+      "title_en": "BEC or supplier impersonation",
+      "technology_domains": [],
+      "analysis_domains": [
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [
+        "business_email_compromise",
+        "supplier_procurement_fraud"
+      ],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-019",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Reclutamiento falso o captación de mulas",
+      "title_en": "Recruitment fraud or money-mule recruitment",
+      "technology_domains": [],
+      "analysis_domains": [
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [
+        "recruitment_fraud",
+        "mule_recruitment"
+      ],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-020",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Deepfake o suplantación ejecutiva",
+      "title_en": "Deepfake or executive impersonation",
+      "technology_domains": [],
+      "analysis_domains": [
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE ATLAS",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [
+        "deepfake_social_engineering"
+      ],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": "MITRE ATLAS"
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-021",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Fraude vinculado con kiosco, PoS, QR o canal conectado",
+      "title_en": "Fraud linked to kiosk, PoS, QR, or connected channel",
+      "technology_domains": [
+        "iot"
+      ],
+      "analysis_domains": [
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE EMB3D",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [
+        "payment_fraud",
+        "transaction_fraud"
+      ],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-022",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Cadena ciber, identidad, fraude y monetización",
+      "title_en": "Cyber, identity, fraud, and monetization chain",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber",
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [
+        "shared_observed_entity"
+      ],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK Enterprise",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Enterprise",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-023",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Abuso de pagos o activos digitales",
+      "title_en": "Digital-asset or payment-technology abuse",
+      "technology_domains": [],
+      "analysis_domains": [
+        "fraud"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE AADAPT",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE F3",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [
+        "digital_asset_fraud"
+      ],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "MITRE F3",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-024",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Brecha de preparación threat-informed",
+      "title_en": "Threat-informed readiness gap",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE INFORM",
+          "id": "",
+          "status": "preventive_reference"
+        },
+        {
+          "framework": "MITRE D3FEND",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": "MITRE D3FEND"
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
+    },
+    {
+      "id": "CDE-MD-025",
+      "version": "1.0.0",
+      "status": "preventive_template",
+      "sector": "all",
+      "title_es": "Aplicación o servicio móvil expuesto",
+      "title_en": "Exposed mobile application or service",
+      "technology_domains": [],
+      "analysis_domains": [
+        "cyber"
+      ],
+      "required_entity_types": [
+        "public_observation"
+      ],
+      "minimum_attribution_confidence": 0.35,
+      "public_only_compatible": true,
+      "public_evidence_gate": [
+        "direct",
+        "validated",
+        "confirmed"
+      ],
+      "independent_source_gate": 1,
+      "corroboration_gate": 1,
+      "activation_rules": [
+        "current_run_assured_evidence",
+        "explicit_scope_relationship"
+      ],
+      "deactivation_rules": [
+        "false_positive",
+        "stale_without_current_support",
+        "critical_contradiction"
+      ],
+      "cross_domain_transitions": [],
+      "framework_mappings": [
+        {
+          "framework": "MITRE ATT&CK Mobile",
+          "id": "",
+          "status": "preventive_reference"
+        }
+      ],
+      "fraud_mappings": [],
+      "impact_dimensions": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "safety",
+        "fraud",
+        "reputation"
+      ],
+      "limitations": [
+        "Reference template; it does not confirm incident, compromise, exploitation, or internal deployment."
+      ],
+      "frameworks": {
+        "attack": {
+          "id": "",
+          "name": "MITRE ATT&CK Mobile",
+          "tactics": []
+        },
+        "disarm": {
+          "id": "",
+          "name": ""
+        },
+        "d3fend": {
+          "id": "",
+          "name": ""
+        },
+        "atlas": {
+          "id": "",
+          "name": ""
+        },
+        "f3": {
+          "id": "",
+          "name": "",
+          "tactics": [],
+          "isAttack": false
+        }
+      },
+      "scores": {
+        "likelihood": 0.0,
+        "impact": 0.0,
+        "inherent_risk": 0.0,
+        "control_effectiveness": 0.0,
+        "residual_risk": 0.0,
+        "geographic_relevance": 0.0
+      },
+      "math": {
+        "z": 0.0,
+        "formula": "not_calculated_until_current_run_evidence_is_validated",
+        "variables": {}
+      },
+      "recommendation_es": "Validar el activo, la atribucion, la aplicabilidad y los controles antes de decidir tratamiento.",
+      "recommendation_en": "Validate the asset, attribution, applicability, and controls before deciding treatment.",
+      "strategic_question_es": "¿La evidencia actual satisface los gates del escenario y justifica validacion adicional?",
+      "strategic_question_en": "Does current evidence satisfy the scenario gates and justify additional validation?",
+      "test_matrix": [
+        "positive",
+        "negative",
+        "boundary",
+        "missing_data",
+        "duplicate",
+        "stale_evidence",
+        "contradiction",
+        "source_failure",
+        "tenant_isolation"
+      ]
     }
   ]
 }

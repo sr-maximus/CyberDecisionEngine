@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { getDisinformationFramework } from "../api";
 import type { DisinformationFrameworkResponse, LanguageMode, RunRecord } from "../types";
-import { cleanEvidenceTitle, displaySourceName } from "../utils/sourceLabels";
+import { cleanEvidenceTitle, displaySourceName, publicEvidenceUrl } from "../utils/sourceLabels";
 import { BarRanking } from "./ChartPrimitives";
 
 const labels = {
@@ -187,7 +187,7 @@ function narrativeClaims(run?: RunRecord): NarrativeClaimView[] {
       disarmEligible: Boolean(claim.disarmEligible)
     }));
   }
-  const events = run?.summary.records ?? run?.summary.events ?? [];
+  const events = run?.summary.records?.length ? run.summary.records : run?.summary.events ?? [];
   return events
     .map((event) => {
       const tags = (event.tags ?? []).map((tag) => tag.toLowerCase());
@@ -223,11 +223,12 @@ function NarrativeGroup({ title, claims, language }: { title: string; claims: Na
     <summary><strong>{title}</strong><span>{claims.length}</span></summary>
     <div className="signal-list narrative-signal-list">
       {claims.map((item) => (
-        <a href={item.url ?? "#"} target="_blank" rel="noreferrer" key={item.id}>
+        <a href={publicEvidenceUrl(item.url) ?? undefined} target={publicEvidenceUrl(item.url) ? "_blank" : undefined} rel="noreferrer" key={item.id}>
           <strong>{cleanEvidenceTitle(item.title)}</strong>
           <span>{displaySourceName(item.source, language)} · {item.contentType.replace(/_/g, " ")}</span>
           <small>{item.truthStatus.replace(/_/g, " ")} · {item.coordinationStatus.replace(/_/g, " ")} · {Math.round(item.confidence)}%</small>
           <em>{item.reviewReason}</em>
+          {!publicEvidenceUrl(item.url) ? <small>{language === "es" ? "Fuente original sin enlace público verificable." : "No verifiable public link to the original source."}</small> : null}
         </a>
       ))}
     </div>

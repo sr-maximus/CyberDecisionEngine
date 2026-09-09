@@ -6,15 +6,19 @@ export function formatRisk(value: number): string {
   return value.toFixed(value >= 10 ? 1 : 2);
 }
 
-export function formatDateTime(value?: string | null): string {
-  if (!value) return "No data";
+import type { LanguageMode } from "../types";
+
+export function formatDateTime(value?: string | null, language: LanguageMode = "en"): string {
+  const emptyLabel = language === "es" ? "Sin datos" : "No data";
+  if (!value) return emptyLabel;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No data";
-  return new Intl.DateTimeFormat("en-US", {
+  if (Number.isNaN(date.getTime())) return emptyLabel;
+  return new Intl.DateTimeFormat(language === "es" ? "es-CO" : "en-US", {
     month: "short",
     day: "2-digit",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
+    hour12: language === "en"
   }).format(date);
 }
 

@@ -10,6 +10,11 @@ export const ANALYSIS_WINDOWS: Array<{
   description: Record<LanguageMode, string>;
 }> = [
   {
+    value: "custom", hours: 8760, days: 365,
+    label: { es: "Fechas específicas", en: "Specific dates" },
+    description: { es: "Período de publicación; incluye evidencia sin fecha identificada por separado.", en: "Publication period; undated evidence is included and identified separately." }
+  },
+  {
     value: "1h",
     hours: 1,
     days: 1,
@@ -67,9 +72,10 @@ export function analysisWindowFromRequest(request?: { analysis_window?: Analysis
 }
 
 export function analysisWindowLabel(
-  request: { analysis_window?: AnalysisWindow; lookback_hours?: number; lookback_days?: number } | undefined,
+  request: { analysis_window?: AnalysisWindow; lookback_hours?: number; lookback_days?: number; analysis_start_date?: string; analysis_end_date?: string } | undefined,
   language: LanguageMode
 ): string {
+  if (request?.analysis_start_date && request?.analysis_end_date) return `${request.analysis_start_date} — ${request.analysis_end_date} (UTC)`;
   const config = analysisWindowConfig(analysisWindowFromRequest(request));
   return `${config.label[language]} (${config.hours}h)`;
 }

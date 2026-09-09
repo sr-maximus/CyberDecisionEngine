@@ -4,6 +4,8 @@ import { apiUrl } from "../api";
 import { analysisWindowLabel } from "../data/analysisWindows";
 import type { LanguageMode, ReportCatalogItem, RunRecord } from "../types";
 import { formatDateTime } from "../utils/format";
+import { hasReadyReport } from "../utils/reportLifecycle";
+import { preferredRunIdsBySubject } from "../utils/runSelection";
 
 export function ReportsView({
   reports,
@@ -26,7 +28,17 @@ export function ReportsView({
 }) {
   const technicalReports = reports.filter(isTechnicalReport);
   const executiveReports = reports.filter((report) => !isTechnicalReport(report));
+  const subjectsByRun = new Map(
+    runs.map((run) => [
+      run.id,
+      run.request.organization_name?.trim()
+        || run.request.person_name?.trim()
+        || run.domains[0]
+        || run.id
+    ])
+  );
   const copy = labels[language];
+  const preferredRunIds = preferredRunIdsBySubject(runs);
 
   return (
     <section className="panel table-panel reports-workspace">
@@ -54,6 +66,8 @@ export function ReportsView({
           openLabel={copy.open}
           downloadLabel={copy.download}
           deleteLabel={copy.delete}
+          language={language}
+          subjectsByRun={subjectsByRun}
           canDelete={canDelete}
           onDelete={onDelete}
         />
@@ -67,6 +81,8 @@ export function ReportsView({
           openLabel={copy.open}
           downloadLabel={copy.download}
           deleteLabel={copy.delete}
+          language={language}
+          subjectsByRun={subjectsByRun}
           canDelete={canDelete}
           onDelete={onDelete}
         />
@@ -87,15 +103,22 @@ export function ReportsView({
           <tbody>
             {runs.map((run) => (
               <tr key={run.id}>
-                <td>#{run.id}</td>
-                <td>{run.status}</td>
+                <td>
+                  <span className="report-run-id">#{run.id}</span>
+                  {preferredRunIds.has(run.id) ? (
+                    <span className="status-chip status-chip-success">
+                      {language === "es" ? "Más completa" : "Most complete"}
+                    </span>
+                  ) : null}
+                </td>
+                <td>{runStatusLabel(run, language)}</td>
                 <td>{analysisWindowLabel(run.request, language)}</td>
                 <td>{run.domains.join(", ")}</td>
-                <td>{formatDateTime(run.updated_at)}</td>
+                <td>{formatDateTime(run.updated_at, language)}</td>
                 <td>
                   <span className="table-actions">
                     <button className="table-link button-link" type="button" onClick={() => onOpenRun(run.id)}>{copy.openDashboard}</button>
-                    {run.report ? (
+                    {hasReadyReport(run) && run.report ? (
                       <>
                       <a className="table-link" href={apiUrl(run.report.url)} target="_blank" rel="noreferrer">
                         {copy.openExecutive}
@@ -107,7 +130,20 @@ export function ReportsView({
                       ) : null}
                       </>
                     ) : run.status === "completed" ? (
-                      <button className="table-link button-link" type="button" onClick={() => onGenerateReport(run.id)}>{copy.generate}</button>
+                      <button
+                        className="table-link button-link"
+                        type="button"
+                        disabled={run.report_status === "queued" || run.report_status === "generating"}
+                        onClick={() => onGenerateReport(run.id)}
+                      >
+                        {run.report_status === "queued"
+                          ? copy.reportQueued
+                          : run.report_status === "generating"
+                            ? copy.reportGenerating
+                            : run.report_status === "failed"
+                              ? copy.retryReport
+                              : copy.generate}
+                      </button>
                     ) : (
                       <button className="table-link button-link" type="button" onClick={() => onRerunRun(run.id)}>{copy.rerun}</button>
                     )}
@@ -137,6 +173,8 @@ function ReportColumn({
   openLabel,
   downloadLabel,
   deleteLabel,
+  language,
+  subjectsByRun,
   canDelete,
   onDelete
 }: {
@@ -149,6 +187,8 @@ function ReportColumn({
   openLabel: string;
   downloadLabel: string;
   deleteLabel: string;
+  language: LanguageMode;
+  subjectsByRun: ReadonlyMap<string, string>;
   canDelete: boolean;
   onDelete: (report: ReportCatalogItem) => void;
 }) {
@@ -167,9 +207,9 @@ function ReportColumn({
           <div className="report-row" key={report.path}>
             <FileText size={20} />
             <div>
-              <strong>{report.name.replace(/cyberdeck/gi, "CyberDecisionEngine")}</strong>
+              <strong title={report.name}>{reportDisplayName(report, subjectsByRun, language)}</strong>
               <span>
-                {typeLabel} | {formatDateTime(report.modified_at)} | {Math.round(report.size_bytes / 1024)} KB
+                {typeLabel} | {formatDateTime(report.modified_at, language)} | {Math.round(report.size_bytes / 1024)} KB
               </span>
             </div>
             <div className="report-actions">
@@ -198,6 +238,20 @@ function ReportColumn({
 
 function isTechnicalReport(report: ReportCatalogItem): boolean {
   return report.report_type === "technical";
+}
+
+function reportDisplayName(
+  report: ReportCatalogItem,
+  subjectsByRun: ReadonlyMap<string, string>,
+  language: LanguageMode
+): string {
+  const inferredRunId = report.name.match(/^([a-f0-9]{12})-/i)?.[1] ?? null;
+  const runId = report.run_id || inferredRunId;
+  const subject = runId ? subjectsByRun.get(runId) : null;
+  if (subject && runId) {
+    return `${subject} | ${language === "es" ? "corrida" : "run"} #${runId}`;
+  }
+  return report.name.replace(/cyberdeck/gi, "CyberDecisionEngine");
 }
 
 const labels = {
@@ -229,6 +283,9 @@ const labels = {
     pending: "Pendiente",
     openDashboard: "Ver tablero",
     generate: "Generar informe",
+    reportQueued: "Informe en cola",
+    reportGenerating: "Generando informe",
+    retryReport: "Reintentar informe",
     rerun: "Reejecutar"
   },
   en: {
@@ -259,6 +316,20 @@ const labels = {
     pending: "Pending",
     openDashboard: "Open dashboard",
     generate: "Generate report",
+    reportQueued: "Report queued",
+    reportGenerating: "Generating report",
+    retryReport: "Retry report",
     rerun: "Rerun"
   }
 };
+
+function runStatusLabel(run: RunRecord, language: LanguageMode): string {
+  const statuses = {
+    es: { queued: "En cola", running: "Ejecutando", completed: "Completada", failed: "Fallida" },
+    en: { queued: "Queued", running: "Running", completed: "Completed", failed: "Failed" }
+  }[language];
+  if (run.status === "completed" && run.report_status === "queued") return labels[language].reportQueued;
+  if (run.status === "completed" && run.report_status === "generating") return labels[language].reportGenerating;
+  if (run.status === "completed" && run.report_status === "failed") return labels[language].retryReport;
+  return statuses[run.status];
+}

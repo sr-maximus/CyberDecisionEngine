@@ -232,7 +232,7 @@ export function BrandRiskView({ run, language }: { run?: RunRecord; language: La
               <a className={`mention-row ${mention.tone}`} key={mention.id} href={mention.url ?? "#"} target="_blank" rel="noreferrer">
                 <div>
                   <strong>{mention.title}</strong>
-                  <span>{mention.source} | {mention.category} | {formatDateTime(mention.observedAt)}</span>
+                  <span>{mention.source} | {mention.category} | {formatDateTime(mention.observedAt, language)}</span>
                   <em>{mention.driver}</em>
                 </div>
                 <b>{mention.term}</b>
@@ -249,7 +249,7 @@ export function BrandRiskView({ run, language }: { run?: RunRecord; language: La
             </div>
           </div>
           <div className="decision-list">
-            {model.recommendations.map((item) => <p key={item}>{item}</p>)}
+            {model.recommendations.map((item) => <p key={item}>{language === "es" ? decisionActionsEs[item] ?? item : item}</p>)}
           </div>
         </article>
       </section>
@@ -266,3 +266,11 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
     </div>
   );
 }
+const decisionActionsEs: Record<string, string> = {
+  "Activate brand protection triage: verify URLs, source credibility, takedown path and customer-impact messaging.": "Activar la revisión de protección de marca: verificar las URL, la credibilidad de las fuentes, las opciones de retiro del contenido y la comunicación a los clientes afectados.",
+  "Prioritize fraud controls: phishing/BEC monitoring, ATO detection, customer warnings and transaction anomaly review.": "Priorizar controles de fraude: monitorear suplantación de correo, detectar toma de cuentas, alertar a los clientes y revisar anomalías transaccionales.",
+  "Escalate authorized dark web findings through legal, threat intel and incident response before any direct interaction.": "Escalar los hallazgos autorizados de la web oscura a las áreas jurídica, de inteligencia y de respuesta a incidentes antes de cualquier interacción directa.",
+  "Map public narratives and related accounts in SOCMINT to detect impersonation or coordinated abuse.": "Relacionar las narrativas públicas y las cuentas asociadas para detectar suplantación o abuso coordinado.",
+  "No current-run brand/domain mentions were found; do not infer brand impact without URL-level evidence.": "No se encontraron menciones de la marca o los dominios en esta corrida; no se infiere impacto sin evidencia verificable.",
+  "No active brand-risk evidence in the current run; keep scheduled OSINT/SOCMINT monitoring and source health checks.": "No hay evidencia de riesgo de marca activo en esta corrida; mantener el monitoreo programado de fuentes públicas y sociales."
+};

@@ -4,6 +4,7 @@ import csv
 import json
 from datetime import datetime, timezone
 
+from cyberdeck.analysis.multidomain import public_evidence_reference
 from cyberdeck.analysis.strategic_news import apply_strategic_context_to_scenarios, build_strategic_intelligence, export_strategic_scores
 from cyberdeck.schemas import EvidenceStatus, OrganizationProfile, ThreatEvent
 
@@ -111,7 +112,7 @@ def test_official_direct_environmental_sanction_is_traceable():
     assert environmental["score"] is not None
     assert legal["score"] is not None
     assert environmental["confidence"] > 0
-    assert environmental["evidence_ids"] == ["official-sanction"]
+    assert environmental["evidence_ids"] == [public_evidence_reference(event)]
     assert event.evidence_url in environmental["evidence_urls"]
     assert result["pestel"]["scenarios"] == []
 
@@ -300,7 +301,8 @@ def test_strategic_json_and_csv_export_same_dimension_values(tmp_path):
         "" if environmental["validatedPressure"] is None else str(environmental["validatedPressure"])
     )
     assert float(csv_environmental["confidence"]) == environmental["confidence"]
-    assert csv_environmental["evidence_ids"] == "export-sanction"
+    assert csv_environmental["evidence_ids"].startswith("CDE-EV-")
+    assert csv_environmental["evidence_ids"] == environmental["evidence_ids"][0]
 
 
 def test_strategic_context_never_promotes_candidates_and_is_limited_to_ten_percent():

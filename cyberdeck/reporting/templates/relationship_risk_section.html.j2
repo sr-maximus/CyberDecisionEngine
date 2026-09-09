@@ -1,0 +1,61 @@
+<section id="relationship-risk-evidence" class="report-subsection relationship-report-section">
+  <h3>{{ "Relationships, third parties and similar domains" if report_lang == "en" else "Relaciones, terceros y dominios similares" }}</h3>
+  <p class="small">{{ "A declaration establishes context, not risk. A similar domain remains a candidate until ownership, content and use are validated." if report_lang == "en" else "Una declaración establece contexto, no riesgo. Un dominio similar permanece como candidato hasta validar titularidad, contenido y uso." }}</p>
+  <div class="relationship-kpis">
+    <article><span>{{ "Evidence-supported third parties" if report_lang == "en" else "Terceros con evidencia" }}</span><strong>{{ relationship_risk.third_party.rows | length }}</strong></article>
+    <article><span>{{ "Observed similar domains" if report_lang == "en" else "Dominios similares observados" }}</span><strong>{{ relationship_risk.domain_abuse.rows | length }}</strong></article>
+    <article><span>{{ "Competitive relationships" if report_lang == "en" else "Relaciones competitivas" }}</span><strong>{{ relationship_risk.competitive_context.rows | length }}</strong></article>
+  </div>
+  <details class="report-subdetail">
+    <summary><strong>{{ "Third parties" if report_lang == "en" else "Terceras partes" }}</strong><span>{{ relationship_risk.third_party.rows | length }}</span></summary>
+    <div class="report-subdetail-body">
+      {% if relationship_risk.third_party.rows %}
+      <div class="evidence-table"><table>
+        <tr><th>{{ "Entity" if report_lang == "en" else "Entidad" }}</th><th>{{ "Basis" if report_lang == "en" else "Base" }}</th><th>{{ "State" if report_lang == "en" else "Estado" }}</th><th>{{ "Records" if report_lang == "en" else "Registros" }}</th><th>{{ "Supported signals" if report_lang == "en" else "Señales respaldadas" }}</th><th>URL</th></tr>
+        {% for item in relationship_risk.third_party.rows %}
+        <tr><td><strong>{{ item.name }}</strong></td><td>{% for basis in item.relationship_basis %}{{ (relationship_basis_en if report_lang == "en" else relationship_basis_es).get(basis, basis) }}{% if not loop.last %} · {% endif %}{% endfor %}</td><td>{{ (relationship_status_en if report_lang == "en" else relationship_status_es).get(item.status, item.status) }}</td><td>{{ item.record_count }}</td><td>{{ item.risk_signal_count }}</td><td>{% if item.urls %}<a class="compact-source-link" href="{{ item.urls[0] }}">{{ "Open source" if report_lang == "en" else "Abrir fuente" }}</a>{% else %}N/D{% endif %}</td></tr>
+        {% endfor %}
+      </table></div>
+      {% else %}<div class="empty-state">{{ "No third party crossed the evidence threshold in this run." if report_lang == "en" else "Ninguna tercera parte cruzó el umbral de evidencia en esta corrida." }}</div>{% endif %}
+    </div>
+  </details>
+  <details class="report-subdetail">
+    <summary><strong>{{ "Observed similar-domain candidates" if report_lang == "en" else "Candidatos observados de dominio similar" }}</strong><span>{{ relationship_risk.domain_abuse.rows | length }}</span></summary>
+    <div class="report-subdetail-body">
+      {% if relationship_risk.domain_abuse.rows %}
+      <div class="domain-candidate-list">
+        {% for item in relationship_risk.domain_abuse.rows %}
+        <details class="domain-candidate-row">
+          <summary><span>{{ loop.index }}</span><strong>{{ item.candidate_domain }}</strong><em>{{ "Reference" if report_lang == "en" else "Referencia" }}: {{ item.target_domain }}</em><b>{{ (item.similarity * 100) | round(0) }}%</b></summary>
+          <div class="domain-candidate-detail">
+            <p><strong>{{ "State" if report_lang == "en" else "Estado" }}:</strong> {{ (relationship_status_en if report_lang == "en" else relationship_status_es).get(item.status, item.status) }}</p>
+            <p><strong>{{ "Observed variations" if report_lang == "en" else "Variaciones observadas" }}:</strong> {% for variation in item.variation_types %}{{ (variation_en if report_lang == "en" else variation_es).get(variation, variation) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+            <p><strong>{{ "Analytical limit" if report_lang == "en" else "Límite analítico" }}:</strong> {{ "Similarity does not prove phishing, fraud, cybersquatting or adversary control." if report_lang == "en" else item.what_it_does_not_mean }}</p>
+            {% set observation = item.observation | default({}, true) %}
+            <div class="domain-observation-grid">
+              {% if observation.observed_hosts %}<div><strong>{{ "Observed hosts" if report_lang == "en" else "Hosts observados" }}</strong><span>{{ observation.observed_hosts | join(" · ") }}</span></div>{% endif %}
+              {% if observation.ip_addresses %}<div><strong>IP</strong><span>{{ observation.ip_addresses | join(" · ") }}</span></div>{% endif %}
+              {% if observation.countries %}<div><strong>{{ "Countries" if report_lang == "en" else "Países" }}</strong><span>{{ observation.countries | join(" · ") }}</span></div>{% endif %}
+              {% if observation.cities %}<div><strong>{{ "Cities" if report_lang == "en" else "Ciudades" }}</strong><span>{{ observation.cities | join(" · ") }}</span></div>{% endif %}
+              {% if observation.registrars %}<div><strong>{{ "Registrar" if report_lang == "en" else "Registrador" }}</strong><span>{{ observation.registrars | join(" · ") }}</span></div>{% endif %}
+              {% if observation.registrants %}<div><strong>{{ "Public registrant" if report_lang == "en" else "Titular público" }}</strong><span>{{ observation.registrants | join(" · ") }}</span></div>{% endif %}
+              {% if observation.created_at %}<div><strong>{{ "Creation" if report_lang == "en" else "Creación" }}</strong><span>{{ observation.created_at | join(" · ") }}</span></div>{% endif %}
+              {% if observation.updated_at %}<div><strong>{{ "Updated" if report_lang == "en" else "Actualización" }}</strong><span>{{ observation.updated_at | join(" · ") }}</span></div>{% endif %}
+              {% if observation.expires_at %}<div><strong>{{ "Expiry" if report_lang == "en" else "Vencimiento" }}</strong><span>{{ observation.expires_at | join(" · ") }}</span></div>{% endif %}
+              {% if observation.first_seen %}<div><strong>{{ "First seen" if report_lang == "en" else "Primera observación" }}</strong><span>{{ observation.first_seen | join(" · ") }}</span></div>{% endif %}
+              {% if observation.last_seen %}<div><strong>{{ "Last seen" if report_lang == "en" else "Última observación" }}</strong><span>{{ observation.last_seen | join(" · ") }}</span></div>{% endif %}
+            </div>
+            {% if observation.captures %}<div class="capture-reference-list"><strong>{{ "Verified captures" if report_lang == "en" else "Capturas verificadas" }}</strong>{% for capture in observation.captures %}<a href="{{ capture.url }}" title="{{ capture.url }}">{{ "Capture" if report_lang == "en" else "Captura" }} {{ loop.index }} · {{ capture.captured_at }} · {{ capture.status }}</a>{% endfor %}</div>{% endif %}
+            <div class="evidence-links">{% for url in item.urls %}<a class="compact-source-link" href="{{ url }}" title="{{ url }}">{{ "Open evidence" if report_lang == "en" else "Abrir evidencia" }} {{ loop.index }}</a>{% endfor %}</div>
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+      {% else %}<div class="empty-state">{{ "No observed similar-domain candidate was available." if report_lang == "en" else "No se obtuvo un candidato observado de dominio similar." }}</div>{% endif %}
+    </div>
+  </details>
+  <details class="report-subdetail">
+    <summary><strong>{{ "Declared competitive context" if report_lang == "en" else "Contexto competitivo declarado" }}</strong><span>{{ relationship_risk.competitive_context.rows | length }}</span></summary>
+    <div class="report-subdetail-body">{% if relationship_risk.competitive_context.rows %}<div class="framework-chip-row">{% for item in relationship_risk.competitive_context.rows %}<span>{{ item.name }} · {{ (relationship_status_en if report_lang == "en" else relationship_status_es).get(item.status, item.status) }}</span>{% endfor %}</div>{% else %}<div class="empty-state">{{ "No competitive relationship was supported by the available evidence." if report_lang == "en" else "Ninguna relación competitiva fue respaldada por la evidencia disponible." }}</div>{% endif %}</div>
+  </details>
+</section>

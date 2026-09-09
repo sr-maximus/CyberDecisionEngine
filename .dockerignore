@@ -20,3 +20,16 @@ web/
 .local-logs/
 web/node_modules/
 web/dist/
+
+.git
+.codex
+.codebase-memory
+graphify-out
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.sqlite*
+**/*.db

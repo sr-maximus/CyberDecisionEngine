@@ -103,6 +103,7 @@ def _events_from_rows(rows: object, query: str, limit: int, country_filter: Opti
                 tags=["darkweb_index", "ransomware", "tor_onion_metadata" if has_onion else "clearweb_index", f"query:{query}", f"country:{country or 'unknown'}"],
                 evidence_url=row.get("url") or "https://www.ransomware.live/",
                 observed_at=_date_or_now(attack_date),
+                published_at=attack_date,
                 demo=False,
             )
         )

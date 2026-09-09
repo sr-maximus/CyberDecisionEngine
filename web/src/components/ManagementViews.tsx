@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createMonitoringProfile, createSupportTicket, getMonitoringOverview, updateMonitoringAlert, updateMonitoringProfile, updateSupportTicket } from "../api";
 import type { DomainAnalysisRequest, MonitoringCadence, MonitoringOverview, RunRecord } from "../types";
 import { formatDateTime } from "../utils/format";
+import { hasReadyReport } from "../utils/reportLifecycle";
 import { DomainComposer } from "./DomainComposer";
 import type { DomainComposerProps } from "./DomainComposer";
 import type { AnalysisMode, AnalysisWindow, LanguageMode } from "../types";
@@ -140,14 +141,14 @@ export function RunsView({
                 <td>
                   <span className="table-actions">
                     <button className="table-link button-link" type="button" onClick={() => onOpenRun(run.id)}>{copy.openDashboard}</button>
-                    {run.report?.url ? (
+                    {hasReadyReport(run) && run.report?.url ? (
                       <a href={run.report.url} target="_blank" rel="noreferrer">{copy.open}</a>
                     ) : run.status === "completed" ? (
                       <button className="table-link button-link" type="button" onClick={() => onGenerateReport(run.id)}>{copy.generate}</button>
                     ) : <span>{copy.noReport}</span>}
                   </span>
                 </td>
-                <td>{formatDateTime(run.updated_at)}</td>
+                <td>{formatDateTime(run.updated_at, language)}</td>
               </tr>
             ))}
           </tbody>
@@ -558,7 +559,7 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
               <div>
                 <strong>{profile.name}</strong>
                 <span>{copy.cadences[profile.cadence]} · {profile.alert_count} {copy.alertsWord}</span>
-                <span>{copy.lastRun}: {profile.last_completed_at ? formatDateTime(profile.last_completed_at) : "N/A"} · {copy.nextRun}: {profile.next_run_at ? formatDateTime(profile.next_run_at) : copy.indefinite}</span>
+                <span>{copy.lastRun}: {profile.last_completed_at ? formatDateTime(profile.last_completed_at, props.language) : "N/A"} · {copy.nextRun}: {profile.next_run_at ? formatDateTime(profile.next_run_at, props.language) : copy.indefinite}</span>
                 {profile.last_error ? <em>{profile.last_error}</em> : null}
               </div>
               <button className="table-link button-link" type="button" disabled={loading} onClick={() => toggleProfile(profile.id, profile.status !== "active")}>
@@ -575,7 +576,7 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
             <div className={`monitoring-row severity-${alert.severity}`} key={alert.id}>
               <div>
                 <strong>{alert.title}</strong>
-                <span>{alert.category} · {alert.severity} · {alert.status} · {formatDateTime(alert.created_at)}</span>
+                <span>{alert.category} · {alert.severity} · {alert.status} · {formatDateTime(alert.created_at, props.language)}</span>
                 <span>{alert.validation}</span>
                 {alert.evidence_url ? <a href={alert.evidence_url} target="_blank" rel="noreferrer">{alert.evidence_url}</a> : null}
               </div>
@@ -598,7 +599,7 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
               <FileWarning size={15} />
               <div>
                 <strong>{log.component}</strong>
-                <span>{log.message} · {formatDateTime(log.created_at)}</span>
+                <span>{log.message} · {formatDateTime(log.created_at, props.language)}</span>
               </div>
             </div>
           ))}
@@ -617,7 +618,7 @@ function ContinuousMonitoringPanel(props: DomainViewProps) {
               <div className={`monitoring-row log-${ticket.severity === "high" ? "error" : ticket.severity === "medium" ? "warning" : "info"}`} key={ticket.id}>
                 <div>
                   <strong>{ticket.subject}</strong>
-                  <span>{ticket.status} · {ticket.severity} · {formatDateTime(ticket.created_at)}</span>
+                  <span>{ticket.status} · {ticket.severity} · {formatDateTime(ticket.created_at, props.language)}</span>
                 </div>
                 {ticket.status !== "resolved" ? (
                   <button className="table-link button-link" type="button" disabled={loading} onClick={() => setTicketStatus(ticket.id, ticket.status === "open" ? "in_review" : "resolved")}>
@@ -710,11 +711,11 @@ function ScanScheduler({ language, domains, isRunning, onRun }: { language: Lang
         </label>
         <div>
           <span>{copy.next}</span>
-          <strong>{enabled && nextRunAt ? formatDateTime(nextRunAt) : copy.disabled}</strong>
+          <strong>{enabled && nextRunAt ? formatDateTime(nextRunAt, language) : copy.disabled}</strong>
         </div>
         <div>
           <span>{copy.last}</span>
-          <strong>{lastRunAt ? formatDateTime(lastRunAt) : copy.noRun}</strong>
+          <strong>{lastRunAt ? formatDateTime(lastRunAt, language) : copy.noRun}</strong>
         </div>
         <button className="primary-button" type="button" onClick={runNow} disabled={isRunning || !domains.length}>
           <PlayCircle size={17} />

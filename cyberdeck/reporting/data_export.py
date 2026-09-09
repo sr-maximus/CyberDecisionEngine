@@ -5,8 +5,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from cyberdeck.analysis.multidomain import sanitize_public_payload
+from cyberdeck.analysis.period import publication_date
 from cyberdeck.schemas import RunContext
 from cyberdeck.semantics import get_term_registry
+from cyberdeck.snapshot_integrity import seal_snapshot
 
 
 def export_evidence(context: RunContext, html_path: Path) -> Dict[str, Any]:
@@ -34,7 +37,7 @@ def export_decision_snapshot(snapshot: Dict[str, Any], html_path: Path) -> Dict[
     stem = html_path.stem
     json_path = html_path.with_name(f"{stem}_decision_snapshot.json")
     csv_path = html_path.with_name(f"{stem}_decision_snapshot.csv")
-    payload = snapshot or {}
+    payload = seal_snapshot(sanitize_public_payload(snapshot or {}))
     json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     rows = _snapshot_rows(payload)
     _write_snapshot_csv(csv_path, rows)
@@ -60,7 +63,7 @@ def _payload(context: RunContext) -> Dict[str, Any]:
         record["claim_ids"] = ",".join(sorted(set(claims_by_evidence.get(evidence_id, []))))
         record["semantic_registry_version"] = get_term_registry().version
         record["claim_evidence_model_version"] = context.claim_evidence_model_version
-    return {
+    return sanitize_public_payload({
         "generated_at": context.generated_at,
         "organization": _dump(context.organization),
         "mode": context.mode,
@@ -68,6 +71,8 @@ def _payload(context: RunContext) -> Dict[str, Any]:
         "lookback_hours": context.lookback_hours,
         "lookback_days": context.lookback_days,
         "records": records,
+        "analysis_period": context.metrics.get("analysis_period", {}),
+        "excluded_period_records": [_event_row(event) for event in context.excluded_period_events],
         "events": records,
         "processing_summary": context.processing_summary,
         "connector_coverage": context.connector_coverage,
@@ -85,7 +90,8 @@ def _payload(context: RunContext) -> Dict[str, Any]:
         "decisions": context.decisions,
         "semantic_registry_version": get_term_registry().version,
         "claim_evidence_model_version": context.claim_evidence_model_version,
-    }
+        "multidomain_intelligence": context.multidomain_intelligence,
+    })
 
 
 def _event_row(event: Any) -> Dict[str, Any]:
@@ -123,6 +129,39 @@ def _event_row(event: Any) -> Dict[str, Any]:
         "tags": ",".join(data.get("tags") or []),
         "evidence_url": data.get("evidence_url"),
         "observed_at": data.get("observed_at"),
+        "published_at": str(publication_date(data) or ""),
+        "publication_date_status": "available" if publication_date(data) else "unavailable",
+        "primary_technology_domain": data.get("primary_technology_domain"),
+        "technology_domains": ",".join(data.get("technology_domains") or []),
+        "technology_domain_confidence": data.get("technology_domain_confidence"),
+        "technology_domain_basis": ",".join(data.get("technology_domain_basis") or []),
+        "analysis_domains": ",".join(data.get("analysis_domains") or []),
+        "asset_class": data.get("asset_class"),
+        "vendor": data.get("vendor"),
+        "product": data.get("product"),
+        "model": data.get("model"),
+        "firmware": data.get("firmware"),
+        "version": data.get("version"),
+        "cpe": data.get("cpe"),
+        "protocols": ",".join(data.get("protocols") or []),
+        "public_observation_type": data.get("public_observation_type"),
+        "public_attribution_status": data.get("public_attribution_status"),
+        "attribution_score": data.get("attribution_score"),
+        "attribution_basis": ",".join(data.get("attribution_basis") or []),
+        "first_seen": data.get("first_seen"),
+        "last_seen": data.get("last_seen"),
+        "freshness_status": data.get("freshness_status"),
+        "framework_refs": ",".join(data.get("framework_refs") or []),
+        "technique_refs": ",".join(data.get("technique_refs") or []),
+        "scenario_refs": ",".join(data.get("scenario_refs") or []),
+        "fraud_refs": ",".join(data.get("fraud_refs") or []),
+        "limitations": " | ".join(data.get("limitations") or []),
+        "public_capability_id": data.get("public_capability_id"),
+        "public_capability_label": data.get("public_capability_label"),
+        "public_source_class": data.get("public_source_class"),
+        "public_evidence_id": data.get("public_evidence_id"),
+        "original_publisher": data.get("original_publisher"),
+        "original_artifact_url": data.get("original_artifact_url"),
         "data_mode": "real" if not data.get("demo") else "demo",
     }
 
@@ -161,6 +200,39 @@ def _write_events_csv(path: Path, rows: List[Dict[str, Any]]) -> None:
         "tags",
         "evidence_url",
         "observed_at",
+        "published_at",
+        "publication_date_status",
+        "primary_technology_domain",
+        "technology_domains",
+        "technology_domain_confidence",
+        "technology_domain_basis",
+        "analysis_domains",
+        "asset_class",
+        "vendor",
+        "product",
+        "model",
+        "firmware",
+        "version",
+        "cpe",
+        "protocols",
+        "public_observation_type",
+        "public_attribution_status",
+        "attribution_score",
+        "attribution_basis",
+        "first_seen",
+        "last_seen",
+        "freshness_status",
+        "framework_refs",
+        "technique_refs",
+        "scenario_refs",
+        "fraud_refs",
+        "limitations",
+        "public_capability_id",
+        "public_capability_label",
+        "public_source_class",
+        "public_evidence_id",
+        "original_publisher",
+        "original_artifact_url",
         "data_mode",
         "claim_ids",
         "semantic_registry_version",

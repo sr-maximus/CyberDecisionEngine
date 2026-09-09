@@ -29,7 +29,8 @@ class SpiderFootCollector(Collector):
         self.endpoint = endpoint.rstrip("/")
         self.enabled = enabled
         self.max_records = max(1, int(max_records))
-        self.timeout_seconds = max(0.0, float(timeout_seconds))
+        self.timeout_seconds = min(86400.0, max(1.0, float(timeout_seconds) or 86400.0))
+        self.partial_events: List[ThreatEvent] = []
         self.max_threads = max(1, min(8, int(max_threads)))
         self.include_raw = include_raw
         self.depth = depth if depth in {"standard", "deep"} else "deep"
@@ -40,20 +41,18 @@ class SpiderFootCollector(Collector):
         if not self.domains:
             return CollectionResult(SourceStatus(name=self.name, status="skipped", records=0, mode="real", warning="No domains configured."), [])
         try:
-            request_timeout = (
-                httpx.Timeout(None, connect=10.0)
-                if self.timeout_seconds <= 0
-                else httpx.Timeout(self.timeout_seconds + 12.0, connect=10.0)
-            )
+            request_timeout = httpx.Timeout(self.timeout_seconds + 30.0, connect=10.0)
             async with httpx.AsyncClient(timeout=request_timeout) as client:
                 health = await client.get(f"{self.endpoint}/health", timeout=10.0)
                 health.raise_for_status()
                 payload = {"domains": [], "warnings": []}
                 semaphore = asyncio.Semaphore(2)
-                results = await asyncio.gather(*[self._scan_domain(client, semaphore, domain) for domain in self.domains])
-                for domain_payload in results:
+                async def collect_domain(domain: str) -> None:
+                    domain_payload = await self._scan_domain(client, semaphore, domain)
                     payload["domains"].extend(domain_payload.get("domains") or [])
                     payload["warnings"].extend(domain_payload.get("warnings") or [])
+                    self.partial_events = _events_from_payload(payload, self.max_records)
+                await asyncio.gather(*(collect_domain(domain) for domain in self.domains))
         except Exception as exc:  # pragma: no cover - sidecar/network dependent
             return CollectionResult(
                 SourceStatus(name=self.name, status="skipped", records=0, mode="real", warning=f"Inventario pasivo no disponible: {exc}"),
