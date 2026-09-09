@@ -1,7 +1,7 @@
 # CyberDecisionEngine
 
 CyberDecisionEngine es el motor defensivo de ciberinteligencia, evidencia,
-decisión y riesgo creado por **Edwin Javier Peñuela Camacho**. Es la
+decisión y riesgo creado por **Edwin Peñuela **. Es la
 implementación de referencia viva de **P-CIDER v1.0** (Peñuela Cyber
 Intelligence Decision, Evidence & Risk Model), construido a partir de su
 investigación, arquitectura, metodología y modelos propios.
@@ -224,8 +224,7 @@ La app incluye una capa de gobierno preparada para evolucionar a SaaS/licenciami
 - Bitacora: registra arranque del control plane y cambios de empresa, licencia, usuario, estado y acceso.
 
 Las credenciales locales de laboratorio no se publican en el repositorio. Deben
-solicitarse al propietario en
-[edwinjavpenuela@gmail.com](mailto:edwinjavpenuela@gmail.com) y entregarse por un
+solicitarse al propietario y entregarse por un
 canal seguro. El repositorio y la interfaz no incluyen usuarios, contraseñas ni
 hashes predeterminados.
 
