@@ -1,7 +1,7 @@
 # CyberDecisionEngine
 
 CyberDecisionEngine es el motor defensivo de ciberinteligencia, evidencia,
-decisión y riesgo creado por **Edwin Peñuela **. Es la
+decisión y riesgo creado por **Edwin Peñuela**. Es la
 implementación de referencia viva de **P-CIDER v1.0** (Peñuela Cyber
 Intelligence Decision, Evidence & Risk Model), construido a partir de su
 investigación, arquitectura, metodología y modelos propios.
