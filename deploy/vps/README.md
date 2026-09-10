@@ -30,6 +30,7 @@ flowchart LR
   rotados. No se monta el socket Docker. PostgreSQL mantiene su volumen propio.
 - `operator.yml` exige contraseña HTTP Basic en el servidor para aplicación,
   API, informes y bootstrap. Solo `/healthz` es público y devuelve `ok` estático.
+  Se rechazan solicitudes de navegador con origen externo.
   HTTP recorre el túnel SSH cifrado; no se ofrece HTTP ni HTTPS público.
 - La identidad `superadmin` inicializa la interfaz local existente. Nginx y SSH
   son los controles efectivos de acceso. **No hay SSO/MFA, autorización por
