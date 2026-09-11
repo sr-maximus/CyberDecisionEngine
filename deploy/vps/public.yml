@@ -1,0 +1,20 @@
+# Apply after compose.yml and operator.yml. The public TLS edge runs on the host.
+services:
+  api:
+    environment:
+      CDE_AUTH_ENABLED: "true"
+      CDE_PUBLIC_ORIGIN: ${CDE_PUBLIC_ORIGIN:?Set a verified HTTPS origin}
+      CDE_AUTH_USERS_FILE: /run/secrets/auth_users.json
+      CDE_AUTH_STATE_FILE: /app/data/auth-sessions.sqlite
+      # Only Nginx connects through this isolated application network. The edge
+      # replaces forwarded IPs; public callers cannot reach the API directly.
+      FORWARDED_ALLOW_IPS: ${CDE_PROXY_SUBNET:?Set the isolated application subnet}
+    secrets:
+      - source: auth_users
+        target: auth_users.json
+  web:
+    volumes: !override
+      - ./nginx.public.conf:/etc/nginx/conf.d/default.conf:ro
+secrets:
+  auth_users:
+    file: ${CDE_SECRET_DIR:?Set CDE_SECRET_DIR}/auth_users.json

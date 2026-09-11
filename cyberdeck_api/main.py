@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import Request as HTTPRequest
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -27,6 +28,7 @@ from cyberdeck.cti.knowledge import rollback_knowledge_source
 from cyberdeck.settings import PROJECT_ROOT
 from cyberdeck.methodology import load_methodology_registry
 from cyberdeck_api.attack_surface import build_attack_surface
+from cyberdeck_api.auth import AuthMiddleware
 from cyberdeck_api.ai_orchestration import (
     CHAT_PROMPT_VERSION,
     ai_orchestration_config,
@@ -145,6 +147,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+app.add_middleware(AuthMiddleware)
 
 reports_dir = PROJECT_ROOT / "reports"
 reports_dir.mkdir(parents=True, exist_ok=True)
@@ -153,6 +156,15 @@ app.mount("/reports", StaticFiles(directory=str(reports_dir), html=True), name="
 
 def _report_download_url(relative_path: str) -> str:
     return f"/api/reports/{relative_path}/download"
+
+
+def _authenticated_actor(request: HTTPRequest, legacy_actor: str | None) -> str | None:
+    if os.environ.get("CDE_AUTH_ENABLED", "false").lower() != "true":
+        return legacy_actor
+    actor = getattr(request.state, "auth_user", None)
+    if not actor or not actor.get("username"):
+        raise HTTPException(status_code=401, detail="Authenticated identity is required.")
+    return actor["username"]
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -166,7 +178,11 @@ async def methodologies() -> Dict[str, Any]:
 
 
 @app.post("/api/analysis", response_model=RunRecord, status_code=202)
-async def create_analysis(request: DomainAnalysisRequest) -> RunRecord:
+async def create_analysis(request: DomainAnalysisRequest, http_request: HTTPRequest) -> RunRecord:
+    if (request.report_display_at
+            and os.environ.get("CDE_AUTH_ENABLED", "false").lower() == "true"
+            and getattr(http_request.state, "auth_user", {}).get("role") != "super_admin"):
+        raise HTTPException(status_code=403, detail="Only the administrator may override report_display_at.")
     try:
         return await store.create_run(request)
     except PermissionError as exc:
@@ -296,11 +312,11 @@ async def monitoring_overview() -> MonitoringOverview:
 
 
 @app.post("/api/monitoring/profiles", response_model=MonitoringProfile, status_code=201)
-async def create_monitoring_profile(request: MonitoringProfileRequest) -> MonitoringProfile:
+async def create_monitoring_profile(request: MonitoringProfileRequest, http_request: HTTPRequest) -> MonitoringProfile:
     if not request.request.authorized_scope:
         raise HTTPException(status_code=403, detail="Monitoring requires authorized_scope=true.")
     try:
-        return await monitoring_store.create_profile(request)
+        return await monitoring_store.create_profile(request.model_copy(update={"created_by": _authenticated_actor(http_request, request.created_by)}))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -316,35 +332,35 @@ async def update_monitoring_profile(
 
 
 @app.patch("/api/monitoring/alerts/{alert_id}", response_model=MonitoringAlert)
-async def update_monitoring_alert(alert_id: str, request: MonitoringAlertUpdate) -> MonitoringAlert:
-    alert = await monitoring_store.update_alert_status(alert_id, request.status, user=request.user)
+async def update_monitoring_alert(alert_id: str, request: MonitoringAlertUpdate, http_request: HTTPRequest) -> MonitoringAlert:
+    alert = await monitoring_store.update_alert_status(alert_id, request.status, user=_authenticated_actor(http_request, request.user))
     if alert is None:
         raise HTTPException(status_code=404, detail="Monitoring alert not found.")
     return alert
 
 
 @app.post("/api/support/tickets", response_model=SupportTicket, status_code=201)
-async def create_support_ticket(request: SupportTicketRequest) -> SupportTicket:
-    return await monitoring_store.create_support_ticket(request)
+async def create_support_ticket(request: SupportTicketRequest, http_request: HTTPRequest) -> SupportTicket:
+    return await monitoring_store.create_support_ticket(request.model_copy(update={"user": _authenticated_actor(http_request, request.user)}))
 
 
 @app.patch("/api/support/tickets/{ticket_id}", response_model=SupportTicket)
-async def update_support_ticket(ticket_id: str, request: SupportTicketUpdate) -> SupportTicket:
-    ticket = await monitoring_store.update_support_ticket(ticket_id, request)
+async def update_support_ticket(ticket_id: str, request: SupportTicketUpdate, http_request: HTTPRequest) -> SupportTicket:
+    ticket = await monitoring_store.update_support_ticket(ticket_id, request.model_copy(update={"user": _authenticated_actor(http_request, request.user)}))
     if ticket is None:
         raise HTTPException(status_code=404, detail="Support ticket not found.")
     return ticket
 
 
 @app.post("/api/platform/logs", response_model=PlatformLogEntry, status_code=201)
-async def create_platform_log(entry: PlatformLogEntry) -> PlatformLogEntry:
+async def create_platform_log(entry: PlatformLogEntry, http_request: HTTPRequest) -> PlatformLogEntry:
     return await monitoring_store.record_log(
         entry.level,
         entry.component,
         entry.message,
         run_id=entry.run_id,
         profile_id=entry.profile_id,
-        user=entry.user,
+        user=_authenticated_actor(http_request, entry.user),
     )
 
 
@@ -641,6 +657,9 @@ async def _cti_for_run(run_id: str) -> Dict[str, Any]:
 
 
 def _require_cti_admin_key(provided: str | None) -> None:
+    if os.environ.get("CDE_AUTH_ENABLED", "false").lower() == "true":
+        # Public-mode middleware has already required a server super_admin session and CSRF.
+        return
     configured = os.getenv("CDE_ADMIN_API_KEY", "").strip()
     if not configured:
         raise HTTPException(
@@ -784,10 +803,10 @@ async def get_run_evidence(run_id: str) -> Response:
 
 
 @app.patch("/api/runs/{run_id}/evidence", response_model=RunRecord)
-async def review_run_evidence_batch(run_id: str, request: EvidenceReviewBatchRequest) -> Response:
+async def review_run_evidence_batch(run_id: str, request: EvidenceReviewBatchRequest, http_request: HTTPRequest) -> Response:
     try:
         run = await store.review_evidence_batch(
-            run_id, [review.model_dump() for review in request.reviews]
+            run_id, [{**review.model_dump(), "reviewer": _authenticated_actor(http_request, review.reviewer)} for review in request.reviews]
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -803,13 +822,14 @@ async def review_run_evidence(
     run_id: str,
     evidence_id: str,
     request: EvidenceReviewRequest,
+    http_request: HTTPRequest,
 ) -> RunRecord:
     try:
         run = await store.review_evidence(
             run_id,
             evidence_id,
             request.status,
-            request.reviewer,
+            _authenticated_actor(http_request, request.reviewer),
             request.reason,
         )
     except ValueError as exc:

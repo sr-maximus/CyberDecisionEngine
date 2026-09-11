@@ -66,7 +66,8 @@ def test_public_access_instructions_require_direct_contact():
 
     assert 'const ACCESS_REQUEST_URL = `mailto:${ACCESS_REQUEST_EMAIL}' in login_source
     assert "edwinjavpenuela@gmail.com" in login_source
-    assert "edwinjavpenuela@gmail.com" in readme
+    # Public documentation routes access through the owner without publishing
+    # personal contact details; the application retains its contact action.
     assert "solicitarse al propietario" in readme.lower()
     assert "no incluyen usuarios, contraseñas ni" in readme.lower()
 

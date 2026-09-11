@@ -29,6 +29,7 @@ import type {
   ViewKey
 } from "./types";
 
+import { serverCsrfToken } from "./data/serverAuth";
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export function apiUrl(path: string): string {
@@ -39,10 +40,12 @@ export function apiUrl(path: string): string {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    ...options
+    ...options,
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": serverCsrfToken(), ...options?.headers }
   });
   if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event("cde:session-expired"));
     const payload = await response.json().catch(() => ({ detail: response.statusText }));
     const detail = Array.isArray(payload.detail) ? payload.detail[0]?.msg : payload.detail;
     throw new Error(detail || `Request failed: ${response.status}`);
@@ -225,6 +228,8 @@ export function getAttackSurface(domains: string[], competitors: string[] = []):
 export async function runEmployeeRiskAnalysis(formData: FormData): Promise<EmployeeRiskRunResponse> {
   const response = await fetch(`${API_BASE}/api/employee-risk/analyze`, {
     method: "POST",
+    credentials: "same-origin",
+    headers: { "X-CSRF-Token": serverCsrfToken() },
     body: formData
   });
   if (!response.ok) {

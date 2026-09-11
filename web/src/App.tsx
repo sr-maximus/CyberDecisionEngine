@@ -4,6 +4,7 @@ import { createAnalysis, deleteReport, generateRunReport, getLicensingOverview, 
 import { ALL_CONTINENTS, ALL_COUNTRIES, ALL_SECTORS, countriesFor, economicSectors, selectedWithoutAll } from "./data/catalog";
 import { DEFAULT_ANALYSIS_WINDOW, analysisWindowConfig } from "./data/analysisWindows";
 import { clearSession, loadUsers, readSession, saveUsers, sessionPolicyForUser, touchSession, writeSession } from "./data/auth";
+import { authMode, serverSession, serverLogout } from "./data/serverAuth";
 import { AppShell } from "./components/AppShell";
 import { EvidenceLedger } from "./components/EvidenceLedger";
 import { evidenceReviews } from "./utils/evidenceReviewQueue";
@@ -328,8 +329,11 @@ export function App() {
   const [riskContext, setRiskContext] = useState<RiskContextDraft>(emptyRiskContext);
   const [hasTouchedDomains, setHasTouchedDomains] = useState(false);
   const [scopeDefaultMessage, setScopeDefaultMessage] = useState<string | null>(null);
-  const [users, setUsers] = useState<LocalUser[]>(() => loadUsers());
-  const [sessionUserId, setSessionUserId] = useState<string | null>(() => readSession()?.userId ?? null);
+  const [users, setUsers] = useState<LocalUser[]>([]);
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [serverMode, setServerMode] = useState<boolean | null>(null);
+  const [serverUser, setServerUser] = useState<LocalUser | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => (window.localStorage.getItem("cyberdecision.theme") as ThemeMode | null) ?? "light");
   const [language, setLanguage] = useState<LanguageMode>(() => (window.localStorage.getItem("cyberdecision.language") as LanguageMode | null) ?? "es");
@@ -359,7 +363,34 @@ export function App() {
     return () => { unsubscribe(); window.removeEventListener("beforeunload", warnUnsaved); };
   }, []);
 
-  const currentUser = useMemo(() => users.find((user) => user.id === sessionUserId) ?? null, [sessionUserId, users]);
+  useEffect(() => {
+    let disposed = false;
+    authMode().then(async (enabled) => {
+      const user = enabled ? await serverSession() : null;
+      if (disposed) return;
+      if (enabled) {
+        clearSession();
+        setServerUser(user);
+      } else {
+        setUsers(loadUsers());
+        setSessionUserId(readSession()?.userId ?? null);
+      }
+      setServerMode(enabled);
+    }).catch((exc) => { if (!disposed) setAuthError(String(exc.message || exc)); });
+    return () => { disposed = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!serverMode) return;
+    const expire = () => {
+      setServerUser(null); setRuns([]); setReports([]); setSelectedRunId(null);
+      setSessionNotice("La sesión venció. Ingresa nuevamente.");
+    };
+    window.addEventListener("cde:session-expired", expire);
+    return () => window.removeEventListener("cde:session-expired", expire);
+  }, [serverMode]);
+
+  const currentUser = useMemo(() => serverMode === null ? null : serverMode ? serverUser : users.find((user) => user.id === sessionUserId) ?? null, [serverMode, serverUser, sessionUserId, users]);
   const domains = useMemo(() => parseDomains(rawDomains), [rawDomains]);
   const competitorDomains = useMemo(() => parseDomains(rawCompetitorDomains), [rawCompetitorDomains]);
   const reusableScopeProfile = useMemo(() => {
@@ -389,13 +420,22 @@ export function App() {
   const countryOptions = useMemo(() => countriesFor([ALL_CONTINENTS]), []);
 
   function handleLogin(user: LocalUser) {
+    if (serverMode) {
+      setServerUser(user); setSessionNotice(null); setActiveView("dashboards");
+      return;
+    }
     writeSession(user.id);
     setSessionUserId(user.id);
     if (user.mustChangePassword) setActiveView("settings");
     setSessionNotice(null);
   }
 
-  function handleLogout(reason?: "expired" | "manual") {
+  async function handleLogout(reason?: "expired" | "manual") {
+    if (serverMode) {
+      try { await serverLogout(); }
+      catch (exc) { setError(exc instanceof Error ? exc.message : "No se pudo cerrar la sesión."); return; }
+      setServerUser(null); setRuns([]); setReports([]);
+    }
     clearSession();
     setSessionUserId(null);
     setSelectedRunId(null);
@@ -488,7 +528,7 @@ export function App() {
   }, [currentUser, sessionUserId]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || serverMode) return;
     let lastTouch = 0;
     const expire = () => handleLogout("expired");
     const checkSession = () => {
@@ -512,10 +552,10 @@ export function App() {
       document.removeEventListener("visibilitychange", checkSession);
       window.clearInterval(timer);
     };
-  }, [currentUser?.id, language]);
+  }, [currentUser?.id, language, serverMode]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || serverMode) return;
     let disposed = false;
     getLicensingOverview()
       .then((overview) => {
@@ -556,7 +596,7 @@ export function App() {
     return () => {
       disposed = true;
     };
-  }, [currentUser?.username]);
+  }, [currentUser?.username, serverMode]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -943,6 +983,12 @@ export function App() {
     }
     if (activeView === "help" && currentUser) return <UsageGuideView language={language} role={currentUser.role} />;
     if (activeView === "settings" && currentUser) {
+      if (serverMode) return <section className="panel"><h2>Administración del acceso público</h2>
+        <p>Sesión de {currentUser.username}. El servidor valida las cuentas, permisos y contraseñas.</p>
+        <p>El operador puede consultar y ejecutar análisis autorizados en este espacio compartido. Solo el administrador puede administrar la plataforma.</p>
+        <p>Para crear, revocar o cambiar credenciales, utiliza el procedimiento de administración entregado con el servidor. Los usuarios locales del navegador no modifican el acceso público.</p>
+        <p>La sesión vence después de 30 minutos sin peticiones o de 8 horas desde el ingreso.</p>
+      </section>;
       return (
         <SettingsView
           currentUser={currentUser}
@@ -989,6 +1035,7 @@ export function App() {
     );
   }
 
+  if (serverMode === null) return <main className="panel"><h1>CyberDecisionEngine</h1><p>{authError ?? "Comprobando acceso seguro…"}</p>{authError && <button onClick={() => window.location.reload()}>Reintentar</button>}</main>;
   if (!currentUser) {
     return (
       <LoginView
@@ -1000,6 +1047,7 @@ export function App() {
         onLogin={handleLogin}
         onUsersChange={handleUsersChange}
         sessionMessage={sessionNotice}
+        serverMode={serverMode}
       />
     );
   }

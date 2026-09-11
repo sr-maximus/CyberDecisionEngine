@@ -1,5 +1,9 @@
 # CyberDecisionEngine en VPS privado
 
+Para acceso con usuario y contraseña desde cualquier navegador por HTTPS,
+consultar el [perfil público protegido](PUBLIC.md). Este documento describe
+el perfil privado por túnel SSH.
+
 Perfil para **un único operador de confianza**: Ubuntu 24.04 LTS x86-64,
 Docker Engine del repositorio oficial y Compose 2.24.4 o posterior (incluye v5).
 Conservar el sistema de un VPS existente; esta configuración no reinstala discos.

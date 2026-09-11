@@ -6,6 +6,13 @@ set -euo pipefail
 cd /opt/cde/app
 install -d -m 700 /etc/cde/secrets /var/backups/cde
 printf 'CDE_SECRET_DIR=/etc/cde/secrets\nCDE_RELEASE=%s\n' "$CDE_RELEASE" > /etc/cde/deployment.env
+if [ -n "${CDE_PUBLIC_ORIGIN:-}" ]; then
+  [[ "$CDE_PUBLIC_ORIGIN" =~ ^https://[a-zA-Z0-9.-]+$ ]] || exit 1
+  printf 'CDE_PUBLIC_ORIGIN=%s\n' "$CDE_PUBLIC_ORIGIN" >> /etc/cde/deployment.env
+  : "${CDE_PROXY_SUBNET:?Set the isolated application subnet}"
+  [[ "$CDE_PROXY_SUBNET" =~ ^[0-9./]+$ ]] || exit 1
+  printf 'CDE_PROXY_SUBNET=%s\n' "$CDE_PROXY_SUBNET" >> /etc/cde/deployment.env
+fi
 chmod 600 /etc/cde/deployment.env
 if [ ! -f /etc/cde/secrets/backup-password ]; then umask 077; openssl rand -hex 32 > /etc/cde/secrets/backup-password; fi
 export RESTIC_REPOSITORY=/var/backups/cde/repository RESTIC_PASSWORD_FILE=/etc/cde/secrets/backup-password

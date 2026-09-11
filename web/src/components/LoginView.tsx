@@ -2,6 +2,7 @@ import { AlertTriangle, KeyRound, LockKeyhole, Mail, Moon, ShieldCheck, Sun, Use
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { authenticateUser, hashPassword, lockoutMinutes, verifyMfaCode } from "../data/auth";
+import { serverSession } from "../data/serverAuth";
 import type { LanguageMode, LocalUser, ThemeMode } from "../types";
 
 interface LoginViewProps {
@@ -13,6 +14,7 @@ interface LoginViewProps {
   onLogin: (user: LocalUser) => void;
   onUsersChange: (users: LocalUser[]) => void;
   sessionMessage?: string | null;
+  serverMode?: boolean;
 }
 
 const copy = {
@@ -101,7 +103,8 @@ export function LoginView({
   onThemeChange,
   onLogin,
   onUsersChange,
-  sessionMessage
+  sessionMessage,
+  serverMode = false
 }: LoginViewProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -132,6 +135,13 @@ export function LoginView({
       return;
     }
 
+    if (serverMode) {
+      try {
+        const user = await serverSession(username, password);
+        if (user) { setPassword(""); onLogin(user); }
+      } catch (exc) { setError(exc instanceof Error ? exc.message : labels.error); }
+      return;
+    }
     const result = await authenticateUser(users, username, password);
     onUsersChange(result.users);
     if (result.status === "success" && result.user) {
@@ -235,7 +245,7 @@ export function LoginView({
         </div>
         <span>{labels.eyebrow}</span>
         <h1>{labels.title}</h1>
-        <p>{labels.subtitle}</p>
+        <p>{serverMode ? (language === "es" ? "Acceso seguro para consultar informes y realizar análisis autorizados." : "Secure access to reports and authorized analysis.") : labels.subtitle}</p>
         <div className="login-value-grid">
           <div>
             <LockKeyhole size={18} />
@@ -245,7 +255,7 @@ export function LoginView({
           <div>
             <UserRound size={18} />
             <strong>{labels.roles}</strong>
-            <span>{labels.governance}</span>
+            <span>{serverMode ? (language === "es" ? "Identidad y permisos verificados por el servidor." : "Identity and permissions verified by the server.") : labels.governance}</span>
           </div>
         </div>
       </section>
